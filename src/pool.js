@@ -1,0 +1,491 @@
+// Pool, built like a game: a 7-foot table with real holes the heads fall through, physically based materials,
+// an overhead lamp with shadows, an orbit camera, an aiming guide, and sampled impact sounds.
+//
+// Physics: gravity is -z (the table normal). The felt is a triangle mesh with six circular holes; pocket wells sit
+// under the holes; cushions are segments with angled jaws. Felt friction gives slide-to-roll and spin behaviour
+// through Rapier's contact solver; rolling resistance (which Rapier lacks) is applied per step.
+// Scale: one head is a 57 mm ball, so 1 unit = 26 mm, g = 377, table 78 x 39 (7-foot bar table).
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+import { RAPIER, DEPTH, renderer, scene, camera, world, eventQueue, heads, lights, DEFAULT_LIGHTS, resetHeads, placeHead, hideHead,
+  setHeadRadius, addMesh, addBody, addStaticCollider, registerProp, clearProps, pointerToPlane, meshUnderPointer, ui } from './core.js';
+import { noiseBump, feltMap, woodMap, carpetMap, clothNormal, radialShadow, gradientStrip } from './textures.js';
+import { bakeCap, authenticBall } from './ballcaps.js';
+import { PoolAudio } from './sounds.js';
+import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
+
+const { R, G, MU_SLIDE, MU_BALL, E_BALL, HW, HH, RAIL_H, CUSH, POCKET_R } = P;   // table physics constants live in physics/poolphysics.js
+const MAX_PULL = 24, SPEED_PER_PULL = 75 / 8;   // speed grows with pull-back distance: 8 units = 1.9 m/s, 24 units = 5.8 m/s
+const FELT_Z = -DEPTH, BALL_Z = FELT_Z + R;
+const RAIL_W = 3.2, WELL_DEPTH = P.WELL_DEPTH;
+let cue, aiming = null, pockets = [], guide, cueStick, marker, pocketed = 0, shots = 0, spin = { x: 0, y: 0 }, spinEl, controls;
+let pocketedSet = new Set(), respotAt = 0, pmrem, envTex, feltCol, lastStatus = '', contactShadows = [], fixture = [], fixtureFade = [0, 1];
+const capped = new Map();   // head -> { plain, capped, ball } textures; caps are baked lazily once the plain map has loaded
+let capsOn = false;
+let ballStyle = localStorage.getItem('playful.ballStyle') || 'heads';   // 'heads' | 'balls'
+// The cue ball is always a plain white ball, and the plain black 8 sits at the centre of the rack. The 14 heads
+// take the other numbers (1-7 and 9-15). `extras` holds the two plain balls; `objects()` is the rack order.
+let extras = [];
+const rackIndexOfHead = (i) => (i < 4 ? i : i + 1);                 // the 8 occupies rack index 4 (centre of row 3)
+const objects = () => { const eight = extras.find((e) => e.number === 8); return [...heads.slice(0, 4), eight, ...heads.slice(4)].filter(Boolean); };
+const allBalls = () => [cue, ...objects()].filter(Boolean);
+// Orientation at rack time: a plain ball shows its number (bottom pole of the texture, local -y) upward; a head in
+// heads mode shows its face (texture centre, local +x) upward; a head in balls mode shows its number.
+// Both orientations end with a quarter turn about the table normal so that what should read as "up" (the crown of
+// a head, the top of a digit) points away from the cue ball (+x): a player at the head of the table sees faces and
+// numbers upright. Derivation: the crown is local +y; standing the face (local +x) up leaves +y pointing across the
+// table (+y world). A digit's top in the cap is the texture's u = 0.25 direction, local +z; standing the bottom pole
+// (local -y) up sends +z to world +y as well. Rz(-90 deg) then maps +y to +x.
+const TOWARD_FAR_RAIL = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
+const NUMBER_UP = TOWARD_FAR_RAIL.clone().multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1)));
+const FACE_UP = TOWARD_FAR_RAIL.clone().multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)));
+const rackRot = (ball) => { const q = (heads.includes(ball) && ballStyle === 'heads') ? FACE_UP : NUMBER_UP; return { x: q.x, y: q.y, z: q.z, w: q.w }; };
+const IDENTITY = { x: 0, y: 0, z: 0, w: 1 };
+const saved = {};
+
+// ---------- table ----------
+function build() {
+  clearProps();
+  const registerCollider = (c) => registerProp(c);
+  const rules = { friction: RAPIER.CoefficientCombineRule.Max, restitution: RAPIER.CoefficientCombineRule.Min };
+  pockets = pocketCenters();
+
+  // ---- felt with holes: visual slab + trimesh collider so heads really drop through ----
+  const shape = tableShape();
+  const feltGeo = new THREE.ExtrudeGeometry(shape, { depth: 1.2, bevelEnabled: false, curveSegments: 40 });
+  feltGeo.translate(0, 0, FELT_Z - 1.2);
+  const feltMat = new THREE.MeshPhysicalMaterial({
+    map: feltMap(512, 6, '#0a3820'), normalMap: clothNormal(512, 40), normalScale: new THREE.Vector2(0.45, 0.45),
+    roughness: 1.0, sheen: 0.18, sheenRoughness: 0.95, sheenColor: new THREE.Color('#2f8a55'), color: '#ffffff',
+  });
+  const slabWood = new THREE.MeshPhysicalMaterial({ map: woodMap(1024, 1, 11, ['#1f1007', '#2a170a', '#31200c', '#160b04']), roughness: 0.6, clearcoat: 0.15, clearcoatRoughness: 0.6, envMapIntensity: 0.08 });
+  const felt = addMesh(new THREE.Mesh(feltGeo, [feltMat, slabWood])); felt.receiveShadow = true;   // caps felt, sides wood
+  feltCol = feltCollider(world, FELT_Z); registerCollider(feltCol);
+
+  // ---- pocket wells: liner walls and a bottom, plus a leather rim ----
+  const liner = new THREE.MeshStandardMaterial({ color: '#3a2a1d', roughness: 0.9, side: THREE.BackSide, bumpMap: noiseBump(256, 4, 9), bumpScale: 0.4 });
+  const leather = new THREE.MeshStandardMaterial({ color: '#1e140c', roughness: 0.55, bumpMap: noiseBump(256, 3, 9), bumpScale: 0.35 });
+  for (const p of pockets) {
+    const cyl = addMesh(new THREE.Mesh(new THREE.CylinderGeometry(POCKET_R + 0.2, POCKET_R + 0.2, WELL_DEPTH, 32, 1, true).rotateX(Math.PI / 2), liner));
+    cyl.position.set(p.x, p.y, FELT_Z - WELL_DEPTH / 2 + 0.05);
+    const bottom = addMesh(new THREE.Mesh(new THREE.CircleGeometry(POCKET_R + 0.2, 32), new THREE.MeshStandardMaterial({ color: '#2b1f15', roughness: 1 })));
+    bottom.position.set(p.x, p.y, FELT_Z - WELL_DEPTH); bottom.receiveShadow = true;
+    const rim = addMesh(new THREE.Mesh(new THREE.TorusGeometry(POCKET_R + 0.12, 0.2, 10, 48), leather));
+    rim.position.set(p.x, p.y, FELT_Z + 0.02); rim.castShadow = true; rim.receiveShadow = true;
+    // pocket casting: a thick leather collar at rail height that covers the notch in the rails
+    const toward = Math.atan2(-p.y, -p.x);                          // direction from the pocket to the table centre
+    const arc = Math.abs(p.x) < 1 ? Math.PI * 1.05 : Math.PI * 1.35; // side pockets show less collar than corners
+    const casting = addMesh(new THREE.Mesh(new THREE.TorusGeometry(POCKET_R + 0.55, 0.5, 12, 40, arc), leather));
+    casting.position.set(p.x, p.y, FELT_Z + RAIL_H * 0.55); casting.rotation.z = toward + Math.PI - arc / 2;
+    casting.castShadow = true; casting.receiveShadow = true;
+  }
+  for (const c of pocketWellColliders(world, FELT_Z, true)) registerCollider(c);
+
+  // ---- cushions: each is a top-view polygon (nose edge on the playing line, ends angled into the pockets),
+  // extruded with a rounded top; the collider is the convex hull of the same polygon so the jaws exist in physics ----
+  const cushionMat = feltMat;
+  for (const pts of cushionPolygons()) {
+    const shape = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: RAIL_H - 0.3, bevelEnabled: true, bevelThickness: 0.3, bevelSize: 0.28, bevelSegments: 3 });
+    geo.translate(0, 0, FELT_Z - 0.02);
+    const m = addMesh(new THREE.Mesh(geo, cushionMat)); m.receiveShadow = true; m.castShadow = true;
+  }
+  cushionColliders(world, FELT_Z, true).forEach(registerCollider);
+  // ---- rails, diamonds, apron, legs: dark walnut with a satin finish ----
+  const walnut = ['#1f1007', '#2a170a', '#31200c', '#160b04'];   // dark walnut
+  const woodTex = (seed, rx, ry, rot = 0) => { const t = woodMap(1024, 1, seed, walnut); t.repeat.set(rx, ry); t.rotation = rot; t.center.set(0.5, 0.5); return t; };
+  const wood = (seed, rx, ry, rot) => new THREE.MeshPhysicalMaterial({ map: woodTex(seed, rx, ry, rot), roughness: 0.6, clearcoat: 0.15, clearcoatRoughness: 0.6, metalness: 0, envMapIntensity: 0.08 });   // satin; the environment carries the lamp at high intensity and would mirror it as a streak along the rounded edges
+  const railLong = wood(11, 4, 0.3), railShort = wood(12, 0.3, 2, Math.PI / 2), apronWood = wood(13, 4, 0.5), apronWoodEnd = wood(13, 2, 0.5, Math.PI / 2), legWood = wood(14, 0.4, 1.2, Math.PI / 2);
+  const rail = (w, h, x, y, mat) => {
+    const sh = new THREE.Shape([new THREE.Vector2(-w / 2, -h / 2), new THREE.Vector2(w / 2, -h / 2), new THREE.Vector2(w / 2, h / 2), new THREE.Vector2(-w / 2, h / 2)]);
+    // ExtrudeGeometry bevels both ends; the rail is sunk so the bottom chamfer sits inside the apron instead of
+    // catching the lamp as a bright line along the base.
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: RAIL_H + 1.5, bevelEnabled: true, bevelThickness: 0.5, bevelSize: 0.45, bevelSegments: 5 });
+    const m = addMesh(new THREE.Mesh(geo, mat)); m.position.set(x, y, FELT_Z - 1.5); m.receiveShadow = true; m.castShadow = true;
+  };
+  const ox = HW + CUSH + RAIL_W, oy = HH + CUSH + RAIL_W;
+  for (const sy of [-1, 1]) rail(ox * 2, RAIL_W, 0, sy * (HH + CUSH + RAIL_W / 2), railLong);
+  for (const sx of [-1, 1]) rail(RAIL_W, (HH + CUSH) * 2, sx * (HW + CUSH + RAIL_W / 2), 0, railShort);
+  // sight diamonds: inlaid rhombi, long axis across the rail (pointing at the playing surface), flush with the top
+  const pearl = new THREE.MeshPhysicalMaterial({ color: '#efe6d6', roughness: 0.25, clearcoat: 0.6, clearcoatRoughness: 0.2, iridescence: 0.35, iridescenceIOR: 1.3 });
+  const railTop = FELT_Z - 1.5 + RAIL_H + 1.5 + 0.5;   // extrude depth plus the top bevel
+  const rhombus = (longAxis, shortAxis) => new THREE.Shape([new THREE.Vector2(longAxis / 2, 0), new THREE.Vector2(0, shortAxis / 2), new THREE.Vector2(-longAxis / 2, 0), new THREE.Vector2(0, -shortAxis / 2)]);
+  const diamondAcross = new THREE.ExtrudeGeometry(rhombus(0.5, 1.1), { depth: 0.06, bevelEnabled: false });   // long axis along y: for the long rails
+  const diamondAlong = new THREE.ExtrudeGeometry(rhombus(1.1, 0.5), { depth: 0.06, bevelEnabled: false });    // long axis along x: for the short rails
+  for (let i = 1; i < 8; i++) if (i !== 4) for (const sy of [-1, 1]) { const d = addMesh(new THREE.Mesh(diamondAcross, pearl)); d.position.set(-HW + (i / 4) * HW, sy * (HH + CUSH + RAIL_W / 2), railTop - 0.03); }
+  for (let i = 1; i < 4; i++) for (const sx of [-1, 1]) { const d = addMesh(new THREE.Mesh(diamondAlong, pearl)); d.position.set(sx * (HW + CUSH + RAIL_W / 2), -HH + (i / 2) * HH, railTop - 0.03); }
+  // apron with a moulding line and a lower lip
+  const apronH = 4.2, apronZ = FELT_Z - 1.2 - apronH / 2;
+  for (const sy of [-1, 1]) { const a = addMesh(new THREE.Mesh(new THREE.BoxGeometry(ox * 2, 1.2, apronH), apronWood)); a.position.set(0, sy * (oy - 0.6), apronZ); a.castShadow = true; a.receiveShadow = true; }
+  for (const sx of [-1, 1]) { const a = addMesh(new THREE.Mesh(new THREE.BoxGeometry(1.2, oy * 2, apronH), apronWoodEnd)); a.position.set(sx * (ox - 0.6), 0, apronZ); a.castShadow = true; a.receiveShadow = true; }
+  const mouldMat = new THREE.MeshPhysicalMaterial({ color: '#1a0d05', roughness: 0.6, clearcoat: 0.15, clearcoatRoughness: 0.6, envMapIntensity: 0.08 });
+  for (const [w, h, x, y] of [[ox * 2 + 0.4, 0.5, 0, oy], [ox * 2 + 0.4, 0.5, 0, -oy], [0.5, oy * 2 + 0.4, ox, 0], [0.5, oy * 2 + 0.4, -ox, 0]]) {
+    const m1 = addMesh(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.35), mouldMat)); m1.position.set(x, y, FELT_Z - 1.2 - 1.3);    // moulding line
+    const m2 = addMesh(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.5), mouldMat)); m2.position.set(x, y, FELT_Z - 1.2 - apronH + 0.25);  // lower lip
+  }
+  // tapered square legs with a foot block
+  const legH = 24, legTop = FELT_Z - 1.2 - apronH;
+  const legGeo = new THREE.CylinderGeometry(1.6, 2.4, legH, 4, 1).rotateX(Math.PI / 2).rotateZ(Math.PI / 4);   // square section, wider at the top
+  const footGeo = new THREE.BoxGeometry(3.6, 3.6, 1.2);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    const l = addMesh(new THREE.Mesh(legGeo, legWood)); l.position.set(sx * (HW - 3), sy * (HH - 1), legTop - legH / 2); l.castShadow = true; l.receiveShadow = true;
+    const f = addMesh(new THREE.Mesh(footGeo, mouldMat)); f.position.set(sx * (HW - 3), sy * (HH - 1), legTop - legH + 0.6);
+  }
+  for (const c of backstopColliders(world, FELT_Z)) registerCollider(c);   // nothing leaves the table area even on a jump
+
+  // ---- room: dark walls with a baseboard, dark carpet, and the lamp fixture in frame ----
+  const floorZ = FELT_Z - 1.2 - 4 - 24;
+  const floor = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshStandardMaterial({ map: carpetMap(512, 30, '#121014'), roughness: 1 })));
+  floor.position.z = floorZ; floor.receiveShadow = true;
+  const wallMat = new THREE.MeshStandardMaterial({ color: '#121116', roughness: 1, side: THREE.DoubleSide });
+  const baseMat = new THREE.MeshStandardMaterial({ color: '#0d0c0f', roughness: 0.7 });
+  // Stand each wall up (X), then turn it about the world vertical so it faces the room; a plain Euler with
+  // the default XYZ order would spin it about its own normal instead.
+  for (const [x, y, rz] of [[0, 160, 0], [0, -160, Math.PI], [160, 0, -Math.PI / 2], [-160, 0, Math.PI / 2]]) {
+    const w = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(320, 140), wallMat)); w.position.set(x, y, floorZ + 70);
+    w.rotation.set(Math.PI / 2, 0, 0); w.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), rz); w.receiveShadow = true;
+    const b = addMesh(new THREE.Mesh(new THREE.BoxGeometry(320, 0.6, 2.2), baseMat)); b.position.set(x, y, floorZ + 1.1); b.rotation.z = rz;
+  }
+  const LAMP_Z = FELT_Z + 23;
+  const shade = addMesh(new THREE.Mesh(new THREE.BoxGeometry(46, 12, 2.4), new THREE.MeshStandardMaterial({ color: '#12301f', roughness: 0.45, metalness: 0.35, transparent: true })));
+  shade.position.set(0, 0, LAMP_Z + 1.2); shade.castShadow = false;
+  const panel = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(44, 10), new THREE.MeshStandardMaterial({ color: '#fff2d6', emissive: '#fff0c8', emissiveIntensity: 2.5, transparent: true })));
+  panel.position.set(0, 0, LAMP_Z - 0.05); panel.rotation.x = Math.PI;
+  fixture = [shade, panel];
+  for (const x of [-16, 0, 16]) { const w = addMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 60), new THREE.MeshStandardMaterial({ color: '#222', transparent: true }))); w.rotation.x = Math.PI / 2; w.position.set(x, 0, LAMP_Z + 32); fixture.push(w); }
+  fixtureFade = [LAMP_Z - 7, LAMP_Z - 2];   // camera heights between which the fixture fades out so it never blocks a top-down view
+
+  // ---- lights: soft panel for the look, spotlight for shadows, tight enough that the floor falls into shadow ----
+  const area = addMesh(new THREE.RectAreaLight('#fff1d0', 1.6, 44, 10)); area.position.set(0, 0, LAMP_Z); area.lookAt(0, 0, FELT_Z);
+  const spot = addMesh(new THREE.SpotLight('#fff3dc', 1000, 0, Math.PI / 3.1, 0.7, 2)); spot.position.set(0, 0, LAMP_Z);
+  spot.target.position.set(0, 0, FELT_Z); addMesh(spot.target);
+  spot.castShadow = true; spot.shadow.mapSize.set(2048, 2048); spot.shadow.bias = -0.0004; spot.shadow.normalBias = 0.02; spot.shadow.camera.near = 5; spot.shadow.camera.far = 80;
+
+  // ---- contact shadows under the balls, and occlusion strips where the cushions meet the felt ----
+  const shadowTex = radialShadow();
+  contactShadows = [...heads, { id: 'cue' }, { id: 'ball8' }].map(() => { const m = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(R * 2.6, R * 2.6), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, opacity: 0.55 }))); m.visible = false; return m; });
+  const stripTex = gradientStrip();
+  const strip = (len, x, y, rotZ) => {
+    const m = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(0.9, len), new THREE.MeshBasicMaterial({ map: stripTex, transparent: true, depthWrite: false, opacity: 0.8 })));
+    m.position.set(x, y, FELT_Z + 0.012); m.rotation.z = rotZ;
+  };
+  for (const sy of [-1, 1]) strip(HW * 2, 0, sy * (HH - 0.45), sy > 0 ? -Math.PI / 2 : Math.PI / 2);
+  for (const sx of [-1, 1]) strip(HH * 2, sx * (HW - 0.45), 0, sx > 0 ? Math.PI : 0);
+
+  // ---- plain balls: the white cue ball (0) and the black 8, so the 14 heads plus one make a full rack ----
+  extras = [0, 8].map((n) => {
+    const mat = new THREE.MeshPhysicalMaterial({ map: authenticBall(n), roughness: 0.32, clearcoat: 0.6, clearcoatRoughness: 0.2, envMapIntensity: 1.4 });
+    const mesh = new THREE.Mesh(heads[0].mesh.geometry, mat); mesh.scale.setScalar(R / 1.5); mesh.castShadow = true;
+    const body = addBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 0, BALL_Z + 5 + 5 * n).setLinearDamping(0).setAngularDamping(0.02).setCcdEnabled(true),
+      RAPIER.ColliderDesc.ball(R).setRestitution(E_BALL).setFriction(MU_BALL).setDensity(1).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS), mesh);
+    return { id: n === 0 ? 'cue' : `ball${n}`, body, mesh, number: n };
+  });
+  cue = extras[0];
+
+  // ---- aiming guide (line to first impact, ghost ball, object-ball direction) and the cue stick ----
+  guide = new THREE.Group(); addMesh(guide);
+  guide.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85 }));
+  guide.ghost = new THREE.Mesh(new THREE.TorusGeometry(R, 0.06, 8, 48), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.8 }));
+  guide.objLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#ffd27a', transparent: true, opacity: 0.9 }));
+  guide.cueLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.5 }));
+  guide.add(guide.line, guide.ghost, guide.objLine, guide.cueLine); guide.visible = false;
+  cueStick = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 24, 16), new THREE.MeshStandardMaterial({ color: '#e2c48f', roughness: 0.35 }));
+  const butt = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 18, 16), new THREE.MeshStandardMaterial({ map: woodMap(512, 1, 21, ['#2a1408', '#3d1f0c', '#1e0f06', '#4a2a12']), roughness: 0.4 }));
+  const ferrule = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.8, 16), new THREE.MeshStandardMaterial({ color: '#f4efe6', roughness: 0.5 }));
+  const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.2, 0.35, 16), new THREE.MeshStandardMaterial({ color: '#2a4d8f', roughness: 0.9 }));
+  shaft.position.y = -12; butt.position.y = -33; ferrule.position.y = -0.4; tip.position.y = 0.17;
+  for (const m of [shaft, butt, ferrule, tip]) { m.castShadow = true; cueStick.add(m); }
+  cueStick.rotation.z = -Math.PI / 2;   // stick along +x with the tip at the origin
+  cueStick.visible = false;
+  const cueHolder = new THREE.Group(); cueHolder.add(cueStick); addMesh(cueHolder); cueStick.holder = cueHolder;
+  // Cue-ball indicator: a steady ring on the felt around the cue ball whenever a shot can be taken.
+  marker = addMesh(new THREE.Mesh(new THREE.RingGeometry(R * 1.3, R * 1.65, 48), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, depthWrite: false })));
+  marker.visible = false;
+}
+
+// ---------- heads on the table ----------
+export function ballNumber(j) { return j < 4 ? j + 1 : j === 4 ? 8 : j <= 7 ? j : j + 1; }   // rack index -> number: 1-4, 8, 5-7, 9-15
+function applyCaps() {
+  for (let i = 0; i < heads.length; i++) {
+    const h = heads[i], m = h.mesh.material;
+    let entry = capped.get(h);
+    if (!entry) {
+      if (!m.map || !m.map.image || !m.map.image.width) continue;   // plain texture not loaded yet; try again next frame
+      const n = ballNumber(rackIndexOfHead(i));
+      entry = { plain: m.map, capped: bakeCap(m.map.image, n), ball: authenticBall(n) }; capped.set(h, entry);
+    }
+    const want = ballStyle === 'balls' ? entry.ball : entry.capped;
+    if (capsOn && m.map !== want) { m.map = want; m.needsUpdate = true; }
+  }
+}
+function removeCaps() {
+  for (const [h, entry] of capped) { const m = h.mesh.material; if (m.map !== entry.plain) { m.map = entry.plain; m.needsUpdate = true; } }
+}
+function setBallStyle(style) {
+  ballStyle = style; localStorage.setItem('playful.ballStyle', style);
+  if (tableStill()) for (const h of heads) if (h.mesh.visible && !pocketedSet.has(h)) h.body.setRotation(rackRot(h), true);   // re-orient resting heads face/number up
+  document.querySelectorAll('#style button').forEach((b) => b.classList.toggle('active', b.dataset.style === style));
+  applyCaps();
+}
+
+function layout() {
+  resetHeads({ linearDamping: 0, angularDamping: 0.02, restitution: E_BALL, friction: MU_BALL });
+  for (const h of heads) h.body.collider(0).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+  for (const e of extras) { e.body.setEnabled(true); e.mesh.visible = true; }
+  spot(cue, -HW * 0.5, 0, IDENTITY);
+  const rack = objects();
+  let j = 0;
+  for (let row = 0; row < 5 && j < rack.length; row++)
+    for (let k = 0; k <= row && j < rack.length; k++, j++) spot(rack[j], HW * 0.5 + row * R * 1.74, (k - row / 2) * R * 2.01, rackRot(rack[j]));
+  pocketed = 0; shots = 0; aiming = null; pocketedSet = new Set(); respotAt = 0; belowSince.clear(); inWell.clear();
+  ui.status(`pocketed 0 / ${allBalls().length - 1}`);
+}
+function spot(h, x, y, rot) { h.body.setTranslation({ x, y, z: BALL_Z }, true); h.body.setRotation(rot, true); h.body.setLinvel({ x: 0, y: 0, z: 0 }, true); h.body.setAngvel({ x: 0, y: 0, z: 0 }, true); }
+
+// ---------- camera ----------
+function setupCamera() {
+  camera.up.set(0, 0, 1); camera.fov = 48; camera.far = 800; camera.updateProjectionMatrix();
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0, FELT_Z); controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.enablePan = true; controls.screenSpacePanning = false;   // right-drag slides the view along the table plane
+  controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+  controls.panSpeed = 1.2; controls.minDistance = 10; controls.maxDistance = 200;
+  controls.minPolarAngle = 0.05; controls.maxPolarAngle = Math.PI / 2 - 0.1;
+  resetView();
+}
+function resetView() { controls.target.set(0, 0, FELT_Z); camera.position.set(-HW * 1.6, 0, FELT_Z + 21); controls.update(); }
+
+// ---------- look: dark room, tone mapping, environment reflections, glossy balls ----------
+function setLook(on) {
+  if (on) {
+    saved.bg = scene.background; saved.tone = renderer.toneMapping; saved.exp = renderer.toneMappingExposure; saved.env = scene.environment; saved.fog = scene.fog;
+    scene.background = new THREE.Color('#0a0a0d'); scene.fog = new THREE.Fog('#0a0a0d', 140, 330);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9;
+    pmrem = pmrem || new THREE.PMREMGenerator(renderer); envTex = envTex || pmrem.fromScene(lampRoom(), 0.02).texture;
+    scene.environment = envTex; scene.environmentIntensity = 0.5;
+    lights.hemi.intensity = 0.12; lights.key.intensity = 0; lights.fill.intensity = 0;
+    for (const h of heads) { const m = h.mesh.material; m.roughness = 0.32; m.clearcoat = 0.6; m.clearcoatRoughness = 0.2; m.envMapIntensity = 1.4; }
+  } else {
+    scene.background = saved.bg; scene.fog = saved.fog; renderer.toneMapping = saved.tone; renderer.toneMappingExposure = saved.exp; scene.environment = saved.env;
+    lights.hemi.intensity = DEFAULT_LIGHTS.hemi; lights.key.intensity = DEFAULT_LIGHTS.key; lights.fill.intensity = DEFAULT_LIGHTS.fill;
+    for (const h of heads) { const m = h.mesh.material; m.roughness = 0.5; m.clearcoat = 0; m.envMapIntensity = 1; }
+  }
+}
+
+// The reflection environment is the room itself: near-black walls and floor, one warm rectangular lamp overhead.
+// Every ball then shows a single elongated highlight from the lamp instead of a scatter of studio panels.
+function lampRoom() {
+  const env = new THREE.Scene();
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(400, 400, 200), new THREE.MeshStandardMaterial({ color: '#0a0a0c', side: THREE.BackSide, roughness: 1 }));
+  env.add(walls);
+  const lamp = new THREE.Mesh(new THREE.PlaneGeometry(44, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color('#fff1d0').multiplyScalar(14) }));
+  lamp.position.set(0, 0, 25); lamp.rotation.x = Math.PI; env.add(lamp);
+  const floorGlow = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial({ color: '#141216' }));
+  floorGlow.position.z = -30; env.add(floorGlow);
+  return env;
+}
+
+// ---------- sound ----------
+const audio = new PoolAudio();
+// pan and distance of a table position relative to the camera
+function spatial(p) {
+  const v = new THREE.Vector3(p.x, p.y, p.z), dist = v.distanceTo(camera.position);
+  v.applyMatrix4(camera.matrixWorldInverse);
+  const halfW = Math.abs(v.z) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
+  return { pan: halfW > 1e-3 ? THREE.MathUtils.clamp(v.x / halfW, -1, 1) : 0, dist };
+}
+// Collision *start* events only (never the sustained contact with the felt or a neighbour in the rack),
+// loudness from the relative speed at impact, rate-limited per pair and overall.
+const lastSound = new Map(); let soundBudget = 0, lastBudgetT = 0;
+const inWell = new Set();
+function drainSounds() {
+  const now = performance.now();
+  if (now - lastBudgetT > 100) { soundBudget = 4; lastBudgetT = now; }
+  const byHandle = new Map(allBalls().map((h) => [h.body.collider(0).handle, h]));
+  eventQueue.drainCollisionEvents((a, b, started) => {
+    if (!started || soundBudget <= 0) return;
+    if (feltCol && (a === feltCol.handle || b === feltCol.handle)) return;
+    const ha = byHandle.get(a), hb = byHandle.get(b);
+    if (!ha && !hb) return;
+    const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+    if (now - (lastSound.get(key) || 0) < 90) return;
+    const va = ha ? ha.body.linvel() : { x: 0, y: 0, z: 0 }, vb = hb ? hb.body.linvel() : { x: 0, y: 0, z: 0 };
+    const rel = Math.hypot(va.x - vb.x, va.y - vb.y, va.z - vb.z);
+    if (rel < 1.0) return;
+    const ball = ha || hb, at = spatial(ball.body.translation());
+    if (ha && hb) audio.ballBall(rel / 60, at.pan, at.dist);
+    else {
+      const other = world.getCollider(ha ? b : a);
+      if (other && other.translation().z < FELT_Z - 1) {          // pocket well: first contact is the drop, later ones rattle
+        if (!inWell.has(ball)) { inWell.add(ball); audio.pocket(rel / 30, at.pan, at.dist); } else audio.rattle(rel / 20, at.pan, at.dist);
+      } else audio.cushion(rel / 45, at.pan, at.dist);
+    }
+    lastSound.set(key, now); soundBudget--;
+  });
+}
+
+// ---------- aiming ----------
+function spinWidget(show) {
+  document.getElementById('vignette').hidden = !show;
+  const styleEl = document.getElementById('style'); styleEl.hidden = !show;
+  if (!styleEl.dataset.wired) { styleEl.dataset.wired = '1'; styleEl.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => setBallStyle(b.dataset.style))); }
+  styleEl.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.style === ballStyle));
+  if (!spinEl) {
+    spinEl = document.getElementById('spin');
+    spinEl.addEventListener('pointerdown', (e) => {
+      const r = spinEl.getBoundingClientRect();
+      const x = ((e.clientX - r.left) / r.width) * 2 - 1, y = -(((e.clientY - r.top) / r.height) * 2 - 1);
+      const len = Math.hypot(x, y), s = len > 0.7 ? 0.7 / len : 1;
+      spin = { x: x * s, y: y * s };
+      spinEl.querySelector('.dot').style.left = `${50 + spin.x * 50}%`; spinEl.querySelector('.dot').style.top = `${50 - spin.y * 50}%`;
+      e.stopPropagation();
+    });
+  }
+  spinEl.hidden = !show;
+}
+function aimVector() {
+  const c = cue.body.translation(), d = new THREE.Vector2(c.x - aiming.to.x, c.y - aiming.to.y);
+  return { c, dir: d.clone().normalize(), pull: Math.min(d.length(), MAX_PULL) };
+}
+const ballShape = new RAPIER.Ball(R);
+function updateGuide() {
+  const { c, dir, pull } = aimVector();
+  // Cast a ball along the aim line. The felt is excluded: the resting ball already touches it, and its triangle
+  // edges otherwise register as hits in the middle of the table.
+  const hit = world.castShape({ x: c.x, y: c.y, z: c.z }, { x: 0, y: 0, z: 0, w: 1 }, { x: dir.x, y: dir.y, z: 0 }, ballShape, 0, 200, false,
+    undefined, undefined, feltCol, cue.body);
+  const dist = hit ? hit.time_of_impact : 200;
+  const end = new THREE.Vector3(c.x + dir.x * dist, c.y + dir.y * dist, c.z);
+  guide.line.geometry.setFromPoints([new THREE.Vector3(c.x, c.y, c.z), end]);
+  guide.ghost.position.copy(end); guide.ghost.visible = !!hit;
+  guide.objLine.visible = false; guide.cueLine.visible = false;
+  if (hit) {
+    const other = allBalls().find((h) => h.mesh.visible && h.body.collider(0).handle === hit.collider.handle);
+    if (other) {   // object ball leaves along the line of centres; a stunned cue ball leaves along the tangent
+      const o = other.body.translation(), n = new THREE.Vector3(o.x - end.x, o.y - end.y, 0).normalize();
+      guide.objLine.geometry.setFromPoints([new THREE.Vector3(o.x, o.y, o.z), new THREE.Vector3(o.x + n.x * 12, o.y + n.y * 12, o.z)]);
+      guide.objLine.visible = true;
+      const d3 = new THREE.Vector3(dir.x, dir.y, 0), tangent = d3.clone().sub(n.clone().multiplyScalar(d3.dot(n)));
+      if (tangent.length() > 0.05) {
+        tangent.normalize();
+        guide.cueLine.geometry.setFromPoints([end.clone(), end.clone().add(tangent.multiplyScalar(7))]);
+        guide.cueLine.visible = true;
+      }
+    }
+  }
+  // cue stick behind the ball, pulled back with the power, slightly elevated
+  const h = cueStick.holder, right = new THREE.Vector2(dir.y, -dir.x);   // shooter's right-hand side
+  h.position.set(c.x - dir.x * (R + 0.5 + pull * 0.6) + right.x * spin.x * R * 0.7, c.y - dir.y * (R + 0.5 + pull * 0.6) + right.y * spin.x * R * 0.7, BALL_Z + 0.15 + spin.y * R * 0.7);
+  const txt = `power ${Math.round((pull / MAX_PULL) * 100)}%${spin.x || spin.y ? ' · spin' : ''}`;
+  if (txt !== lastStatus) { lastStatus = txt; ui.status(txt); }
+  // Elevate the cue so the butt clears the rail behind the ball: find how far back the nearest cushion line is
+  // along the stick, and pitch the stick so it is above the rail top there (a player's cue over the rail).
+  const railDist = (() => { let d = Infinity; if (dir.x > 1e-6) d = Math.min(d, (c.x + HW) / dir.x); if (dir.x < -1e-6) d = Math.min(d, (c.x - HW) / dir.x); if (dir.y > 1e-6) d = Math.min(d, (c.y + HH) / dir.y); if (dir.y < -1e-6) d = Math.min(d, (c.y - HH) / dir.y); return Math.max(d, 1); })();
+  const tipZ = 0.15 + spin.y * R * 0.7, railClear = RAIL_H + 0.9 - (R + tipZ) + 0.4;   // rise needed above the tip at the rail
+  const elevation = THREE.MathUtils.clamp(Math.atan2(railClear, railDist + RAIL_W), THREE.MathUtils.degToRad(5), THREE.MathUtils.degToRad(40));
+  h.rotation.set(0, elevation, Math.atan2(dir.y, dir.x), 'ZYX');   // aim about the table normal first, then pitch the butt up
+}
+function tableStill() {
+  return allBalls().every((h) => {
+    if (!h.mesh.visible || !h.body.isEnabled() || h.body.translation().z < FELT_Z - 1.5) return true;   // hidden, or down a pocket
+    const v = h.body.linvel(); return Math.hypot(v.x, v.y, v.z) < 0.3;
+  });
+}
+function endAim() {
+  aiming = null; guide.visible = false; cueStick.visible = false; if (controls) controls.enabled = true;
+  ui.status(pocketed === allBalls().length - 1 ? `all ${pocketed} pocketed in ${shots} shots · R to re-rack` : `pocketed ${pocketed} / ${allBalls().length - 1}`);
+}
+function shoot() {
+  const { c, dir, pull } = aimVector();
+  if (pull < 0.3) return;
+  const speed = pull * SPEED_PER_PULL;
+  strike(cue.body, dir, speed, spin);
+  shots++;
+  const at = spatial(c); audio.cueTip(speed / (MAX_PULL * SPEED_PER_PULL), at.pan, at.dist);
+}
+
+// ---------- per-step physics extras ----------
+function rollingResistance(dt) { feltExtras(allBalls().filter((h) => h.mesh.visible).map((h) => h.body), dt, BALL_Z); }
+// A ball that has been below the felt for a moment is pocketed, whatever it is still doing down in the well
+// (a ball can roll around the well for a long time, and a wedged ball never settles). A ball resting beyond the
+// cushion line (it jumped the cushion and sits under the rail) counts the same: off the table. Object balls are
+// hidden shortly after; a scratched cue is respotted.
+const belowSince = new Map();
+function collectPocketed() {
+  const now = performance.now();
+  for (const h of allBalls()) {
+    if (!h.mesh.visible || pocketedSet.has(h)) continue;
+    const t = h.body.translation();
+    if (t.z < FELT_Z - 1.5 || Math.abs(t.x) > HW + CUSH || Math.abs(t.y) > HH + CUSH) {
+      if (!belowSince.has(h)) belowSince.set(h, now);
+      if (now - belowSince.get(h) > 600) {
+        pocketedSet.add(h); belowSince.delete(h);
+        if (h === cue) respotAt = now + 600;
+        else { pocketed++; ui.status(pocketed === allBalls().length - 1 ? `all ${pocketed} pocketed in ${shots} shots · R to re-rack` : `pocketed ${pocketed} / ${allBalls().length - 1}`); setTimeout(() => hideHead(h), 500); }
+      }
+    } else belowSince.delete(h);
+  }
+  if (respotAt && performance.now() > respotAt) {
+    respotAt = 0; pocketedSet.delete(cue);
+    let x = -HW * 0.5;
+    const blocked = (px) => allBalls().some((h) => h !== cue && h.mesh.visible && !pocketedSet.has(h) && Math.hypot(h.body.translation().x - px, h.body.translation().y) < R * 2.2);
+    while (blocked(x) && x > -HW + R * 1.5) x -= R * 0.5;
+    spot(cue, x, 0, IDENTITY);
+  }
+}
+
+export default {
+  name: 'pool', label: 'Pool',
+  // 480 Hz: Rapier's contact model loses restitution on slow impacts at coarse steps (see physics/validate.mjs);
+  // at 480 Hz a 0.95 ball reads 0.91-0.95 across the speed range instead of 0.68-0.94 at 120 Hz.
+  stepRate: 480,
+  enter() {
+    setHeadRadius(R); world.gravity = { x: 0, y: 0, z: -G };
+    RectAreaLightUniformsLib.init();
+    build(); layout(); setupCamera(); setLook(true); spinWidget(true); capsOn = true; applyCaps();
+    ui.hint('drag back from the cue head to shoot · left-drag the table to orbit, right-drag to pan, wheel to zoom, C resets the view · ball widget sets spin · B toggles heads / balls · M mutes · R re-racks');
+  },
+  exit() {
+    clearProps(); aiming = null; spinWidget(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
+    controls?.dispose(); controls = null; setLook(false);
+  },
+  key(k) { if (k === 'r') layout(); if (k === 'c') resetView(); if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); },
+  resize() {},
+  pointerdown(e) {
+    audio.ensure();
+    if (e.button !== 0) return false;
+    if (meshUnderPointer(e, [cue.mesh]) !== cue.mesh || !cue.mesh.visible || pocketedSet.has(cue) || !tableStill()) return false;
+    controls.enabled = false;
+    aiming = { to: pointerToPlane(e, BALL_Z) }; guide.visible = true; cueStick.visible = true; return true;
+  },
+  pointermove(e) { if (aiming) aiming.to = pointerToPlane(e, BALL_Z); else return meshUnderPointer(e, [cue.mesh]) === cue.mesh && tableStill(); },
+  pointerup() { if (aiming) shoot(); endAim(); },
+  pointercancel() { endAim(); },   // a lost pointer never fires the shot
+  step() {
+    drainSounds();
+    if (aiming) updateGuide();
+    rollingResistance(world.timestep);
+    collectPocketed();
+  },
+  controls: () => controls,   // for scripted testing
+  audio,
+  frame() {
+    controls?.update();
+    audio.setMuted(!!window.playful?.mute);
+    const fade = THREE.MathUtils.clamp((fixtureFade[1] - camera.position.z) / (fixtureFade[1] - fixtureFade[0]), 0, 1);   // lamp fixture fades as the camera climbs to it
+    for (const m of fixture) { m.visible = fade > 0; m.material.opacity = fade; }
+    if (capsOn && capped.size < heads.length) applyCaps();
+    allBalls().forEach((h, i) => {
+      const cs = contactShadows[i]; if (!cs) return;
+      const t = h.body.translation(), on = h.mesh.visible && h.body.isEnabled() && t.z > BALL_Z - 0.3;
+      cs.visible = on; if (on) cs.position.set(h.mesh.position.x, h.mesh.position.y, FELT_Z + 0.015);
+    });
+    if (marker) {
+      const ready = !aiming && cue.mesh.visible && !pocketedSet.has(cue) && tableStill();
+      marker.visible = ready;
+      if (ready) { const c = cue.body.translation(); marker.position.set(c.x, c.y, FELT_Z + 0.03); }
+    }
+  },
+};

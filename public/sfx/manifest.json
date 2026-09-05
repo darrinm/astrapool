@@ -1,0 +1,29 @@
+{
+ "ballBall_hard": [
+  "ballBall_hard_0.wav",
+  "ballBall_hard_2.wav",
+  "ballBall_hard_3.wav"
+ ],
+ "ballBall_soft": [
+  "ballBall_soft_0.wav",
+  "ballBall_soft_3.wav"
+ ],
+ "cueTip": [
+  "cueTip_1.wav",
+  "cueTip_2.wav"
+ ],
+ "cushion": [
+  "cushion_0.wav",
+  "cushion_1.wav"
+ ],
+ "pocket": [
+  "pocket_0.wav",
+  "pocket_1.wav",
+  "pocket_2.wav"
+ ],
+ "rattle": [
+  "rattle_0.wav",
+  "rattle_1.wav",
+  "rattle_2.wav"
+ ]
+}

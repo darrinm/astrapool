@@ -1,0 +1,50 @@
+import * as THREE from 'three';
+import { renderer, scene, camera, world, eventQueue, syncMeshes, snapshotPoses, heads } from './core.js';
+import pool from './pool.js';
+
+const current = pool;
+const STEP = 1 / current.stepRate;   // 480 Hz: see the note on stepRate in pool.js
+let accumulator = 0;
+world.timestep = STEP;
+current.enter();
+
+// ---------- input ----------
+const canvas = renderer.domElement;
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());   // right button is for camera panning
+canvas.addEventListener('pointerdown', (e) => {
+  if (current.pointerdown(e)) { canvas.setPointerCapture(e.pointerId); document.body.style.cursor = 'grabbing'; }
+});
+canvas.addEventListener('pointermove', (e) => {
+  const hover = current.pointermove(e);
+  if (hover !== undefined && !canvas.hasPointerCapture?.(e.pointerId)) document.body.style.cursor = hover ? 'grab' : 'default';
+});
+canvas.addEventListener('pointerup', (e) => { current.pointerup(e); document.body.style.cursor = 'default'; });
+canvas.addEventListener('pointercancel', (e) => { current.pointercancel(e); document.body.style.cursor = 'default'; });
+addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'm') { window.playful.mute = !window.playful.mute; return; }
+  current.key(k);
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------- loop ----------
+let last = performance.now();
+const perf = { frames: 0, worst: 0, step: 0, render: 0, steps: 0, slow: 0, gaps: 0, reset() { this.frames = this.worst = this.step = this.render = this.steps = this.slow = this.gaps = 0; } };
+function tick() { snapshotPoses(); current.step(); world.step(eventQueue); }
+window.playful = { heads, world, camera, scene3: scene, THREE, tick, scene: () => current, perf, mute: false }; // debug handle
+function animate(now) {
+  requestAnimationFrame(animate);
+  const t0 = performance.now();
+  if (now - last > 25) perf.gaps++;   // long gap between frames = a visible hitch, whatever caused it
+  accumulator += Math.min((now - last) / 1000, 0.05); last = now;
+  while (accumulator >= STEP) { tick(); accumulator -= STEP; perf.steps++; }
+  const t1 = performance.now();
+  syncMeshes(accumulator / STEP);
+  current.frame();
+  renderer.render(scene, camera);
+  const t2 = performance.now();
+  perf.frames++; perf.step += t1 - t0; perf.render += t2 - t1; perf.worst = Math.max(perf.worst, t2 - t0); if (t2 - t0 > 12) perf.slow++;
+}
+requestAnimationFrame(animate);

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Playful Pool · sound audition</title>
+<style>
+  body { font: 15px/1.4 system-ui, sans-serif; margin: 0; padding: 24px; background: #14110d; color: #e8e2d6; max-width: 900px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } p { color: #b5ad9f; margin: 0 0 18px; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 24px; } th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #2b251d; vertical-align: middle; }
+  th { color: #b5ad9f; font-weight: 500; }
+  button { font: inherit; padding: 6px 12px; margin: 2px; border-radius: 6px; border: 1px solid #4a4030; background: #241e16; color: #e8e2d6; cursor: pointer; }
+  button:hover { background: #33291c; } button.take { padding: 4px 9px; font-size: 13px; }
+  .synth { border-color: #3a4a6a; } .sample { border-color: #4a6a3a; }
+  label { margin-right: 16px; } input[type=range] { vertical-align: middle; width: 200px; }
+  #ab { background: #1c1712; padding: 16px; border-radius: 8px; } #ab .row { margin: 8px 0; } #verdict { color: #f0c46a; min-height: 1.4em; }
+  #tally { color: #b5ad9f; }
+</style>
+</head>
+<body>
+<h1>Pool sound audition</h1>
+<p>Same event, two voices: the generated samples the game now uses, and the earlier modal synthesis. Strength sets the hit speed (level, pitch, brightness). Click anywhere first to unlock audio.</p>
+<div style="margin-bottom:16px">
+  <label>strength <input id="strength" type="range" min="0" max="1" step="0.05" value="0.6"> <span id="sv">0.60</span></label>
+  <label>pan <input id="pan" type="range" min="-1" max="1" step="0.1" value="0"></label>
+  <label><input id="reverb" type="checkbox" checked> room reverb</label>
+</div>
+<table id="grid"><thead><tr><th>event</th><th>samples</th><th>synth</th><th>individual takes</th></tr></thead><tbody></tbody></table>
+<div id="ab">
+  <strong>Blind A/B.</strong> Plays one voice at random; say which you think it is, then it tells you and keeps score.
+  <div class="row">
+    <button id="abPlay">play X</button> <button id="abReplay">replay X</button>
+    <select id="abCat"></select>
+  </div>
+  <div class="row">X was… <button id="guessSample">samples</button> <button id="guessSynth">synth</button></div>
+  <div id="verdict"></div><div id="tally"></div>
+</div>
+<script type="module">
+  import { PoolAudio } from './src/sounds.js';
+  const audio = new PoolAudio();
+  const EVENTS = [['ballBall', 'ball on ball'], ['cushion', 'cushion'], ['cueTip', 'cue tip'], ['pocket', 'pocket drop'], ['rattle', 'pocket rattle']];
+  const TAKES = { ballBall: ['ballBall_soft', 'ballBall_hard'], cushion: ['cushion'], cueTip: ['cueTip'], pocket: ['pocket'], rattle: ['rattle'] };
+  const strength = document.getElementById('strength'), sv = document.getElementById('sv'), pan = document.getElementById('pan'), reverb = document.getElementById('reverb');
+  strength.oninput = () => (sv.textContent = Number(strength.value).toFixed(2));
+  const S = () => Number(strength.value), PAN = () => Number(pan.value);
+  function fire(ev, mode, take = -1, s = S()) {
+    audio.ensure(); audio.mode = mode; if (audio.wet) audio.wet.gain.value = reverb.checked ? 0.18 : 0;
+    if (ev === 'ballBall' && take >= 0) { const cat = take >= 100 ? 'ballBall_hard' : 'ballBall_soft', idx = take % 100, e = audio.begin(s, 0.12, 0.88, PAN(), 10); if (e) audio.sample(cat, e.dest, e.s, { take: idx }); return; }
+    audio[ev](s, PAN(), 10, take >= 0 ? take : undefined);
+  }
+  const tbody = document.querySelector('#grid tbody'), sel = document.getElementById('abCat');
+  for (const [ev, label] of EVENTS) {
+    const tr = document.createElement('tr'); tr.innerHTML = `<td>${label}</td><td><button class="sample">samples</button></td><td><button class="synth">synth</button></td><td class="takes">loading…</td>`;
+    tr.querySelector('.sample').onclick = () => fire(ev, 'samples'); tr.querySelector('.synth').onclick = () => fire(ev, 'synth');
+    tbody.appendChild(tr); sel.add(new Option(label, ev));
+    audio.ensure(); audio.load().then((buffers) => {
+      const cell = tr.querySelector('.takes'); cell.textContent = '';
+      for (const cat of TAKES[ev]) (buffers[cat] || []).forEach((_, i) => {
+        const b = document.createElement('button'); b.className = 'take sample'; b.textContent = `${cat.replace('ballBall_', '')} ${i}`;
+        b.onclick = () => fire(ev, 'samples', ev === 'ballBall' ? (cat.endsWith('hard') ? 100 + i : i) : i); cell.appendChild(b);
+      });
+    });
+  }
+  // blind A/B
+  let x = null, right = 0, total = 0;
+  const verdict = document.getElementById('verdict'), tally = document.getElementById('tally');
+  document.getElementById('abPlay').onclick = () => { x = Math.random() < 0.5 ? 'samples' : 'synth'; verdict.textContent = ''; fire(sel.value, x); };
+  document.getElementById('abReplay').onclick = () => { if (x) fire(sel.value, x); };
+  const guess = (g) => { if (!x) return; total++; if (g === x) right++; verdict.textContent = `X was ${x}${g === x ? ' — right' : ' — wrong'}`; tally.textContent = `${right} / ${total} correct`; x = null; };
+  document.getElementById('guessSample').onclick = () => guess('samples'); document.getElementById('guessSynth').onclick = () => guess('synth');
+</script>
+</body>
+</html>
