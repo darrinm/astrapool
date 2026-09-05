@@ -25,3 +25,13 @@ Carried over from playful-photos when the pool game was extracted (2026-09-05).
   without them silently averages with the ball's 0.95 and bounces twice as hard as its own number says.
 - Rule: geometry that only the scene builds is geometry the harness never tests. Table furniture lives in
   physics/poolphysics.js so validate.mjs runs the real table.
+
+## 2026-09-05 — Fling "stops cold": lostpointercapture before pointerup
+- The user's Chrome fired `lostpointercapture` (buttons=0) before the canvas's pointerup handler ran; the code treated
+  it as a cancel and zeroed the ball. My Playwright Chromium and CDP input fired it after pointerup, so nothing I
+  drove myself reproduced it, and I spent two rounds tuning the velocity estimator (also improved, but not the bug).
+- Rule: when a bug "works for me", get the user's real event stream before theorising. A 20-line reporter posting
+  each release to a local collector settled it in one round; the same tab was served from this repo, so it was free.
+- Rule: browsers disagree on pointer-capture event order (w3c/pointerevents#357). Never treat lostpointercapture as
+  a cancel when no button is held: it is the release.
+- Rule: a hidden tab has no rAF; the extension tab is hidden while tools run. Use headed Playwright for loop-dependent checks.

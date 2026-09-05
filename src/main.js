@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { renderer, scene, camera, world, eventQueue, syncMeshes, snapshotPoses, heads } from './core.js';
 import pool from './pool.js';
+import { connectPointerInput } from './pointer-input.js';
 
 const current = pool;
 const STEP = 1 / current.stepRate;   // 480 Hz: see the note on stepRate in pool.js
@@ -9,17 +10,7 @@ world.timestep = STEP;
 current.enter();
 
 // ---------- input ----------
-const canvas = renderer.domElement;
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());   // right button is for camera panning
-canvas.addEventListener('pointerdown', (e) => {
-  if (current.pointerdown(e)) { canvas.setPointerCapture(e.pointerId); document.body.style.cursor = 'grabbing'; }
-});
-canvas.addEventListener('pointermove', (e) => {
-  const hover = current.pointermove(e);
-  if (hover !== undefined && !canvas.hasPointerCapture?.(e.pointerId)) document.body.style.cursor = hover ? 'grab' : 'default';
-});
-canvas.addEventListener('pointerup', (e) => { current.pointerup(e); document.body.style.cursor = 'default'; });
-canvas.addEventListener('pointercancel', (e) => { current.pointercancel(e); document.body.style.cursor = 'default'; });
+connectPointerInput(renderer.domElement, current);
 addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (k === 'm') { window.playful.mute = !window.playful.mute; return; }

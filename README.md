@@ -11,8 +11,15 @@ widget (bottom right) sets follow / draw / english. Left-drag the table to orbit
 `C` resets the view. Heads / Balls buttons (or `B`) swap the heads for authentic numbered balls. `M` mutes,
 `R` re-racks.
 
+Choose **Drag & fling** (or press `F`) to grab any ball and slide it across the felt. Release while moving to
+fling it in the direction of your mouse; move faster for a harder throw. Hold still before releasing to place
+the ball. Balls still collide with each other and the cushions. Drag empty table space to orbit as usual,
+and choose **Cue** or press `F` again to return to cue shots.
+
 ## Layout
-- `src/main.js` – fixed-step loop (480 Hz physics, interpolated rendering), pointer and key routing, `window.playful` debug handle.
+- `src/main.js` – fixed-step loop (480 Hz physics, interpolated rendering), key routing, `window.playful` debug handle.
+- `src/pointer-input.js` – browser pointer routing, including release before or after capture loss. `src/fling.js`
+  estimates throw velocity from recent mouse samples. `node --test physics/*.test.mjs` checks both modules.
 - `src/core.js` – renderer, camera, physics world, the 14 heads, and the prop registry and pointer helpers the scene uses.
 - `src/pool.js` – the game. Physics: gravity into the felt, a triangle-mesh felt with six real holes and pocket wells
   underneath so balls physically drop in (rail-side castings lean over the hole and catch a fast ball), cushions with a

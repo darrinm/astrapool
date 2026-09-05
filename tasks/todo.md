@@ -27,3 +27,11 @@ sampled audio, the 14 head maps, and the sound-effect pipeline. The head-map pip
 ## Pool: lamp fixture (2026-09-05)
 - [x] Fixture (shade, panel, cords) fades out as the camera rises from 7 to 2 units below the lamp, so a top-down view is never blocked; the lights stay
 
+
+## Pool: drag & fling momentum (2026-09-05)
+- [x] Reproduced in Chrome with synthetic pointer events: a constant-speed release flings at the 225 u/s cap every time, but the same sweep with a human-like slowing, jittery tail before the button comes up flung at ~9 u/s (the ball barely rolled)
+- [x] `src/fling.js`: the throw is the fastest recent 80 ms window of movement (decayed by the pause since it), not the motion in the last 80 ms before release; a full 300 ms hold still places the ball
+- [x] `physics/fling.test.mjs`: 10 cases incl. slowing release, sub-pixel rest jitter, faded long tail (`node --test physics/fling.test.mjs`)
+- [x] Real cause (from the user's own event stream, captured by a temporary reporter): their Chrome fires `lostpointercapture` (buttons=0) before pointerup, and main.js treated it as a cancel → ball zeroed. `src/main.js` now treats a lost capture with no button held as the release (fling / shoot); only a capture lost mid-press cancels
+- [x] Simplified after the fix: cursor reset lives in endDrag/endAim only, pointermove uses early returns, pointer samples use `e.timeStamp` directly, and endDrag no longer releases capture by hand (the browser releases it on pointerup). Verified flings and cue shots in both lostpointercapture orders. Speed caps left as they are (user: "it's fun")
+- [x] /simplify pass (4 reviewers): adapter owns cursor + pointer identity and delivers one completion per gesture (scene drops pointerId bookkeeping); `endGesture()` replaces five `endDrag(); endAim();` pairs; `onTable`/`cueReady` predicates; `pushSample` and the release time move into fling.js; leftover zero-movement guard deleted; `MAX_SPEED` shared with the cue strike; `wireOnce` for the two button groups; `#mode` styled by aria-pressed only. Skipped: full gesture-object refactor, Vector2.clampLength, per-step scratch objects (micro)

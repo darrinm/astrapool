@@ -13,6 +13,7 @@ import { RAPIER, DEPTH, renderer, scene, camera, world, eventQueue, heads, light
 import { noiseBump, feltMap, woodMap, carpetMap, clothNormal, radialShadow, gradientStrip } from './textures.js';
 import { bakeCap, authenticBall } from './ballcaps.js';
 import { PoolAudio } from './sounds.js';
+import { flingVelocity, pushSample } from './fling.js';
 import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
 
 const { R, G, MU_SLIDE, MU_BALL, E_BALL, HW, HH, RAIL_H, CUSH, POCKET_R } = P;   // table physics constants live in physics/poolphysics.js
@@ -24,6 +25,8 @@ let pocketedSet = new Set(), respotAt = 0, pmrem, envTex, feltCol, lastStatus = 
 const capped = new Map();   // head -> { plain, capped, ball } textures; caps are baked lazily once the plain map has loaded
 let capsOn = false;
 let ballStyle = localStorage.getItem('playful.ballStyle') || 'heads';   // 'heads' | 'balls'
+let interactionMode = 'cue', dragging = null;
+const MAX_SPEED = MAX_PULL * SPEED_PER_PULL;   // for a cue strike and for a fling alike
 // The cue ball is always a plain white ball, and the plain black 8 sits at the centre of the rack. The 14 heads
 // take the other numbers (1-7 and 9-15). `extras` holds the two plain balls; `objects()` is the rack order.
 let extras = [];
@@ -231,6 +234,7 @@ function setBallStyle(style) {
 }
 
 function layout() {
+  endGesture();
   resetHeads({ linearDamping: 0, angularDamping: 0.02, restitution: E_BALL, friction: MU_BALL });
   for (const h of heads) h.body.collider(0).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
   for (const e of extras) { e.body.setEnabled(true); e.mesh.visible = true; }
@@ -239,7 +243,7 @@ function layout() {
   let j = 0;
   for (let row = 0; row < 5 && j < rack.length; row++)
     for (let k = 0; k <= row && j < rack.length; k++, j++) spot(rack[j], HW * 0.5 + row * R * 1.74, (k - row / 2) * R * 2.01, rackRot(rack[j]));
-  pocketed = 0; shots = 0; aiming = null; pocketedSet = new Set(); respotAt = 0; belowSince.clear(); inWell.clear();
+  pocketed = 0; shots = 0; pocketedSet = new Set(); respotAt = 0; belowSince.clear(); inWell.clear();
   ui.status(`pocketed 0 / ${allBalls().length - 1}`);
 }
 function spot(h, x, y, rot) { h.body.setTranslation({ x, y, z: BALL_Z }, true); h.body.setRotation(rot, true); h.body.setLinvel({ x: 0, y: 0, z: 0 }, true); h.body.setAngvel({ x: 0, y: 0, z: 0 }, true); }
@@ -327,10 +331,65 @@ function drainSounds() {
 }
 
 // ---------- aiming ----------
-function spinWidget(show) {
+function setInteractionMode(mode) {
+  endGesture();
+  interactionMode = mode;
+  document.querySelectorAll('#mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  spinEl.hidden = mode !== 'cue';
+  ui.hint(`${mode === 'fling' ? 'drag any ball and release to fling · hold still before releasing to place' : 'drag back from the cue ball to shoot · ball widget sets spin'} · drag the table to orbit · right-drag to pan · wheel to zoom · F switches mode · C resets view · B heads / balls · M mutes · R re-racks`);
+}
+const onTable = (h) => h.mesh.visible && h.body.isEnabled() && !pocketedSet.has(h) && h.body.translation().z > BALL_Z - 0.5;
+const cueReady = () => onTable(cue) && tableStill();
+function ballUnderPointer(e) {
+  const balls = allBalls().filter((h) => h.mesh.visible), mesh = meshUnderPointer(e, balls.map((h) => h.mesh));
+  const ball = balls.find((h) => h.mesh === mesh);
+  return ball && onTable(ball) ? ball : undefined;
+}
+function dragTarget(e) {
+  const p = pointerToPlane(e, BALL_Z).add(dragging.offset);
+  // Keep the target inside the table surround; balls still collide with the cushions and pocket jaws.
+  p.x = THREE.MathUtils.clamp(p.x, -HW, HW); p.y = THREE.MathUtils.clamp(p.y, -HH, HH);
+  return p;
+}
+// The ball's target stops at the rails; the mouse does not. Measure the gesture before that clamp.
+const sampleDrag = (e) => pushSample(dragging.samples, { x: e.clientX, y: e.clientY, t: e.timeStamp });
+function flingOnTable(ball, velocity) {
+  // Convert screen velocity at the ball to table velocity. Using the ball as the projection anchor
+  // also works when the mouse has crossed the horizon and its ray no longer meets the felt.
+  const p = ball.body.translation();
+  const origin = new THREE.Vector3(p.x, p.y, BALL_Z), ndc = origin.clone().project(camera);
+  const anchor = { clientX: (ndc.x + 1) * innerWidth / 2, clientY: (1 - ndc.y) * innerHeight / 2 };
+  const dx = pointerToPlane({ ...anchor, clientX: anchor.clientX + 1 }, BALL_Z).sub(origin);
+  const dy = pointerToPlane({ ...anchor, clientY: anchor.clientY + 1 }, BALL_Z).sub(origin);
+  return limitFling(dx.x * velocity.x + dy.x * velocity.y, dx.y * velocity.x + dy.y * velocity.y);
+}
+function limitFling(x, y) {
+  const scale = Math.min(1, MAX_SPEED / (Math.hypot(x, y) || 1));
+  return { x: x * scale, y: y * scale };
+}
+function moveBall(body, velocity) {
+  body.setLinvel({ ...velocity, z: body.linvel().z }, true);
+  body.setAngvel({ x: -velocity.y / R, y: velocity.x / R, z: 0 }, true);
+}
+function endDrag(fling = false) {
+  if (!dragging) return;
+  const { ball, samples } = dragging;
+  moveBall(ball.body, fling ? flingOnTable(ball, flingVelocity(samples)) : { x: 0, y: 0 });
+  dragging = null; controls.enabled = true;
+}
+function endGesture() { endDrag(); endAim(); }   // the two are exclusive; whichever is in progress stops without a shot or fling
+function updateDrag() {
+  if (!dragging) return;
+  const { ball, to } = dragging;
+  if (!onTable(ball)) { endDrag(); return; }
+  const p = ball.body.translation();
+  // Drive a dynamic ball toward the mouse so normal collisions remain active while dragging.
+  moveBall(ball.body, limitFling((to.x - p.x) * 45, (to.y - p.y) * 45));
+}
+function showGameControls(show) {
   document.getElementById('vignette').hidden = !show;
   const styleEl = document.getElementById('style'); styleEl.hidden = !show;
-  if (!styleEl.dataset.wired) { styleEl.dataset.wired = '1'; styleEl.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => setBallStyle(b.dataset.style))); }
+  wireOnce(styleEl, (b) => setBallStyle(b.dataset.style));
   styleEl.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.style === ballStyle));
   if (!spinEl) {
     spinEl = document.getElementById('spin');
@@ -343,7 +402,13 @@ function spinWidget(show) {
       e.stopPropagation();
     });
   }
-  spinEl.hidden = !show;
+  const modeEl = document.getElementById('mode'); modeEl.hidden = !show;
+  wireOnce(modeEl, (b) => setInteractionMode(b.dataset.mode));
+  if (show) setInteractionMode(interactionMode); else spinEl.hidden = true;
+}
+function wireOnce(group, onClick) {
+  if (group.dataset.wired) return;
+  group.dataset.wired = '1'; group.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => onClick(b)));
 }
 function aimVector() {
   const c = cue.body.translation(), d = new THREE.Vector2(c.x - aiming.to.x, c.y - aiming.to.y);
@@ -403,7 +468,7 @@ function shoot() {
   const speed = pull * SPEED_PER_PULL;
   strike(cue.body, dir, speed, spin);
   shots++;
-  const at = spatial(c); audio.cueTip(speed / (MAX_PULL * SPEED_PER_PULL), at.pan, at.dist);
+  const at = spatial(c); audio.cueTip(speed / MAX_SPEED, at.pan, at.dist);
 }
 
 // ---------- per-step physics extras ----------
@@ -444,29 +509,53 @@ export default {
   enter() {
     setHeadRadius(R); world.gravity = { x: 0, y: 0, z: -G };
     RectAreaLightUniformsLib.init();
-    build(); layout(); setupCamera(); setLook(true); spinWidget(true); capsOn = true; applyCaps();
-    ui.hint('drag back from the cue head to shoot · left-drag the table to orbit, right-drag to pan, wheel to zoom, C resets the view · ball widget sets spin · B toggles heads / balls · M mutes · R re-racks');
+    build(); layout(); setupCamera(); setLook(true); showGameControls(true); capsOn = true; applyCaps();
   },
   exit() {
-    clearProps(); aiming = null; spinWidget(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
+    endGesture();
+    clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     controls?.dispose(); controls = null; setLook(false);
   },
-  key(k) { if (k === 'r') layout(); if (k === 'c') resetView(); if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); },
+  key(k) { if (k === 'r') layout(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue'); },
   resize() {},
   pointerdown(e) {
     audio.ensure();
-    if (e.button !== 0) return false;
-    if (meshUnderPointer(e, [cue.mesh]) !== cue.mesh || !cue.mesh.visible || pocketedSet.has(cue) || !tableStill()) return false;
+    if (e.button !== 0 || dragging || aiming) return false;
+    if (interactionMode === 'fling') {
+      const ball = ballUnderPointer(e);
+      if (!ball) return false;
+      controls.enabled = false;
+      const p = ball.body.translation(), to = new THREE.Vector3(p.x, p.y, BALL_Z);
+      dragging = { ball, to, offset: to.clone().sub(pointerToPlane(e, BALL_Z)), samples: [] };
+      sampleDrag(e);
+      return true;
+    }
+    if (meshUnderPointer(e, [cue.mesh]) !== cue.mesh || !cueReady()) return false;
     controls.enabled = false;
     aiming = { to: pointerToPlane(e, BALL_Z) }; guide.visible = true; cueStick.visible = true; return true;
   },
-  pointermove(e) { if (aiming) aiming.to = pointerToPlane(e, BALL_Z); else return meshUnderPointer(e, [cue.mesh]) === cue.mesh && tableStill(); },
-  pointerup() { if (aiming) shoot(); endAim(); },
-  pointercancel() { endAim(); },   // a lost pointer never fires the shot
+  // Only the captured pointer's moves arrive during a gesture; otherwise the return value is the hover state.
+  pointermove(e) {
+    if (dragging) {
+      const coalesced = e.getCoalescedEvents?.();
+      for (const sample of coalesced?.length ? coalesced : [e]) sampleDrag(sample);
+      dragging.to = dragTarget(e); // Project once per event; coalesced samples only contribute velocity.
+      return;
+    }
+    if (aiming) { aiming.to = pointerToPlane(e, BALL_Z); return; }
+    if (interactionMode === 'fling') return !!ballUnderPointer(e);
+    return meshUnderPointer(e, [cue.mesh]) === cue.mesh && cueReady();
+  },
+  pointerup(e) {
+    if (dragging) { sampleDrag(e); endDrag(true); }
+    else if (aiming) { shoot(); endAim(); }
+  },
+  pointercancel: endGesture,   // explicit cancellation never fires a shot or fling
   step() {
     drainSounds();
     if (aiming) updateGuide();
     rollingResistance(world.timestep);
+    updateDrag();
     collectPocketed();
   },
   controls: () => controls,   // for scripted testing
@@ -483,9 +572,9 @@ export default {
       cs.visible = on; if (on) cs.position.set(h.mesh.position.x, h.mesh.position.y, FELT_Z + 0.015);
     });
     if (marker) {
-      const ready = !aiming && cue.mesh.visible && !pocketedSet.has(cue) && tableStill();
+      const ready = !!dragging || (interactionMode === 'cue' && !aiming && cueReady());
       marker.visible = ready;
-      if (ready) { const c = cue.body.translation(); marker.position.set(c.x, c.y, FELT_Z + 0.03); }
+      if (ready) { const c = (dragging?.ball || cue).body.translation(); marker.position.set(c.x, c.y, FELT_Z + 0.03); }
     }
   },
 };
