@@ -4,7 +4,11 @@
   "account_id": "f1a4a152b72d6ebcb0b82a8b384d4c1b",
   "compatibility_date": "2026-09-06",
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*"
+    ]
   },
   "routes": [
     {
@@ -13,5 +17,26 @@
     }
   ],
   "workers_dev": false,
-  "preview_urls": false
+  "preview_urls": false,
+  "main": "server/worker.js",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "POOL_ROOMS",
+        "class_name": "PoolRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "PoolRoom"
+      ]
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
 }

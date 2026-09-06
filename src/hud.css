@@ -125,3 +125,11 @@ select:focus-visible { outline: 2px solid var(--accent); }
   .player-card { min-width: 132px; }
   .player-heading { font-size: 12px; }
 }
+
+.online-panel { position: absolute; top: 134px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); pointer-events: auto; }
+.online-panel p { margin: 0 0 6px; font-size: 12px; text-align: center; color: var(--accent); }
+.online-panel > div { display: flex; align-items: center; gap: 4px; }
+.online-panel input { min-width: 0; width: 190px; color: var(--muted); background: #0b150e; border: 1px solid var(--line); padding: 8px; border-radius: 6px; font-size: 11px; }
+.online-panel button { font-size: 11px; min-height: 32px; padding: 5px 8px; }
+button:disabled { opacity: .6; cursor: default; }
+@media (max-width: 700px) { .online-panel { top: 155px; width: calc(100% - 24px); } .online-panel input { flex: 1; width: 80px; } }

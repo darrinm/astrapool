@@ -7,7 +7,10 @@ export function newMatch(breaker = 0, wins = [0, 0]) {
 }
 export function targets(state, player = state.turn) {
   const group = state.groups[player];
-  if (!group) return [...groupBalls('solids'), ...groupBalls('stripes')].filter(n => !state.down.includes(n));
+  if (!group) {
+    const remaining = [...groupBalls('solids'), ...groupBalls('stripes')].filter(n => !state.down.includes(n));
+    return remaining.length ? remaining : [8];
+  }
   const remaining = groupBalls(group).filter(n => !state.down.includes(n));
   return remaining.length ? remaining : [8];
 }

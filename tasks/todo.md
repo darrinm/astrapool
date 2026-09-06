@@ -40,6 +40,8 @@ sampled audio, the 14 head maps, and the sound-effect pipeline. The head-map pip
 - [x] Stage 1: local two-player house 8-ball, turn and group HUD, fouls, ball-in-hand, called 8, wins, rematch, Free Play.
 - [x] Stage 1 validation: 40 unit tests, 26 physics checks, production build; Chrome break → scratch → placement → early 8 loss → rematch, all 16 balls restored.
 - [x] Stage 2: computer opponent with difficulty selection and the same match rules.
-- [ ] Stage 3: private invite-link online matches, disconnect handling, and deployment.
+- [x] Stage 3: private invite-link online matches, reconnects, interrupted-shot rollback, mutual rematches, and CI deployment checks.
 
 - [x] Stage 2 validation: 47 tests; Chrome computer break and four following shots pocketed seven balls, assigned groups, and returned a legal turn to the human.
+
+- [x] Stage 3 validation: 53 unit tests, 26 physics checks, real Worker/WebSocket lifecycle test, production build and Wrangler dry run. Two isolated Chrome sessions synchronized a real break and retained seats after refresh. Mobile HUD verified at 390 × 844; Balls is the default.

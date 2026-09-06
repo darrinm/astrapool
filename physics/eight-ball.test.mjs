@@ -71,3 +71,9 @@ test('rematch preserves match score and alternates the breaker', () => {
   const state = newMatch(1, [2, 3]);
   assert.equal(state.turn, 1); assert.deepEqual(state.wins, [2, 3]); assert.deepEqual(state.down, []);
 });
+
+test('an open table with both groups cleared can still finish on the 8', () => {
+  const state = { ...open(), down: [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15] };
+  assert.deepEqual(targets(state), [8]);
+  assert.equal(play(state, { first: 8, calledPocket: 0, pocketed: [pot(8)] }).state.winner, 0);
+});

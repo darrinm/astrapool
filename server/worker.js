@@ -1,0 +1,130 @@
+import { DurableObject } from 'cloudflare:workers';
+import { PROTOCOL_VERSION, initialSnapshot, validateShot, placeCue, finishShot } from './protocol.js';
+const DAY = 24 * 60 * 60 * 1000;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+export class PoolRoom extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS room (id INTEGER PRIMARY KEY, data TEXT NOT NULL)');
+    this.room = ctx.storage.sql.exec('SELECT data FROM room WHERE id = 1').toArray().map(row => JSON.parse(row.data))[0] ?? null;
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
+  }
+  #save(room) {
+    this.ctx.storage.sql.exec('INSERT INTO room (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data=excluded.data', JSON.stringify(room));
+    this.room = room;
+  }
+  async create() {
+    if (this.room) return false;
+    this.#save({ snapshot: initialSnapshot(), seats: [null, null], seq: 0, pending: null, votes: [], updated: Date.now() });
+    await this.ctx.storage.setAlarm(Date.now() + DAY);
+    return true;
+  }
+  #connected(exclude) {
+    return [0, 1].map(seat => this.ctx.getWebSockets().some(ws => ws !== exclude && ws.readyState === 1 && ws.deserializeAttachment()?.seat === seat));
+  }
+  #state(ws) { ws.send(JSON.stringify({ type: 'state', ...this.#public(), seat: ws.deserializeAttachment().seat })); }
+  #public() {
+    const { snapshot, seq, pending, votes } = this.room;
+    return { snapshot, seq, pending, votes, connected: this.#connected() };
+  }
+  #broadcast(message, exclude) {
+    for (const ws of this.ctx.getWebSockets()) if (ws !== exclude && ws.readyState === 1 && Number.isInteger(ws.deserializeAttachment()?.seat)) ws.send(JSON.stringify(message));
+  }
+  #broadcastState() { for (const ws of this.ctx.getWebSockets()) if (ws.readyState === 1 && Number.isInteger(ws.deserializeAttachment()?.seat)) this.#state(ws); }
+  async fetch() {
+    if (!this.room || Date.now() - this.room.updated > DAY) return new Response('This room has expired. Create a new room.', { status: 404 });
+    if (this.ctx.getWebSockets().length >= 6) return new Response('Room is full.', { status: 409 });
+    const [client, server] = Object.values(new WebSocketPair());
+    this.ctx.acceptWebSocket(server);
+    server.serializeAttachment({ seat: null, count: 0, since: Date.now() });
+    return new Response(null, { status: 101, webSocket: client });
+  }
+  async webSocketMessage(ws, raw) {
+    if (typeof raw !== 'string' || raw.length > 12000) { ws.close(1009, 'Message too large'); return; }
+    const connection = ws.deserializeAttachment();
+    if (Date.now() - connection.since > 10000) { connection.count = 0; connection.since = Date.now(); }
+    connection.count++; ws.serializeAttachment(connection);
+    if (connection.count > 40) { ws.close(1008, 'Too many requests'); return; }
+    let message;
+    try { message = JSON.parse(raw); } catch { ws.close(1008, 'Invalid message'); return; }
+    try {
+      if (connection.seat === null) {
+        if (message?.type !== 'hello' || message.version !== PROTOCOL_VERSION || !uuid.test(message.token)) throw new Error('Refresh Pool to join this room.');
+        // Hash reconnect credentials; raw tokens never enter URLs, logs, or persistent storage.
+        const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message.token)))].map(b => b.toString(16).padStart(2, '0')).join('');
+        const seats = [...this.room.seats];
+        let seat = seats.indexOf(hash);
+        if (seat === -1) { seat = seats.indexOf(null); if (seat === -1) throw new Error('This room already has two players.'); seats[seat] = hash; }
+        for (const old of this.ctx.getWebSockets()) if (old !== ws && old.deserializeAttachment()?.seat === seat) old.close(4001, 'Opened in another tab');
+        this.#save({ ...this.room, seats });
+        connection.seat = seat; ws.serializeAttachment(connection);
+        this.#state(ws); this.#broadcast({ type: 'presence', connected: this.#connected() });
+        return;
+      }
+      const seat = connection.seat;
+      if (!message || !['shoot', 'result', 'place', 'rematch'].includes(message.type)) throw new Error('Unknown action.');
+      if (message.seq !== this.room.seq) throw new Error('The table changed. Try again.');
+      let room = { ...this.room, updated: Date.now() };
+      if (message.type === 'rematch') {
+        if (room.snapshot.match.winner === null || room.pending) throw new Error('Finish this rack before requesting a rematch.');
+        room.votes = [...new Set([...room.votes, seat])];
+        if (room.votes.length === 2) { room.snapshot = initialSnapshot(1 - room.snapshot.match.breaker, room.snapshot.match.wins); room.votes = []; }
+      } else {
+        if (seat !== room.snapshot.match.turn) throw new Error('It is your friend’s turn.');
+        if (message.type === 'result') {
+          if (!room.pending || room.pending.seat !== seat) throw new Error('No shot is in progress.');
+          room.snapshot = finishShot(room.snapshot, room.pending, message.report, message.balls); room.pending = null;
+        } else {
+          if (room.pending) throw new Error('Wait for the balls to settle.');
+          if (!this.#connected().every(Boolean)) throw new Error('Wait for your friend to reconnect.');
+          if (message.type === 'place') room.snapshot = placeCue(room.snapshot, message.position);
+          else room.pending = { seat, action: validateShot(room.snapshot, message.action), started: Date.now() };
+        }
+      }
+      room.seq++; this.#save(room);
+      await this.ctx.storage.setAlarm(room.pending ? Date.now() + 90000 : Date.now() + DAY);
+      if (message.type === 'shoot') this.#broadcast({ type: 'shot', ...this.#public() });
+      else this.#broadcastState();
+    } catch (error) {
+      ws.send(JSON.stringify({ type: 'error', message: error.message }));
+      if (connection.seat === null) ws.close(4002, error.message);
+      else this.#state(ws);
+    }
+  }
+  webSocketClose(ws) {
+    const seat = ws.deserializeAttachment()?.seat;
+    if (!this.room || !Number.isInteger(seat)) return;
+    if (this.room.pending?.seat === seat && !this.#connected(ws)[seat]) {
+      this.#save({ ...this.room, pending: null, seq: this.room.seq + 1 });
+      this.#broadcastState();
+    }
+    this.#broadcast({ type: 'presence', connected: this.#connected(ws) }, ws);
+  }
+  webSocketError(ws) { ws.close(1011, 'Connection lost'); this.webSocketClose(ws); }
+  async alarm() {
+    if (!this.room) return;
+    if (this.room.pending) {
+      this.#save({ ...this.room, pending: null, seq: this.room.seq + 1 });
+      this.#broadcast({ type: 'error', message: 'Shot interrupted. The previous table has been restored.' });
+      this.#broadcastState();
+      await this.ctx.storage.setAlarm(this.room.updated + DAY);
+    } else if (Date.now() - this.room.updated >= DAY) {
+      for (const ws of this.ctx.getWebSockets()) ws.close(4002, 'Room expired');
+      await this.ctx.storage.deleteAll(); this.room = null;
+    } else await this.ctx.storage.setAlarm(this.room.updated + DAY);
+  }
+}
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (request.headers.get('Origin') !== url.origin) return new Response('Origin not allowed', { status: 403 });
+    if (url.pathname === '/api/rooms' && request.method === 'POST') {
+      const id = crypto.randomUUID(); await env.POOL_ROOMS.getByName(id).create();
+      return Response.json({ id }, { status: 201, headers: { 'Cache-Control': 'no-store' } });
+    }
+    const route = /^\/api\/rooms\/([^/]+)\/socket$/.exec(url.pathname);
+    if (route && uuid.test(route[1]) && request.method === 'GET' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') return env.POOL_ROOMS.getByName(route[1]).fetch(request);
+    return new Response('Not found', { status: 404 });
+  },
+};
