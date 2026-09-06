@@ -12,9 +12,22 @@ current.enter();
 // ---------- input ----------
 connectPointerInput(renderer.domElement, current);
 addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.querySelector('.help').open = false;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.target.closest('input, textarea, select, [contenteditable]')) return;
   const k = e.key.toLowerCase();
-  if (k === 'm') { window.playful.mute = !window.playful.mute; return; }
+  if (k === 'm') { toggleSound(); return; }
   current.key(k);
+});
+function toggleSound() {
+  window.playful.mute = !window.playful.mute;
+  document.getElementById('sound').setAttribute('aria-pressed', String(!window.playful.mute));
+  document.getElementById('sound-state').textContent = window.playful.mute ? 'off' : 'on';
+}
+document.getElementById('sound').addEventListener('click', toggleSound);
+document.getElementById('reset-view').addEventListener('click', () => current.key('c'));
+document.getElementById('rerack').addEventListener('click', () => current.key('r'));
+addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('.help')) document.querySelector('.help').open = false;
 });
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);

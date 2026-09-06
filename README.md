@@ -1,17 +1,26 @@
-# Playful Pool
+# Pool
 
 A 7-foot pool table you can walk around, built with three.js and Rapier, racked with the Playful Heads: the
 Hatch 2025 team as 3D head textures on the balls. Extracted from `playful-photos` (which keeps the head-map pipeline).
 
 `npm install && npm run dev`, then open the printed URL. `npm run physics-test` runs the physics harness.
 
+## Deployment
+Live at [pool.darrinm.com](https://pool.darrinm.com). The repository lives at `~/src/pool`.
+
+`nvm use` selects Node 24 (see `.nvmrc`). `npm run deploy` builds the game and publishes `dist/` to the `pool` Cloudflare Worker.
+`wrangler.jsonc` configures the custom domain, following `~/src/darrinm.com/README.md`.
+Use your Wrangler login; if the shell exports credentials for another account, run
+`env -u CF_API_TOKEN -u CF_ACCOUNT_ID -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_ACCOUNT_ID npm run deploy`.
+
 ## Playing
 Drag back from the cue ball to shoot; the further the pull, the harder the hit (up to about 5.8 m/s). The ball
-widget (bottom right) sets follow / draw / english. Left-drag the table to orbit, right-drag to pan, wheel to zoom,
+widget (bottom right) sets follow / draw / english; Reset centers the contact point. Left-drag the table to orbit, right-drag to pan, wheel to zoom,
 `C` resets the view. Heads / Balls buttons (or `B`) swap the heads for authentic numbered balls. `M` mutes,
-`R` re-racks.
+`R` re-racks. The bottom dock groups play mode, ball appearance, reset view, and re-rack.
+The header shows pocketed balls and shots, with sound and a Help menu for controls and shortcuts.
 
-Choose **Drag & fling** (or press `F`) to grab any ball and slide it across the felt. Release while moving to
+Choose **Fling** (or press `F`) to grab any ball and slide it across the felt. Release while moving to
 fling it in the direction of your mouse; move faster for a harder throw. Hold still before releasing to place
 the ball. Balls still collide with each other and the cushions. Drag empty table space to orbit as usual,
 and choose **Cue** or press `F` again to return to cue shots.

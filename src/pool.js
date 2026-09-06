@@ -229,7 +229,7 @@ function removeCaps() {
 function setBallStyle(style) {
   ballStyle = style; localStorage.setItem('playful.ballStyle', style);
   if (tableStill()) for (const h of heads) if (h.mesh.visible && !pocketedSet.has(h)) h.body.setRotation(rackRot(h), true);   // re-orient resting heads face/number up
-  document.querySelectorAll('#style button').forEach((b) => b.classList.toggle('active', b.dataset.style === style));
+  document.querySelectorAll('#style button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.style === style)));
   applyCaps();
 }
 
@@ -244,7 +244,7 @@ function layout() {
   for (let row = 0; row < 5 && j < rack.length; row++)
     for (let k = 0; k <= row && j < rack.length; k++, j++) spot(rack[j], HW * 0.5 + row * R * 1.74, (k - row / 2) * R * 2.01, rackRot(rack[j]));
   pocketed = 0; shots = 0; pocketedSet = new Set(); respotAt = 0; belowSince.clear(); inWell.clear();
-  ui.status(`pocketed 0 / ${allBalls().length - 1}`);
+  updateScore();
 }
 function spot(h, x, y, rot) { h.body.setTranslation({ x, y, z: BALL_Z }, true); h.body.setRotation(rot, true); h.body.setLinvel({ x: 0, y: 0, z: 0 }, true); h.body.setAngvel({ x: 0, y: 0, z: 0 }, true); }
 
@@ -335,8 +335,8 @@ function setInteractionMode(mode) {
   endGesture();
   interactionMode = mode;
   document.querySelectorAll('#mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
-  spinEl.hidden = mode !== 'cue';
-  ui.hint(`${mode === 'fling' ? 'drag any ball and release to fling · hold still before releasing to place' : 'drag back from the cue ball to shoot · ball widget sets spin'} · drag the table to orbit · right-drag to pan · wheel to zoom · F switches mode · C resets view · B heads / balls · M mutes · R re-racks`);
+  document.getElementById('spin-control').hidden = mode !== 'cue';
+  ui.hint(mode === 'fling' ? 'Grab any ball. Release to fling. Hold still to place.' : 'Pull back from the cue ball. Release to shoot.');
 }
 const onTable = (h) => h.mesh.visible && h.body.isEnabled() && !pocketedSet.has(h) && h.body.translation().z > BALL_Z - 0.5;
 const cueReady = () => onTable(cue) && tableStill();
@@ -388,23 +388,34 @@ function updateDrag() {
 }
 function showGameControls(show) {
   document.getElementById('vignette').hidden = !show;
+  document.getElementById('hud').hidden = !show;
   const styleEl = document.getElementById('style'); styleEl.hidden = !show;
   wireOnce(styleEl, (b) => setBallStyle(b.dataset.style));
-  styleEl.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.style === ballStyle));
+  styleEl.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.style === ballStyle)));
   if (!spinEl) {
     spinEl = document.getElementById('spin');
     spinEl.addEventListener('pointerdown', (e) => {
       const r = spinEl.getBoundingClientRect();
       const x = ((e.clientX - r.left) / r.width) * 2 - 1, y = -(((e.clientY - r.top) / r.height) * 2 - 1);
-      const len = Math.hypot(x, y), s = len > 0.7 ? 0.7 / len : 1;
-      spin = { x: x * s, y: y * s };
-      spinEl.querySelector('.dot').style.left = `${50 + spin.x * 50}%`; spinEl.querySelector('.dot').style.top = `${50 - spin.y * 50}%`;
+      setSpin(x, y);
       e.stopPropagation();
     });
+    spinEl.addEventListener('keydown', (e) => {
+      const offsets = { ArrowLeft: [-0.1, 0], ArrowRight: [0.1, 0], ArrowUp: [0, 0.1], ArrowDown: [0, -0.1] };
+      if (e.key === 'Home') { e.preventDefault(); setSpin(0, 0); }
+      else if (offsets[e.key]) { e.preventDefault(); const [x, y] = offsets[e.key]; setSpin(spin.x + x, spin.y + y); }
+    });
+    document.getElementById('reset-spin').addEventListener('click', () => setSpin(0, 0));
   }
   const modeEl = document.getElementById('mode'); modeEl.hidden = !show;
   wireOnce(modeEl, (b) => setInteractionMode(b.dataset.mode));
-  if (show) setInteractionMode(interactionMode); else spinEl.hidden = true;
+  if (show) setInteractionMode(interactionMode); else document.getElementById('spin-control').hidden = true;
+}
+function setSpin(x, y) {
+  const len = Math.hypot(x, y), scale = len > 0.7 ? 0.7 / len : 1;
+  spin = { x: x * scale, y: y * scale };
+  const dot = spinEl.querySelector('.dot');
+  dot.style.left = `${50 + spin.x * 50}%`; dot.style.top = `${50 - spin.y * 50}%`;
 }
 function wireOnce(group, onClick) {
   if (group.dataset.wired) return;
@@ -443,7 +454,7 @@ function updateGuide() {
   // cue stick behind the ball, pulled back with the power, slightly elevated
   const h = cueStick.holder, right = new THREE.Vector2(dir.y, -dir.x);   // shooter's right-hand side
   h.position.set(c.x - dir.x * (R + 0.5 + pull * 0.6) + right.x * spin.x * R * 0.7, c.y - dir.y * (R + 0.5 + pull * 0.6) + right.y * spin.x * R * 0.7, BALL_Z + 0.15 + spin.y * R * 0.7);
-  const txt = `power ${Math.round((pull / MAX_PULL) * 100)}%${spin.x || spin.y ? ' · spin' : ''}`;
+  const txt = `Power ${Math.round((pull / MAX_PULL) * 100)}%${spin.x || spin.y ? ' · spin applied' : ''}`;
   if (txt !== lastStatus) { lastStatus = txt; ui.status(txt); }
   // Elevate the cue so the butt clears the rail behind the ball: find how far back the nearest cushion line is
   // along the stick, and pitch the stick so it is above the rail top there (a player's cue over the rail).
@@ -458,9 +469,15 @@ function tableStill() {
     const v = h.body.linvel(); return Math.hypot(v.x, v.y, v.z) < 0.3;
   });
 }
+function updateScore() {
+  document.getElementById('pocketed-count').textContent = pocketed;
+  document.getElementById('shot-count').textContent = shots;
+  lastStatus = '';
+  ui.status(pocketed === allBalls().length - 1 ? `Table cleared in ${shots} shots. Ready for another rack?` : '');
+}
 function endAim() {
   aiming = null; guide.visible = false; cueStick.visible = false; if (controls) controls.enabled = true;
-  ui.status(pocketed === allBalls().length - 1 ? `all ${pocketed} pocketed in ${shots} shots · R to re-rack` : `pocketed ${pocketed} / ${allBalls().length - 1}`);
+  updateScore();
 }
 function shoot() {
   const { c, dir, pull } = aimVector();
@@ -488,7 +505,7 @@ function collectPocketed() {
       if (now - belowSince.get(h) > 600) {
         pocketedSet.add(h); belowSince.delete(h);
         if (h === cue) respotAt = now + 600;
-        else { pocketed++; ui.status(pocketed === allBalls().length - 1 ? `all ${pocketed} pocketed in ${shots} shots · R to re-rack` : `pocketed ${pocketed} / ${allBalls().length - 1}`); setTimeout(() => hideHead(h), 500); }
+        else { pocketed++; updateScore(); setTimeout(() => hideHead(h), 500); }
       }
     } else belowSince.delete(h);
   }
