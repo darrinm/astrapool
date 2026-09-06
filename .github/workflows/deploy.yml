@@ -27,7 +27,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Check pointer input and fling behavior
+      - name: Check game rules and pointer input
         run: node --test physics/*.test.mjs
       - name: Check physics, including maximum-power shots
         run: npm run physics-test

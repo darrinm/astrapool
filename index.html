@@ -11,17 +11,24 @@
     <div id="hud" hidden>
       <header class="topbar">
         <div class="brand"><span class="brand-ball" aria-hidden="true">8</span><span><strong>Pool</strong></span></div>
-        <div class="scoreboard" aria-label="Game score">
+        <div id="free-score" class="scoreboard" aria-label="Game score">
           <div><span class="eyebrow">Pocketed</span><span class="score"><b id="pocketed-count">0</b><span> / 15</span></span></div>
           <div><span class="eyebrow">Shots</span><b id="shot-count" class="score">0</b></div>
+        </div>
+        <div id="match-score" class="match-score" aria-label="Match score">
+          <div id="player-0" class="player-card"><div class="player-heading"><strong class="player-name">Player 1</strong><b class="rack-wins">0</b></div><span class="player-group">Open table</span><div class="remaining-balls"></div></div>
+          <span class="versus">8-ball</span>
+          <div id="player-1" class="player-card"><div class="player-heading"><strong class="player-name">Player 2</strong><b class="rack-wins">0</b></div><span class="player-group">Open table</span><div class="remaining-balls"></div></div>
         </div>
         <div class="utilities">
           <button id="sound" class="quiet-button" aria-pressed="true" title="Toggle sound (M)">Sound <span id="sound-state">on</span></button>
           <details class="help">
             <summary class="quiet-button" title="Controls and shortcuts">Help <span aria-hidden="true">?</span></summary>
             <div class="help-panel">
-              <h2>Make yourself at home.</h2>
-              <p>In Cue mode, pull back from the white ball and release to shoot. In Fling mode, grab any ball and throw it. Hold still to place it.</p>
+              <h2>Pool house rules</h2>
+              <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>
+              <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack. Regular shots need no pocket call.</p>
+              <p>In Cue mode, pull back from the white ball and release to shoot. In Free Play’s Fling mode, grab any ball and throw it. Hold still to place it.</p>
               <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag</dd></div><div><dt>Zoom</dt><dd>Scroll</dd></div><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Heads / balls</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
             </div>
           </details>
@@ -29,10 +36,16 @@
       </header>
       <div class="bottom-hud">
         <div class="guidance"><div id="status" role="status"></div><p id="hint"></p></div>
+        <div id="pocket-call" class="pocket-call" hidden>
+          <span class="eyebrow">Call the 8-ball pocket · break end on the left</span>
+          <div class="pocket-map"><button data-pocket="0" aria-pressed="false">Near left</button><button data-pocket="1" aria-pressed="false">Side left</button><button data-pocket="2" aria-pressed="false">Far left</button><button data-pocket="3" aria-pressed="false">Near right</button><button data-pocket="4" aria-pressed="false">Side right</button><button data-pocket="5" aria-pressed="false">Far right</button></div>
+        </div>
+        <button id="rematch" class="primary-button" hidden>Rematch</button>
         <div class="control-dock">
-          <div class="control-group"><span class="eyebrow">Play your way</span><div id="mode" class="segmented" role="group" aria-label="Interaction mode"><button data-mode="cue" aria-pressed="true" title="Shoot with the cue">Cue</button><button data-mode="fling" aria-pressed="false" title="Grab and throw any ball">Fling</button></div></div>
+          <div class="control-group"><label class="eyebrow" for="game-mode">Game</label><select id="game-mode"><option value="local">Local 8-ball</option><option value="free">Free Play</option></select></div>
+          <div id="interaction-group" class="control-group"><span class="eyebrow">Play your way</span><div id="mode" class="segmented" role="group" aria-label="Interaction mode"><button data-mode="cue" aria-pressed="true" title="Shoot with the cue">Cue</button><button data-mode="fling" aria-pressed="false" title="Grab and throw any ball">Fling</button></div></div>
           <div class="control-group"><span class="eyebrow">On the table</span><div id="style" class="segmented" role="group" aria-label="Ball appearance"><button data-style="heads" aria-pressed="true">Heads</button><button data-style="balls" aria-pressed="false">Balls</button></div></div>
-          <div class="dock-actions"><button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button><button id="rerack" class="quiet-button" title="Re-rack (R)">Re-rack <span aria-hidden="true">↻</span></button></div>
+          <div class="dock-actions"><button id="overhead-view" class="quiet-button">Overhead</button><button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button><button id="rerack" class="quiet-button" title="Re-rack (R)">Re-rack <span aria-hidden="true">↻</span></button></div>
         </div>
       </div>
       <section id="spin-control" class="spin-panel" aria-label="Cue spin" hidden>

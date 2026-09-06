@@ -9,7 +9,7 @@ Hatch 2025 team as 3D head textures on the balls. Extracted from `playful-photos
 Live at [pool.darrinm.com](https://pool.darrinm.com). The repository lives at `~/src/pool`.
 
 GitHub Actions checks pull requests targeting `main`. Every push to `main` (including a merged PR)
-runs the 18 input tests, physics harness, and production build, then deploys to Cloudflare.
+runs the game-rule and input tests, physics harness, and production build, then deploys to Cloudflare.
 Failed checks prevent that workflow run from deploying. PRs never deploy. The workflow also supports
 manual runs from the Actions tab on `main`; production deployments run one at a time.
 
@@ -24,6 +24,20 @@ if the shell exports credentials for another account, run
 `env -u CF_API_TOKEN -u CF_ACCOUNT_ID -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_ACCOUNT_ID npm run deploy`.
 
 ## Playing
+Choose **Local 8-ball** to play a match with another person on this device, or **Free Play** for Cue / Fling.
+Local matches track turns, remaining solids / stripes, fouls, rack wins, and rematches with alternating breaks.
+After a foul, click clear felt or drag the cue ball to place it. Choose a pocket before shooting the 8; the selected
+pocket glows gold on the table. **Overhead** gives a top-down view.
+
+Pool uses house rules: the table stays open after the break; the first legal shot pocketing only one group assigns
+solids / stripes. Hit your own group first, then pocket a ball or drive a ball to a cushion. All fouls give ball-in-hand
+anywhere. The 8 must be played on a separate shot after clearing your group, into the called pocket. An early 8,
+foul with the 8, or wrong pocket loses. The 8 is spotted after a break; a dry break needs four distinct object balls
+to a cushion, otherwise the incoming player breaks a fresh rack. Regular shots need no call. These simplified break
+and call-shot rules are intentional; this is not a tournament rules implementation.
+
+`npm test` checks rules and pointer behavior. The pure rules engine lives in `src/eight-ball.js`.
+
 Press `Esc` while lining up a cue shot to cancel without shooting.
 Drag back from the cue ball to shoot; the further the pull, the harder the hit (up to 24 mph / 10.7 m/s). The ball
 widget (bottom right) sets follow / draw / english; Reset centers the contact point. Left-drag the table to orbit, right-drag to pan, wheel to zoom,
