@@ -17,7 +17,8 @@ import { flingVelocity, pushSample } from './fling.js';
 import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
 
 const { R, G, MU_SLIDE, MU_BALL, E_BALL, HW, HH, RAIL_H, CUSH, POCKET_R } = P;   // table physics constants live in physics/poolphysics.js
-const MAX_PULL = 24, SPEED_PER_PULL = 75 / 8;   // speed grows with pull-back distance: 8 units = 1.9 m/s, 24 units = 5.8 m/s
+const MAX_PULL = 24, MAX_SPEED = 24 * 0.44704 / 0.026;   // 24 mph in game units/s (1 unit = 26 mm), shared with flings
+const SPEED_PER_PULL = MAX_SPEED / MAX_PULL;
 const FELT_Z = -DEPTH, BALL_Z = FELT_Z + R;
 const RAIL_W = 3.2, WELL_DEPTH = P.WELL_DEPTH;
 let cue, aiming = null, pockets = [], guide, cueStick, marker, pocketed = 0, shots = 0, spin = { x: 0, y: 0 }, spinEl, controls;
@@ -26,7 +27,6 @@ const capped = new Map();   // head -> { plain, capped, ball } textures; caps ar
 let capsOn = false;
 let ballStyle = localStorage.getItem('playful.ballStyle') || 'heads';   // 'heads' | 'balls'
 let interactionMode = 'cue', dragging = null;
-const MAX_SPEED = MAX_PULL * SPEED_PER_PULL;   // for a cue strike and for a fling alike
 // The cue ball is always a plain white ball, and the plain black 8 sits at the centre of the rack. The 14 heads
 // take the other numbers (1-7 and 9-15). `extras` holds the two plain balls; `objects()` is the rack order.
 let extras = [];
@@ -533,7 +533,7 @@ export default {
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     controls?.dispose(); controls = null; setLook(false);
   },
-  key(k) { if (k === 'r') layout(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue'); },
+  key(k) { if (k === 'escape' && aiming) endAim(); if (k === 'r') layout(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue'); },
   resize() {},
   pointerdown(e) {
     audio.ensure();

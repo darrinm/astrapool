@@ -8,13 +8,24 @@ Hatch 2025 team as 3D head textures on the balls. Extracted from `playful-photos
 ## Deployment
 Live at [pool.darrinm.com](https://pool.darrinm.com). The repository lives at `~/src/pool`.
 
-`nvm use` selects Node 24 (see `.nvmrc`). `npm run deploy` builds the game and publishes `dist/` to the `pool` Cloudflare Worker.
-`wrangler.jsonc` configures the custom domain, following `~/src/darrinm.com/README.md`.
-Use your Wrangler login; if the shell exports credentials for another account, run
+GitHub Actions checks pull requests targeting `main`. Every push to `main` (including a merged PR)
+runs the 18 input tests, physics harness, and production build, then deploys to Cloudflare.
+Failed checks prevent that workflow run from deploying. PRs never deploy. The workflow also supports
+manual runs from the Actions tab on `main`; production deployments run one at a time.
+
+The repository Actions secret `CLOUDFLARE_API_TOKEN` must contain a Cloudflare Workers deployment
+token scoped to the account in `wrangler.jsonc` and the `darrinm.com` zone. Use Cloudflare's
+“Edit Cloudflare Workers” token template. The account ID and custom domain are configured in
+`wrangler.jsonc`, following `~/src/darrinm.com/README.md`.
+
+For a manual local deployment, `nvm use` selects Node 24 (see `.nvmrc`), then `npm run deploy`
+builds and publishes the local files, including uncommitted changes. Use your Wrangler login;
+if the shell exports credentials for another account, run
 `env -u CF_API_TOKEN -u CF_ACCOUNT_ID -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_ACCOUNT_ID npm run deploy`.
 
 ## Playing
-Drag back from the cue ball to shoot; the further the pull, the harder the hit (up to about 5.8 m/s). The ball
+Press `Esc` while lining up a cue shot to cancel without shooting.
+Drag back from the cue ball to shoot; the further the pull, the harder the hit (up to 24 mph / 10.7 m/s). The ball
 widget (bottom right) sets follow / draw / english; Reset centers the contact point. Left-drag the table to orbit, right-drag to pan, wheel to zoom,
 `C` resets the view. Heads / Balls buttons (or `B`) swap the heads for authentic numbered balls. `M` mutes,
 `R` re-racks. The bottom dock groups play mode, ball appearance, reset view, and re-rack.
@@ -48,7 +59,7 @@ and choose **Cue** or press `F` again to return to cue shots.
 - `physics/poolphysics.js` – the table physics as a plain module (constants, felt / cushion / pocket-well / backstop
   colliders, strike, rolling resistance, spin friction) shared by the scene and the harness.
 - `physics/validate.mjs` – 26 headless checks: closed-form sliding / rolling results, collision laws, the 90° and 30°
-  rules, cushion rebound, engine hygiene (timestep sensitivity, tunnelling, determinism), and a 312-shot pocket sweep.
+  rules, cushion rebound, engine hygiene (timestep sensitivity, tunnelling, determinism), and a pocket sweep including 24 mph shots.
   `RATE=120 npm run physics-test` shows the coarse-step losses that led to stepping at 480 Hz. Known deviation: heavy
   topspin into a rail rebounds livelier than on a real table.
 - `public/heads/` – the 14 equirectangular head maps (generated in `playful-photos/pipeline`).

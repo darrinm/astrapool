@@ -181,7 +181,7 @@ for (const v of [12, 40]) {
   const outcomes = { well: 0, table: 0, rail: 0 }, bad = [];
   for (const [pi, p] of pocketCenters().entries()) {
     const toCentre = Math.atan2(-p.y, -p.x);   // straight out of the pocket toward the table centre
-    for (const speed of [25, 60, 120, 220]) for (const off of [-1.2, 0, 1.2]) for (const dAng of [-35, -15, 0, 15, 35]) {
+    for (const speed of [25, 60, 120, 220, 24 * 0.44704 / 0.026]) for (const off of [-1.2, 0, 1.2]) for (const dAng of [-35, -15, 0, 15, 35]) {
       const a = toCentre + Math.PI + (dAng * Math.PI) / 180, dir = { x: Math.cos(a), y: Math.sin(a) };   // into the pocket
       const perp = { x: -dir.y, y: dir.x }, dist = 14;
       const sx = p.x - dir.x * dist + perp.x * off, sy = p.y - dir.y * dist + perp.y * off;
