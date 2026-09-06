@@ -35,3 +35,13 @@ sampled audio, the 14 head maps, and the sound-effect pipeline. The head-map pip
 - [x] Real cause (from the user's own event stream, captured by a temporary reporter): their Chrome fires `lostpointercapture` (buttons=0) before pointerup, and main.js treated it as a cancel → ball zeroed. `src/main.js` now treats a lost capture with no button held as the release (fling / shoot); only a capture lost mid-press cancels
 - [x] Simplified after the fix: cursor reset lives in endDrag/endAim only, pointermove uses early returns, pointer samples use `e.timeStamp` directly, and endDrag no longer releases capture by hand (the browser releases it on pointerup). Verified flings and cue shots in both lostpointercapture orders. Speed caps left as they are (user: "it's fun")
 - [x] /simplify pass (4 reviewers): adapter owns cursor + pointer identity and delivers one completion per gesture (scene drops pointerId bookkeeping); `endGesture()` replaces five `endDrag(); endAim();` pairs; `onTable`/`cueReady` predicates; `pushSample` and the release time move into fling.js; leftover zero-movement guard deleted; `MAX_SPEED` shared with the cue strike; `wireOnce` for the two button groups; `#mode` styled by aria-pressed only. Skipped: full gesture-object refactor, Vector2.clampLength, per-step scratch objects (micro)
+
+## Complete gameplay stages (2026-09-06)
+- [x] Stage 1: local two-player house 8-ball, turn and group HUD, fouls, ball-in-hand, called 8, wins, rematch, Free Play.
+- [x] Stage 1 validation: 40 unit tests, 26 physics checks, production build; Chrome break → scratch → placement → early 8 loss → rematch, all 16 balls restored.
+- [x] Stage 2: computer opponent with difficulty selection and the same match rules.
+- [x] Stage 3: private invite-link online matches, reconnects, interrupted-shot rollback, mutual rematches, and CI deployment checks.
+
+- [x] Stage 2 validation: 47 tests; Chrome computer break and four following shots pocketed seven balls, assigned groups, and returned a legal turn to the human.
+
+- [x] Stage 3 validation: 53 unit tests, 26 physics checks, real Worker/WebSocket lifecycle test, production build and Wrangler dry run. Two isolated Chrome sessions synchronized a real break and retained seats after refresh. Mobile HUD verified at 390 × 844; Balls is the default.

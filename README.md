@@ -9,7 +9,7 @@ Hatch 2025 team as 3D head textures on the balls. Extracted from `playful-photos
 Live at [pool.darrinm.com](https://pool.darrinm.com). The repository lives at `~/src/pool`.
 
 GitHub Actions checks pull requests targeting `main`. Every push to `main` (including a merged PR)
-runs the 18 input tests, physics harness, and production build, then deploys to Cloudflare.
+runs the game-rule, AI, input and online-room tests, physics harness, and production build, then deploys to Cloudflare.
 Failed checks prevent that workflow run from deploying. PRs never deploy. The workflow also supports
 manual runs from the Actions tab on `main`; production deployments run one at a time.
 
@@ -23,11 +23,47 @@ builds and publishes the local files, including uncommitted changes. Use your Wr
 if the shell exports credentials for another account, run
 `env -u CF_API_TOKEN -u CF_ACCOUNT_ID -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_ACCOUNT_ID npm run deploy`.
 
+## Online rooms
+Choose **Play a Friend**, then **Copy invite** and send the link to one friend. Both players must be connected
+to start a shot. Each player controls only their own turn. Both must accept a rematch; the break alternates.
+The same tab can refresh or reconnect without losing its seat. A shot interrupted by the shooter's disconnect
+is rolled back to its starting table. An unfinished shot also times out after 90 seconds. Rooms expire after
+24 hours without a game action. Choose a different game to leave a room.
+
+`npm run dev:online` builds and serves the complete app with a local Cloudflare runtime at http://localhost:8787.
+`npm run dev` serves the local / computer / Free Play game; online rooms require the Worker runtime.
+`npm run build && npm run test:online` exercises a real local Worker and two WebSocket clients, including
+turn enforcement, reconnect, interrupted shots, ball-in-hand, and mutual rematches. CI runs it before deployment.
+
+Each private room has a SQLite-backed Durable Object. The server assigns seats, validates inputs and turn
+ownership, resolves the shared house rules, and persists the accepted table. Browsers simulate shots; the
+shooting browser reports collisions and final positions, which the server checks structurally and shares with
+both players. These are casual friend matches: the server does not independently simulate physics or provide
+competitive anti-cheat. There are no accounts, public matchmaking, or rankings.
+
 ## Playing
+Choose **Local 8-ball** to play a match with another person on this device, or **Free Play** for Cue / Fling.
+Local matches track turns, remaining solids / stripes, fouls, rack wins, and rematches with alternating breaks.
+After a foul, click clear felt or drag the cue ball to place it. Choose a pocket before shooting the 8; the selected
+pocket glows gold on the table. **Overhead** gives a top-down view.
+
+Pool uses house rules: the table stays open after the break; the first legal shot pocketing only one group assigns
+solids / stripes. Hit your own group first, then pocket a ball or drive a ball to a cushion. All fouls give ball-in-hand
+anywhere. The 8 must be played on a separate shot after clearing your group, into the called pocket. An early 8,
+foul with the 8, or wrong pocket loses. The 8 is spotted after a break; a dry break needs four distinct object balls
+to a cushion, otherwise the incoming player breaks a fresh rack. Regular shots need no call. These simplified break
+and call-shot rules are intentional; this is not a tournament rules implementation.
+
+**Vs Computer** adds Easy / Normal / Hard opponents. You are Player 1; the computer is Player 2.
+It evaluates clear pots, legal contact and one-cushion escapes, places the cue after fouls, and calls the 8.
+Difficulty changes shot selection and aiming error; the rules and physics stay the same.
+
+`npm test` checks rules, computer shot selection and actual potting power, pointer behavior, and the server protocol. The pure rules engine lives in `src/eight-ball.js`.
+
 Press `Esc` while lining up a cue shot to cancel without shooting.
 Drag back from the cue ball to shoot; the further the pull, the harder the hit (up to 24 mph / 10.7 m/s). The ball
 widget (bottom right) sets follow / draw / english; Reset centers the contact point. Left-drag the table to orbit, right-drag to pan, wheel to zoom,
-`C` resets the view. Heads / Balls buttons (or `B`) swap the heads for authentic numbered balls. `M` mutes,
+`C` resets the view. Numbered **Balls** are the default. Heads / Balls buttons (or `B`) swap the heads for authentic numbered balls. `M` mutes,
 `R` re-racks. The bottom dock groups play mode, ball appearance, reset view, and re-rack.
 The header shows pocketed balls and shots, with sound and a Help menu for controls and shortcuts.
 
@@ -37,6 +73,8 @@ the ball. Balls still collide with each other and the cushions. Drag empty table
 and choose **Cue** or press `F` again to return to cue shots.
 
 ## Layout
+- `src/eight-ball.js` – shared house rules; `src/computer.js` – computer shot planning; `src/online.js` – invite rooms and reconnects.
+- `server/worker.js` – private Durable Object rooms; `server/protocol.js` – validated server actions and shot results.
 - `src/main.js` – fixed-step loop (480 Hz physics, interpolated rendering), key routing, `window.playful` debug handle.
 - `src/pointer-input.js` – browser pointer routing, including release before or after capture loss. `src/fling.js`
   estimates throw velocity from recent mouse samples. `node --test physics/*.test.mjs` checks both modules.
