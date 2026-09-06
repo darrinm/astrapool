@@ -77,3 +77,26 @@ test('private room: seats, turn enforcement, results, placement, reconnect, inte
   rejoined.send('rematch'); const rematch = await returned.wait(m => m.type === 'state' && m.seq > vote.seq);
   assert.equal(rematch.snapshot.match.winner, null); assert.equal(rematch.snapshot.match.breaker, 1); assert.deepEqual(rematch.snapshot.match.wins, [0, 1]); assert.equal(rematch.snapshot.balls.length, 16);
 });
+
+test('nonexistent rooms return a readable terminal WebSocket rejection', async () => {
+  const ws = new WebSocket(`${base.replace('http:', 'ws:')}/api/rooms/${crypto.randomUUID()}/socket`, { headers: { Origin: base } });
+  const messages = []; ws.on('message', bytes => messages.push(JSON.parse(bytes.toString())));
+  const [code, reason] = await once(ws, 'close');
+  assert.equal(code, 4002); assert.match(reason.toString(), /expired/);
+  assert.deepEqual(messages.map(m => m.type), ['error']);
+});
+
+test('connection capacity returns a terminal rejection while preserving existing connections', async () => {
+  const { id } = await (await fetch(base + '/api/rooms', { method: 'POST', headers: { Origin: base } })).json();
+  const sockets = [];
+  try {
+    for (let i = 0; i < 6; i++) {
+      const ws = new WebSocket(`${base.replace('http:', 'ws:')}/api/rooms/${id}/socket`, { headers: { Origin: base } });
+      sockets.push(ws); await once(ws, 'open');
+    }
+    const rejected = new WebSocket(`${base.replace('http:', 'ws:')}/api/rooms/${id}/socket`, { headers: { Origin: base } });
+    const [code, reason] = await once(rejected, 'close');
+    assert.equal(code, 4002); assert.match(reason.toString(), /full/);
+    assert.ok(sockets.every(ws => ws.readyState === WebSocket.OPEN));
+  } finally { for (const ws of sockets) ws.terminate(); }
+});

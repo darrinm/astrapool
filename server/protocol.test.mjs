@@ -35,3 +35,12 @@ test('illegal break returns a fresh rack without trusting reported positions', (
   const result = finishShot(snapshot, { action }, shotRecord(), []);
   assert.equal(result.match.breaker, 1); assert.equal(result.balls.length, 16);
 });
+
+for (const malformed of [undefined, null, false, 1, 'shot', []]) test(`malformed shot ${JSON.stringify(malformed)} has a validation error`, () => {
+  assert.throws(() => validateShot(initialSnapshot(), malformed), { name: 'Error', message: 'Invalid shot.' });
+});
+for (const malformed of [null, false, 1, 'ball', []]) test(`malformed ball ${JSON.stringify(malformed)} has a validation error`, () => {
+  const snapshot = initialSnapshot(), report = { ...shotRecord(), first: 1, rails: [1, 2, 3, 4] };
+  assert.throws(() => finishShot(snapshot, { action }, { ...report, pocketed: [malformed] }, snapshot.balls), { name: 'Error', message: 'Invalid pocket report.' });
+  assert.throws(() => finishShot(snapshot, { action }, report, [malformed, ...snapshot.balls.slice(1)]), { name: 'Error', message: 'Invalid final table.' });
+});

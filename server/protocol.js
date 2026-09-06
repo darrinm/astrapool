@@ -8,6 +8,7 @@ const ballNumber = n => Number.isInteger(n) && n >= 0 && n <= 15;
 const pocketNumber = n => Number.isInteger(n) && n >= 0 && n < 6;
 const requireValue = (valid, message) => { if (!valid) throw new Error(message); };
 export function validateShot(snapshot, action) {
+  requireValue(action && typeof action === 'object' && !Array.isArray(action), 'Invalid shot.');
   const { match } = snapshot, { dir, speed, spin, calledPocket } = action;
   requireValue(match.winner === null && !match.ballInHand, 'Place the cue ball before shooting.');
   requireValue(Number.isFinite(dir?.x) && Number.isFinite(dir?.y) && Math.abs(Math.hypot(dir.x, dir.y) - 1) < 0.001, 'Invalid shot direction.');
@@ -28,14 +29,14 @@ export function finishShot(snapshot, pending, report, positions) {
   const present = new Set(snapshot.balls.map(b => b.number));
   requireValue(report && (report.first === null || (ballNumber(report.first) && report.first > 0 && present.has(report.first))), 'Invalid first contact.');
   requireValue(Array.isArray(report.rails) && report.rails.length <= 16 && report.rails.every(n => ballNumber(n) && present.has(n)), 'Invalid cushion contacts.');
-  requireValue(Array.isArray(report.pocketed) && report.pocketed.length <= 16 && report.pocketed.every(p => ballNumber(p.number) && present.has(p.number) && pocketNumber(p.pocket)), 'Invalid pocket report.');
+  requireValue(Array.isArray(report.pocketed) && report.pocketed.length <= 16 && report.pocketed.every(p => p && ballNumber(p.number) && present.has(p.number) && pocketNumber(p.pocket)), 'Invalid pocket report.');
   requireValue(Array.isArray(report.offTable) && report.offTable.length <= 16 && report.offTable.every(n => ballNumber(n) && present.has(n)), 'Invalid off-table report.');
   const removed = [...report.pocketed.map(p => p.number), ...report.offTable];
   requireValue(new Set(removed).size === removed.length, 'A ball can leave the table only once.');
   const result = resolveShot(snapshot.match, { ...report, calledPocket: pending.action.calledPocket });
   if (result.rerack) return { ...initialSnapshot(result.state.breaker, result.state.wins), match: result.state };
   const expected = Array.from({ length: 16 }, (_, n) => n).filter(n => n === 0 ? !(result.state.winner !== null && removed.includes(0)) : !result.state.down.includes(n));
-  requireValue(Array.isArray(positions) && positions.length === expected.length && new Set(positions.map(b => b.number)).size === expected.length && positions.every(b =>
-    expected.includes(b.number) && Number.isFinite(b.x) && Number.isFinite(b.y) && Math.abs(b.x) <= P.HW + P.CUSH && Math.abs(b.y) <= P.HH + P.CUSH), 'Invalid final table.');
+  requireValue(Array.isArray(positions) && positions.length === expected.length && positions.every(b =>
+    b && expected.includes(b.number) && Number.isFinite(b.x) && Number.isFinite(b.y) && Math.abs(b.x) <= P.HW + P.CUSH && Math.abs(b.y) <= P.HH + P.CUSH) && new Set(positions.map(b => b.number)).size === expected.length, 'Invalid final table.');
   return { match: result.state, balls: positions.map(({ number, x, y }) => ({ number, x, y })) };
 }

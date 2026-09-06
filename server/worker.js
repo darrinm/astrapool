@@ -32,9 +32,14 @@ export class PoolRoom extends DurableObject {
   }
   #broadcastState() { for (const ws of this.ctx.getWebSockets()) if (ws.readyState === 1 && Number.isInteger(ws.deserializeAttachment()?.seat)) this.#state(ws); }
   async fetch() {
-    if (!this.room || Date.now() - this.room.updated > DAY) return new Response('This room has expired. Create a new room.', { status: 404 });
-    if (this.ctx.getWebSockets().length >= 6) return new Response('Room is full.', { status: 409 });
+    const rejection = !this.room || Date.now() - this.room.updated > DAY ? 'This room has expired. Create a new room.' :
+      this.ctx.getWebSockets().length >= 6 ? 'Room is full.' : null;
     const [client, server] = Object.values(new WebSocketPair());
+    if (rejection) {
+      // Complete the upgrade so browsers can read the reason and stop reconnecting.
+      server.accept(); server.send(JSON.stringify({ type: 'error', message: rejection })); server.close(4002, rejection);
+      return new Response(null, { status: 101, webSocket: client });
+    }
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ seat: null, count: 0, since: Date.now() });
     return new Response(null, { status: 101, webSocket: client });

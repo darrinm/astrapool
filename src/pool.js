@@ -29,7 +29,7 @@ let cue, aiming = null, pockets = [], guide, cueStick, marker, pocketed = 0, sho
 let pocketedSet = new Set(), respotAt = 0, pmrem, envTex, feltCol, lastStatus = '', contactShadows = [], fixture = [], fixtureFade = [0, 1];
 const capped = new Map();   // head -> { plain, capped, ball } textures; caps are baked lazily once the plain map has loaded
 let capsOn = false;
-let ballStyle = localStorage.getItem('playful.ballStyle') || 'balls';   // 'heads' | 'balls'
+let ballStyle = localStorage.getItem('playful.ballStyle') === 'heads' ? 'heads' : 'balls';   // 'heads' | 'balls'
 let interactionMode = 'cue', dragging = null;
 let gameMode = 'local', match = newMatch(), activeShot = null, calledPocket = null;
 let settledFor = 0, physicsTime = 0, placing = null, pocketMarker;
@@ -554,10 +554,11 @@ function updateScore() {
   }
   lastStatus = '';
   ui.status(free ? (pocketed === 15 ? `Table cleared in ${shots} shots. Ready for another rack?` : '') :
-    activeShot ? `Player ${match.turn + 1} shooting…` : match.message);
+    activeShot ? `Player ${match.turn + 1} shooting…` : gameMode === 'online' && online.pending ? 'Waiting for the shot result…' : match.message);
   ui.hint(free ? (interactionMode === 'fling' ? 'Grab any ball. Release to fling. Hold still to place.' : 'Pull back from the cue ball. Release to shoot.') :
     match.winner !== null ? 'A rack well played. Rematch to switch the break.' :
     activeShot ? 'Waiting for the balls to settle.' :
+    gameMode === 'online' && online.pending ? 'The next turn begins when the result is confirmed.' :
     computerTurn() ? 'The computer is lining up its shot.' :
     remoteTurn() ? (online.connected.every(Boolean) ? 'Your friend is lining up a shot.' : 'Share the invite link. Play begins when both players are connected.') :
     match.ballInHand ? 'Ball in hand: click an empty spot on the felt, or drag the white ball into place.' :
@@ -575,7 +576,6 @@ function startGame(mode, roomId = null) {
   document.getElementById('rematch').disabled = false; document.getElementById('rematch').textContent = 'Rematch'; match = newMatch(); layout();
   if (mode === 'online') { if (roomId) online.join(roomId); else void online.create(); }
   setInteractionMode('cue');
-  if (mode !== 'free') setBallStyle('balls');
   return true;
 }
 function joinInvite() {
@@ -585,7 +585,7 @@ function joinInvite() {
 function restart() {
   if (gameMode === 'online') { if (match.winner !== null) online.send('rematch'); return; }
   if (gameMode !== 'free' && match.winner === null && shots && !window.confirm('Restart this rack?')) return;
-  match = newMatch(1 - match.breaker, match.wins); layout();
+  match = newMatch(match.winner === null ? match.breaker : 1 - match.breaker, match.wins); layout();
 }
 function validPlacement(p, ball = cue) {
   return canPlace(p, tablePositions(), numberOf(ball));
@@ -636,17 +636,20 @@ function settleShot(dt) {
     ball.body.setLinvel({ x: 0, y: 0, z: 0 }, true); ball.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
   }
   const completed = activeShot;
+  activeShot = null; calledPocket = null; settledFor = 0;
+  // Both clients animate the shot; only the shooter prepares a result for the server.
+  if (gameMode === 'online' && online.seat !== onlineShooter) { updateScore(); return; }
   const result = resolveShot(match, completed);
-  match = result.state; activeShot = null; calledPocket = null; settledFor = 0;
+  if (gameMode !== 'online') match = result.state;
   if (result.rerack) {
-    if (gameMode === 'online') { sendOnlineResult(completed); return; }
+    if (gameMode === 'online') { sendOnlineResult(completed); updateScore(); return; }
     layout(); return;
   }
   for (const n of result.respot) respot(allBalls().find(b => numberOf(b) === n), HW * 0.5);
-  if (match.ballInHand) respot(cue, -HW * 0.5);
-  pocketed = match.down.length;
-  setSpin(0, 0); updateScore();
+  if (result.state.ballInHand) respot(cue, -HW * 0.5);
   if (gameMode === 'online') sendOnlineResult(completed);
+  else pocketed = match.down.length;
+  setSpin(0, 0); updateScore();
 }
 function endAim() {
   aiming = null; guide.visible = false; cueStick.visible = false; if (controls) controls.enabled = true;
@@ -693,7 +696,7 @@ function updateComputer(dt) {
 }
 
 function sendOnlineResult(report) {
-  if (online.seat === onlineShooter && onlineShotSeq === online.seq) online.send('result', { report, balls: tablePositions() });
+  if (online.seat === onlineShooter && onlineShotSeq === online.seq) online.submitResult({ report, balls: tablePositions() });
 }
 function applyOnlineSnapshot(snapshot) {
   endGesture(); activeShot = null; computerPlan = null; settledFor = 0; calledPocket = null;
@@ -769,7 +772,7 @@ export default {
   enter() {
     setHeadRadius(R); world.gravity = { x: 0, y: 0, z: -G };
     RectAreaLightUniformsLib.init();
-    build(); layout(); setupCamera(); setLook(true); showGameControls(true); capsOn = true; setBallStyle('balls');
+    build(); layout(); setupCamera(); setLook(true); showGameControls(true); capsOn = true; setBallStyle(ballStyle);
     window.addEventListener('hashchange', joinInvite);
     joinInvite();
   },
@@ -785,6 +788,7 @@ export default {
     audio.ensure();
     if (computerTurn() || remoteTurn() || e.button !== 0 || dragging || aiming || placing) return false;
     if (gameMode !== 'free' && match.winner === null && match.ballInHand && !activeShot && tableStill()) {
+      if (meshUnderPointer(e, [cue.mesh]) !== cue.mesh && !validPlacement(pointerToPlane(e, BALL_Z))) return false;
       controls.enabled = false;
       placing = { ball: cue, original: { ...cue.body.translation() }, valid: false };
       cue.body.setEnabled(false); movePlacement(e); return true;

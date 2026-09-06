@@ -1,10 +1,17 @@
 const VERSION = 1;
+export function roomToken() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128;
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 export class OnlineRoom {
   constructor(onMessage, onStatus) {
     this.onMessage = onMessage; this.onStatus = onStatus;
     this.id = null; this.socket = null; this.seq = 0; this.seat = null;
     this.connected = [false, false]; this.pending = false; this.waiting = false;
-    this.generation = 0; this.retry = 0;
+    this.generation = 0; this.retry = 0; this.synced = false; this.result = null; this.error = null; this.errorResync = false;
   }
   get canAct() { return this.socket?.readyState === WebSocket.OPEN && this.seat !== null && this.connected.every(Boolean) && !this.pending && !this.waiting; }
   async create() {
@@ -21,10 +28,11 @@ export class OnlineRoom {
     this.leave(); this.id = id; this.retry = 0;
     history.replaceState(null, '', `#room=${id}`);
     const key = `pool.room.${id}`;
-    this.token = sessionStorage.getItem(key) || crypto.randomUUID(); sessionStorage.setItem(key, this.token);
+    this.token = sessionStorage.getItem(key) || roomToken(); sessionStorage.setItem(key, this.token);
     this.connect();
   }
   connect() {
+    this.synced = false;
     const generation = this.generation;
     this.onStatus(this.retry ? 'Connection lost. Reconnecting…' : 'Joining room…');
     const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/rooms/${this.id}/socket`);
@@ -37,18 +45,22 @@ export class OnlineRoom {
     socket.addEventListener('message', e => {
       if (generation !== this.generation || e.data === 'pong') return;
       const data = JSON.parse(e.data);
-      if (data.type === 'error') { this.onStatus(data.message); return; }
+      if (data.type === 'error') { this.error = data.message; this.errorResync = true; this.result = null; this.onStatus(data.message); return; }
       if (data.type === 'state' || data.type === 'shot') {
+        this.synced = true;
+        if (!this.errorResync && data.seq !== this.seq) this.error = null;
+        this.errorResync = false;
         this.seq = data.seq; this.pending = !!data.pending; this.waiting = false; this.retry = 0;
         if (data.seat !== undefined) this.seat = data.seat;
       }
       if (data.connected) this.connected = data.connected;
       this.onMessage(data);
-      this.onStatus(this.connected.every(Boolean) ? `You are Player ${this.seat + 1} · Friend connected` : `You are Player ${this.seat + 1} · Waiting for your friend`);
+      if (data.type === 'state' || data.type === 'shot') this.flushResult();
+      this.showStatus();
     });
     socket.addEventListener('close', e => {
       if (generation !== this.generation) return;
-      clearInterval(this.heartbeat); this.waiting = false; this.connected = [false, false];
+      clearInterval(this.heartbeat); this.synced = false; this.waiting = false; this.connected = [false, false];
       this.onMessage({ type: 'presence', connected: this.connected });
       if (e.code === 4001 || e.code === 4002) { this.onStatus(e.reason || 'This room is no longer available.'); return; }
       this.onStatus('Connection lost. Reconnecting…');
@@ -56,13 +68,28 @@ export class OnlineRoom {
     });
     socket.addEventListener('error', () => this.onStatus('Unable to reach the room. Reconnecting…'));
   }
+  showStatus() {
+    this.onStatus(this.error || (this.connected.every(Boolean) ? `You are Player ${this.seat + 1} · Friend connected` : `You are Player ${this.seat + 1} · Waiting for your friend`));
+  }
+  submitResult(payload) {
+    this.result = { seq: this.seq, payload: structuredClone(payload), socket: null };
+    this.flushResult();
+  }
+  flushResult() {
+    const result = this.result;
+    if (!result || !this.synced) return;
+    if (result.seq !== this.seq || !this.pending) { this.result = null; return; }
+    // Retry only on a new connection, after its state confirms the same pending shot.
+    if (result.socket !== this.socket && this.send('result', result.payload)) result.socket = this.socket;
+  }
   send(type, payload = {}) {
     if (this.socket?.readyState !== WebSocket.OPEN || this.seat === null) return false;
+    this.error = null; this.errorResync = false; this.showStatus();
     this.waiting = true; this.socket.send(JSON.stringify({ type, seq: this.seq, ...payload })); return true;
   }
   leave() {
     this.generation++; clearTimeout(this.reconnect); clearInterval(this.heartbeat);
-    this.socket?.close(); this.socket = null; this.id = null; this.seat = null;
-    this.connected = [false, false]; this.pending = false; this.waiting = false;
+    this.socket?.close(); this.synced = false; this.socket = null; this.id = null; this.seat = null;
+    this.connected = [false, false]; this.pending = false; this.waiting = false; this.result = null; this.error = null; this.errorResync = false;
   }
 }
