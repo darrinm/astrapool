@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test physics/*.test.mjs src/*.test.mjs server/protocol.test.mjs",
+    "benchmark:computer": "node physics/benchmark-computer.mjs",
     "physics-test": "node physics/validate.mjs",
     "deploy": "npm run build && wrangler deploy",
     "dev:online": "npm run build && wrangler dev --port 8787",

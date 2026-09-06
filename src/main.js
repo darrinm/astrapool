@@ -2,18 +2,21 @@ import * as THREE from 'three';
 import { renderer, scene, camera, world, eventQueue, syncMeshes, snapshotPoses, heads } from './core.js';
 import pool from './pool.js';
 import { connectPointerInput } from './pointer-input.js';
+import { connectHud } from './hud.js';
 
 const current = pool;
 const STEP = 1 / current.stepRate;   // 480 Hz: see the note on stepRate in pool.js
 let accumulator = 0;
 world.timestep = STEP;
 current.enter();
+connectHud(current);
 
 // ---------- input ----------
 connectPointerInput(renderer.domElement, current);
 addEventListener('keydown', (e) => {
   if (e.key === 'Escape') document.querySelector('.help').open = false;
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (document.getElementById('hud-sheet').open) return;
   const k = e.key.toLowerCase();
   if (k === 'm') { toggleSound(); return; }
   current.key(k);

@@ -1,4 +1,4 @@
-import { P, pocketCenters } from '../physics/poolphysics.js';
+import { P, pocketCenters } from '../physics/constants.js';
 import { targets } from './eight-ball.js';
 const pockets = pocketCenters(), { R, HW, HH } = P;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -10,7 +10,7 @@ export function clearPath(a, b, balls, ignored = []) {
     return Math.hypot(ball.x - a.x - dx * t, ball.y - a.y - dy * t) > 2 * R + 0.04;
   });
 }
-function potOptions(balls, legal) {
+export function potOptions(balls, legal) {
   const cue = balls.find(b => b.number === 0), options = [];
   for (const ball of balls.filter(b => legal.includes(b.number))) for (const [pocket, p] of pockets.entries()) {
     const length = distance(ball, p), nx = (p.x - ball.x) / length, ny = (p.y - ball.y) / length;
@@ -27,14 +27,15 @@ function potOptions(balls, legal) {
   }
   return options.sort((a, b) => b.score - a.score);
 }
-export function computerShot(balls, state, difficulty = 'normal', random = Math.random) {
+export function computerShot(balls, state, difficulty = 'medium', random = Math.random) {
   const cue = balls.find(b => b.number === 0), legal = targets(state);
   if (!cue) throw new Error('Computer needs a cue ball');
   if (state.breaking) return { dir: { x: 1, y: 0 }, speed: 300, pocket: null, target: 1 };
   const options = potOptions(balls, legal);
   let choice;
   if (options.length) {
-    const count = difficulty === 'easy' ? Math.min(4, options.length) : 1;
+    // Even a beginner picks a sensible pot, rather than an arbitrary difficult alternative.
+    const count = difficulty === 'easy' ? Math.min(2, options.filter(s => s.score >= options[0].score - 12).length) : 1;
     choice = options[Math.floor(random() * count)];
   } else {
     // With no clear pot, make legal contact. Try a one-cushion escape if direct paths are blocked.
@@ -57,9 +58,14 @@ export function computerShot(balls, state, difficulty = 'normal', random = Math.
     const pocket = pockets.reduce((best, p, i) => distance(target, p) < distance(target, pockets[best]) ? i : best, 0);
     choice = { dir: { x: (aim.x - cue.x) / length, y: (aim.y - cue.y) / length }, speed: 90, pocket, target: target.number };
   }
-  const error = { easy: 0.025, normal: 0.006, hard: 0.0015 }[difficulty] ?? 0.006;
-  const angle = Math.atan2(choice.dir.y, choice.dir.x) + (random() - 0.5) * 2 * error;
-  return { ...choice, dir: { x: Math.cos(angle), y: Math.sin(angle) } };
+  // Short, straight pots are forgiving at every level; distance and cut expose weaker technique.
+  // 'hard' is the geometric fallback/baseline. The actual Hard opponent uses its physics worker.
+  const profile = difficulty === 'easy' ? { aim: 0.014, power: 0.12 } :
+    difficulty === 'hard' ? { aim: 0.0015, power: 0 } : { aim: 0.0035, power: 0.025 };
+  const challenge = difficulty === 'hard' || choice.score === undefined ? 1 : Math.max(0.35, Math.min(1.25, (100 - choice.score) / 60));
+  const angle = Math.atan2(choice.dir.y, choice.dir.x) + (random() - 0.5) * 2 * profile.aim * challenge;
+  const speed = choice.speed * (1 + (random() - 0.5) * 2 * profile.power * challenge);
+  return { ...choice, speed, dir: { x: Math.cos(angle), y: Math.sin(angle) } };
 }
 export function computerPlacement(balls, state, valid) {
   const legal = targets(state), options = [];

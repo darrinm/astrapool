@@ -33,8 +33,8 @@ let ballStyle = localStorage.getItem('playful.ballStyle') === 'heads' ? 'heads' 
 let interactionMode = 'cue', dragging = null;
 let gameMode = 'local', match = newMatch(), activeShot = null, calledPocket = null;
 let settledFor = 0, physicsTime = 0, placing = null, pocketMarker;
-let computerWait = 0, computerPlan = null;
-let difficulty = 'normal', onlineShotSeq = null, onlineShooter = null;
+let computerWait = 0, computerPlan = null, computerWorker = null;
+let difficulty = 'medium', onlineShotSeq = null, onlineShooter = null;
 const online = new OnlineRoom(receiveOnline, text => {
   document.getElementById('online-status').textContent = text;
   document.getElementById('invite-link').value = online.id ? `${location.origin}/#room=${online.id}` : '';
@@ -253,7 +253,7 @@ function setBallStyle(style) {
 }
 
 function layout() {
-  endGesture();
+  cancelComputerSearch(); endGesture();
   eventQueue.drainCollisionEvents(() => {});
   resetHeads({ linearDamping: 0, angularDamping: 0.02, restitution: E_BALL, friction: MU_BALL });
   for (const h of heads) h.body.collider(0).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
@@ -409,7 +409,10 @@ function endDrag(fling = false) {
   if (!dragging) return;
   const { ball, samples } = dragging;
   moveBall(ball.body, fling ? flingOnTable(ball, flingVelocity(samples)) : { x: 0, y: 0 });
-  dragging = null; controls.enabled = true;
+  dragging = null; controls.enabled = true; updateGestureControls();
+}
+function updateGestureControls() {
+  document.getElementById('cancel-gesture').hidden = !(placing || dragging || (aiming && !computerTurn()));
 }
 function endGesture() { cancelPlacement(); endDrag(); endAim(); }   // the two are exclusive; whichever is in progress stops without a shot or fling
 function updateDrag() {
@@ -455,7 +458,10 @@ function showGameControls(show) {
       try { await navigator.clipboard.writeText(field.value); document.getElementById('online-status').textContent = 'Invite link copied. Send it to your friend.'; }
       catch { field.focus(); field.select(); document.getElementById('online-status').textContent = 'Select and copy this invite link.'; }
     });
-    document.getElementById('difficulty').addEventListener('change', e => { difficulty = e.target.value; });
+    document.getElementById('difficulty').addEventListener('change', e => {
+      difficulty = e.target.value;
+      if (computerTurn() && !activeShot) { cancelComputerSearch(); computerPlan = null; computerWait = 0; endAim(); }
+    });
     document.getElementById('overhead-view').addEventListener('click', overheadView);
     document.getElementById('rematch').addEventListener('click', restart);
     document.querySelectorAll('#pocket-call button').forEach(b => b.addEventListener('click', () => {
@@ -468,6 +474,7 @@ function showGameControls(show) {
 function setSpin(x, y) {
   const len = Math.hypot(x, y), scale = len > 0.7 ? 0.7 / len : 1;
   spin = { x: x * scale, y: y * scale };
+  document.getElementById('open-spin').dataset.active = String(Math.hypot(spin.x, spin.y) > 0.01);
   const dot = spinEl.querySelector('.dot');
   dot.style.left = `${50 + spin.x * 50}%`; dot.style.top = `${50 - spin.y * 50}%`;
 }
@@ -524,6 +531,7 @@ function tableStill() {
   });
 }
 function updateScore() {
+  updateGestureControls();
   document.getElementById('pocketed-count').textContent = pocketed;
   document.getElementById('shot-count').textContent = shots;
   const free = gameMode === 'free';
@@ -536,6 +544,12 @@ function updateScore() {
   document.getElementById('rerack').textContent = free ? 'Re-rack ↻' : 'New rack ↻';
   document.getElementById('rematch').hidden = free || match.winner === null;
   document.getElementById('pocket-call').hidden = free || match.winner !== null || !!activeShot || match.ballInHand || computerTurn() || remoteTurn() || !onEight();
+  const pocketButton = document.getElementById('open-pockets');
+  pocketButton.hidden = document.getElementById('pocket-call').hidden;
+  pocketButton.textContent = calledPocket === null ? 'Call pocket' : 'Pocket ✓';
+  pocketButton.title = calledPocket === null ? 'Choose the 8-ball pocket' : document.querySelector(`[data-pocket="${calledPocket}"]`).textContent;
+  document.getElementById('open-spin').hidden = interactionMode !== 'cue' || !!activeShot || computerTurn() || remoteTurn() || (!free && match.winner !== null);
+  document.getElementById('open-settings').firstChild.textContent = gameMode === 'online' ? 'Room ' : 'Game ';
   document.querySelectorAll('#pocket-call button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.pocket) === calledPocket)));
   if (!free) for (let i = 0; i < 2; i++) {
     const card = document.getElementById(`player-${i}`);
@@ -559,7 +573,7 @@ function updateScore() {
     match.winner !== null ? 'A rack well played. Rematch to switch the break.' :
     activeShot ? 'Waiting for the balls to settle.' :
     gameMode === 'online' && online.pending ? 'The next turn begins when the result is confirmed.' :
-    computerTurn() ? 'The computer is lining up its shot.' :
+    computerTurn() ? (computerWorker ? 'The computer is studying the table.' : 'The computer is lining up its shot.') :
     remoteTurn() ? (online.connected.every(Boolean) ? 'Your friend is lining up a shot.' : 'Share the invite link. Play begins when both players are connected.') :
     match.ballInHand ? 'Ball in hand: click an empty spot on the felt, or drag the white ball into place.' :
     onEight() && calledPocket === null ? 'Choose a pocket for the 8-ball below, then take your shot.' :
@@ -609,6 +623,7 @@ function cancelPlacement() {
   const original = placing.original; placing = null;
   cue.body.setEnabled(true); spot(cue, original.x, original.y, IDENTITY);
   if (controls) controls.enabled = true;
+  updateGestureControls();
 }
 function movePlacement(e) {
   const p = pointerToPlane(e, BALL_Z);
@@ -674,25 +689,58 @@ function takeShot(dir, speed, shotSpin = { x: 0, y: 0 }, fromRoom = false) {
 function tablePositions() {
   return allBalls().filter(b => !pocketedSet.has(b)).map(b => ({ number: numberOf(b), ...b.body.translation() }));
 }
+function cancelComputerSearch() {
+  computerWorker?.terminate(); computerWorker = null;
+}
+function prepareComputerPlan(plan) {
+  if (match.ballInHand) {
+    const position = plan.position || computerPlacement(tablePositions(), match, validPlacement) || findSpot(cue, -HW * 0.5);
+    spot(cue, position.x, position.y, IDENTITY); match = { ...match, ballInHand: false };
+  }
+  computerPlan = plan; computerWait = 0.8; calledPocket = plan.pocket;
+  const c = cue.body.translation(), pull = plan.speed / SPEED_PER_PULL;
+  setSpin(plan.spin?.x || 0, plan.spin?.y || 0);
+  aiming = { to: new THREE.Vector3(c.x - plan.dir.x * pull, c.y - plan.dir.y * pull, BALL_Z) };
+  guide.visible = true; cueStick.visible = true; updateScore();
+}
 function updateComputer(dt) {
   if (!computerTurn() || activeShot || !tableStill()) { computerWait = 0; return; }
   computerWait += dt;
-  if (computerWait < 0.8) return;
+  if (computerWait < 0.8 || computerWorker) return;
   if (!computerPlan) {
+    if (difficulty === 'hard') {
+      const worker = new Worker(new URL('./computer-worker.js', import.meta.url), { type: 'module' });
+      computerWorker = worker;
+      const fallback = () => {
+        if (computerWorker !== worker) return;
+        cancelComputerSearch();
+        if (match.ballInHand) {
+          const position = computerPlacement(tablePositions(), match, validPlacement) || findSpot(cue, -HW * 0.5);
+          spot(cue, position.x, position.y, IDENTITY); match = { ...match, ballInHand: false };
+        }
+        prepareComputerPlan(computerShot(tablePositions(), match, 'hard'));
+      };
+      worker.onmessage = ({ data }) => {
+        if (computerWorker !== worker) return;
+        if (data.error) { console.error('Computer search:', data.error); fallback(); return; }
+        cancelComputerSearch(); prepareComputerPlan(data.shot);
+      };
+      worker.onerror = fallback;
+      worker.postMessage({ balls: tablePositions(), state: structuredClone(match), table: {
+        snapshot: world.takeSnapshot(), feltZ: FELT_Z, cushions: [...cushionHandles],
+        handles: allBalls().filter(b => !pocketedSet.has(b)).map(b => ({ number: numberOf(b), handle: b.body.handle })),
+      } });
+      updateScore(); return;
+    }
     if (match.ballInHand) {
       const position = computerPlacement(tablePositions(), match, validPlacement) || findSpot(cue, -HW * 0.5);
       spot(cue, position.x, position.y, IDENTITY); match = { ...match, ballInHand: false };
     }
-    computerPlan = computerShot(tablePositions(), match, difficulty);
-    calledPocket = computerPlan.pocket;
-    const c = cue.body.translation(), pull = computerPlan.speed / SPEED_PER_PULL;
-    setSpin(0, 0);
-    aiming = { to: new THREE.Vector3(c.x - computerPlan.dir.x * pull, c.y - computerPlan.dir.y * pull, BALL_Z) };
-    guide.visible = true; cueStick.visible = true; updateScore();
+    prepareComputerPlan(computerShot(tablePositions(), match, difficulty));
   }
   if (computerWait < 1.6) return;
   const plan = computerPlan; computerPlan = null; computerWait = 0;
-  takeShot(plan.dir, plan.speed); endAim();
+  takeShot(plan.dir, plan.speed, plan.spin); endAim();
 }
 
 function sendOnlineResult(report) {
@@ -777,6 +825,7 @@ export default {
     joinInvite();
   },
   exit() {
+    cancelComputerSearch();
     window.removeEventListener('hashchange', joinInvite); online.leave();
     endGesture();
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
@@ -791,7 +840,7 @@ export default {
       if (meshUnderPointer(e, [cue.mesh]) !== cue.mesh && !validPlacement(pointerToPlane(e, BALL_Z))) return false;
       controls.enabled = false;
       placing = { ball: cue, original: { ...cue.body.translation() }, valid: false };
-      cue.body.setEnabled(false); movePlacement(e); return true;
+      cue.body.setEnabled(false); movePlacement(e); updateGestureControls(); return true;
     }
     if (interactionMode === 'fling') {
       const ball = ballUnderPointer(e);
@@ -799,12 +848,12 @@ export default {
       controls.enabled = false;
       const p = ball.body.translation(), to = new THREE.Vector3(p.x, p.y, BALL_Z);
       dragging = { ball, to, offset: to.clone().sub(pointerToPlane(e, BALL_Z)), samples: [] };
-      sampleDrag(e);
+      sampleDrag(e); updateGestureControls();
       return true;
     }
     if (meshUnderPointer(e, [cue.mesh]) !== cue.mesh || !cueReady()) return false;
     controls.enabled = false;
-    aiming = { to: pointerToPlane(e, BALL_Z) }; guide.visible = true; cueStick.visible = true; return true;
+    aiming = { to: pointerToPlane(e, BALL_Z) }; guide.visible = true; cueStick.visible = true; updateGestureControls(); return true;
   },
   // Only the captured pointer's moves arrive during a gesture; otherwise the return value is the hover state.
   pointermove(e) {

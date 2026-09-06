@@ -61,41 +61,6 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 5px; text-align: cent
 #spin::after { top: 50%; left: 12%; height: 1px; width: 76%; }
 #spin .dot { position: absolute; z-index: 1; left: 50%; top: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%); border-radius: 50%; background: #9d4936; box-shadow: 0 0 0 2px #fff9; }
 .spin-caption { display: block; color: var(--muted); font-size: 9px; text-align: center; margin-top: 10px; }
-@media (max-width: 900px) {
-  .topbar { padding: 18px 20px; }
-  .scoreboard { position: static; transform: none; gap: 14px; }
-  .scoreboard > div { gap: 6px; }
-  .scoreboard > div + div { padding-left: 14px; }
-}
-@media (max-width: 600px) {
-  .topbar { flex-wrap: wrap; gap: 12px; padding: 14px 16px; }
-  .brand { font-size: 16px; }
-  .utilities { margin-left: auto; gap: 0; }
-  .utilities .quiet-button { padding: 6px 8px; min-height: 36px; font-size: 12px; }
-  .scoreboard { order: 3; flex-basis: 100%; justify-content: center; }
-  .score { font-size: 18px; }
-  .help-panel { width: min(310px, calc(100vw - 32px)); }
-  .bottom-hud { bottom: max(14px, env(safe-area-inset-bottom)); max-width: calc(100% - 24px); }
-  .control-dock { padding: 10px; gap: 10px; border-radius: 14px; flex-wrap: wrap; justify-content: center; }
-  .control-group { flex: 1; }
-  .segmented button { min-width: 0; flex: 1; padding: 6px 12px; }
-  .dock-actions { flex-basis: 100%; flex-direction: row; justify-content: space-between; padding: 6px 0 0; border-left: 0; border-top: 1px solid var(--line); }
-  .guidance { margin-bottom: 10px; padding: 0 4px; }
-  #hint { font-size: 11px; max-width: 330px; }
-  .spin-panel { width: 116px; padding: 10px; }
-  .spin-heading { margin-bottom: 8px; }
-  .spin-heading .eyebrow { font-size: 9px; letter-spacing: .8px; }
-  #spin { width: 58px; height: 58px; }
-  .spin-caption { display: none; }
-}
-@media (max-height: 500px) and (min-width: 601px) {
-  .topbar { padding: 8px 20px; }
-  .bottom-hud { bottom: 10px; }
-  .control-dock { padding: 8px 12px; }
-  .spin-panel { width: 106px; padding: 8px; }
-  #spin { width: 54px; height: 54px; }
-  .spin-caption { display: none; }
-}
 @media (prefers-reduced-motion: reduce) { button, summary { transition: none; } }
 
 /* Match play shares the table and controls with Free Play. */
@@ -118,30 +83,73 @@ select:focus-visible { outline: 2px solid var(--accent); }
 .pocket-map { margin-top: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .pocket-map button { color: var(--muted); background: #23372b; border: 1px solid var(--line); border-radius: 6px; padding: 7px; font-size: 11px; }
 .pocket-map button[aria-pressed="true"] { background: var(--accent); color: #17201a; }
-@media (max-width: 900px) { .match-score { gap: 6px; } .player-card { min-width: 140px; padding: 8px; } }
-@media (max-width: 700px) {
-  .topbar { flex-wrap: wrap; gap: 10px; }
-  .match-score { order: 3; width: 100%; justify-content: center; }
-  .utilities { margin-left: auto; }
-  .player-card { min-width: 132px; }
-  .player-heading { font-size: 12px; }
-}
-
 .online-panel { position: absolute; top: 134px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); pointer-events: auto; }
 .online-panel p { margin: 0 0 6px; font-size: 12px; text-align: center; color: var(--accent); }
 .online-panel > div { display: flex; align-items: center; gap: 4px; }
 .online-panel input { min-width: 0; width: 190px; color: var(--muted); background: #0b150e; border: 1px solid var(--line); padding: 8px; border-radius: 6px; font-size: 11px; }
 .online-panel button { font-size: 11px; min-height: 32px; padding: 5px 8px; }
 button:disabled { opacity: .6; cursor: default; }
-@media (max-width: 700px) { .online-panel { top: 155px; width: calc(100% - 24px); } .online-panel input { flex: 1; width: 80px; } }
 
-@media (max-width: 600px) {
-  .pocket-call { padding: 10px; }
-  .pocket-map { gap: 6px; }
-}
+.compact-actions { display: none; }
+.shot-controls { display: contents; }
+.spin-panel { position: fixed; bottom: max(24px, env(safe-area-inset-bottom)); right: 28px; }
+.pocket-call { width: min(360px, 100%); margin: 0 auto 12px; }
 
-@media (min-width: 901px) {
-  .shot-controls { display: contents; }
-  .spin-panel { position: fixed; bottom: max(24px, env(safe-area-inset-bottom)); right: 28px; }
-  .pocket-call { width: min(360px, 100%); margin: 0 auto 12px; }
+/* One modal hosts the existing controls, so desktop and touch share their state. */
+#hud-sheet { width: min(420px, calc(100% - 24px)); max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); margin: auto; padding: 0; color: inherit; background: #161d19; border: 1px solid #ffffff30; border-radius: 20px; box-shadow: 0 20px 80px #0008; overscroll-behavior: contain; }
+#hud-sheet::backdrop { background: #0007; backdrop-filter: blur(5px); }
+.sheet-heading { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #161d19; border-bottom: 1px solid var(--line); }
+.sheet-heading h2 { margin: 0; font-size: 18px; }
+#close-sheet { color: var(--accent); }
+#sheet-content { padding: 16px; }
+#hud-sheet .control-dock { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 12px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; backdrop-filter: none; }
+#hud-sheet .control-group { min-width: 0; }
+#hud-sheet select { width: 100%; }
+#hud-sheet .segmented button { min-width: 0; flex: 1; padding-inline: 8px; }
+#hud-sheet .dock-actions { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 12px 0; border-left: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+#hud-sheet .dock-actions button { flex: 1; justify-content: center; }
+#hud-sheet .utilities { display: flex; flex-wrap: wrap; align-items: start; gap: 8px; margin-top: 12px; }
+#hud-sheet .help { flex: 1; }
+#hud-sheet .help-panel { position: static; width: 100%; max-height: none; margin-top: 8px; padding: 12px 0; border: 0; box-shadow: none; background: none; }
+#hud-sheet .utilities:has(.help[open]) .help { flex-basis: 100%; }
+#hud-sheet .spin-panel, #hud-sheet .pocket-call, #hud-sheet .online-panel { display: block; position: static; transform: none; width: 100%; max-width: none; margin: 0; padding: 0; border: 0; background: none; backdrop-filter: none; }
+#hud-sheet .online-panel { margin-top: 16px; pointer-events: auto; }
+#hud-sheet .online-panel > div { display: flex; flex-wrap: wrap; }
+#hud-sheet .online-panel input { flex-basis: 100%; width: 100%; font-size: 16px; }
+#hud-sheet .online-panel button { flex: 1; }
+#hud-sheet .spin-caption { font-size: 12px; }
+#hud-sheet #spin { width: 132px; height: 132px; }
+#hud-sheet button, #hud-sheet summary, #hud-sheet select, #hud-sheet input { min-height: 44px; }
+#hud-sheet .text-button { padding: 8px 12px; font-size: 13px; }
+#hud-sheet .pocket-map { gap: 10px; margin-top: 16px; }
+#hud-sheet .pocket-map button { min-height: 54px; font-size: 12px; }
+
+/* Compact in either orientation, including tablets with limited vertical space. */
+@media (max-width: 1100px), (max-height: 600px) {
+  .topbar { padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); gap: 0; justify-content: center; }
+  .brand, .utilities, .control-dock, .shot-controls { display: none; }
+  .match-score { width: 100%; max-width: 440px; gap: 8px; }
+  .player-card { min-width: 0; flex: 1; padding: 6px 10px; border-radius: 10px; }
+  .player-heading { gap: 8px; font-size: 12px; }
+  .player-group { margin-top: 2px; }
+  .remaining-balls { gap: 3px; min-height: 14px; margin-top: 4px; }
+  .ball-chip { width: 14px; height: 14px; font-size: 8px; }
+  .versus { font-size: 10px; }
+  .scoreboard { position: static; transform: none; gap: 20px; padding: 8px; }
+  .scoreboard > div { gap: 8px; }
+  .scoreboard > div + div { padding-left: 20px; }
+  .score { font-size: 18px; }
+  .bottom-hud { bottom: max(8px, env(safe-area-inset-bottom)); width: min(480px, calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))); max-width: none; }
+  .guidance { margin-bottom: 8px; padding: 0 6px; }
+  #status { margin-bottom: 3px; font-size: 12px; }
+  #hint { font-size: 11px; }
+  .compact-actions { display: flex; justify-content: space-evenly; gap: 4px; padding: 4px; border: 1px solid #ffffff24; border-radius: 14px; background: var(--panel); pointer-events: auto; box-shadow: 0 6px 24px #0005; }
+  .compact-actions button { flex: 1; min-width: 0; min-height: 44px; padding: 8px 6px; font-size: 12px; }
+  #open-pockets, #cancel-gesture { color: var(--accent); background: #e7c58b12; }
+  #open-spin[data-active="true"]::after { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+  .compact-actions:has(#cancel-gesture:not([hidden])) > button:not(#cancel-gesture) { display: none; }
+  .online-panel { top: max(88px, calc(80px + env(safe-area-inset-top))); padding: 6px 10px; width: max-content; max-width: calc(100% - 24px); border: 0; pointer-events: none; }
+  .online-panel p { font-size: 11px; margin: 0; }
+  .online-panel > div { display: none; }
+  .primary-button { min-height: 44px; margin-bottom: 8px; }
 }

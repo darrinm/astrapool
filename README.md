@@ -54,11 +54,12 @@ foul with the 8, or wrong pocket loses. The 8 is spotted after a break; a dry br
 to a cushion, otherwise the incoming player breaks a fresh rack. Regular shots need no call. These simplified break
 and call-shot rules are intentional; this is not a tournament rules implementation.
 
-**Vs Computer** adds Easy / Normal / Hard opponents. You are Player 1; the computer is Player 2.
-It evaluates clear pots, legal contact and one-cushion escapes, places the cue after fouls, and calls the 8.
-Difficulty changes shot selection and aiming error; the rules and physics stay the same.
+**Vs Computer** adds Easy / Medium / Hard opponents. You are Player 1; the computer is Player 2.
+Easy favors sensible, simple pots with forgiving aim and loose power control; it should make short shots but rarely sustain a long run. Medium is the default: more precise aim and power, with geometric shot selection that can build runs but does not plan ahead. Both become less accurate on long or thin cuts. Hard searches a copy of the live Rapier world: it tests pots, banks, legal escapes, power and spin, rejects scratches and early 8s, and considers the next shot or a defensive leave. It also searches legal ball-in-hand placements and calls the 8. Hard adds no random aiming error; every shot still uses the same physics, spin limits and 24 mph power limit as a human. Its background worker keeps rendering and camera controls responsive while it thinks, and is canceled on a reset or mode/difficulty change.
 
-`npm test` checks rules, computer shot selection and actual potting power, pointer behavior, and the server protocol. The pure rules engine lives in `src/eight-ball.js`.
+`npm test` checks rules, computer shot selection and actual potting power, Hard scratch/safety/run-out regressions, pointer behavior, and the server protocol. `npm run benchmark:computer` compares Easy, Medium and Hard on eight reproducible, shared endgame layouts, measuring run-outs, pots and fouls (four seeded visits per layout for the randomized levels, one for deterministic Hard); it is a diagnostic benchmark, not a human win-rate estimate. The pure rules engine lives in `src/eight-ball.js`.
+
+On phones, tablets, and short windows, a compact action bar keeps settings off the table. **Game** opens mode, difficulty, appearance, sound, and help; **Room** also contains the invite and reconnect controls during online play. **Spin** opens a larger contact-point control, and **Call pocket** appears when you reach the 8. Drag empty space to orbit and use two fingers to pan or pinch to zoom. While holding a shot or placement, tap **Cancel** with another finger to abandon it.
 
 Press `Esc` while lining up a cue shot to cancel without shooting.
 Drag back from the cue ball to shoot; the further the pull, the harder the hit (up to 24 mph / 10.7 m/s). The ball
@@ -73,6 +74,7 @@ the ball. Balls still collide with each other and the cushions. Drag empty table
 and choose **Cue** or press `F` again to return to cue shots.
 
 ## Layout
+- `src/hard-computer.js` – physics-based Hard search; `src/shot-simulation.js` – isolated shot evaluation; `src/computer-worker.js` – background execution.
 - `src/eight-ball.js` – shared house rules; `src/computer.js` – computer shot planning; `src/online.js` – invite rooms and reconnects.
 - `server/worker.js` – private Durable Object rooms; `server/protocol.js` – validated server actions and shot results.
 - `src/main.js` – fixed-step loop (480 Hz physics, interpolated rendering), key routing, `window.playful` debug handle.

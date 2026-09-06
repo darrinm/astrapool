@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Pool</title>
     <link rel="stylesheet" href="/src/hud.css" />
   </head>
@@ -28,8 +28,9 @@
               <h2>Pool house rules</h2>
               <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>
               <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack. Regular shots need no pocket call.</p>
+              <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed. All three follow the same rules.</p>
               <p>In Cue mode, pull back from the white ball and release to shoot. In Free Play’s Fling mode, grab any ball and throw it. Hold still to place it.</p>
-              <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag</dd></div><div><dt>Zoom</dt><dd>Scroll</dd></div><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Heads / balls</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
+              <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag / two fingers</dd></div><div><dt>Zoom</dt><dd>Scroll / pinch</dd></div><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Heads / balls</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
             </div>
           </details>
         </div>
@@ -52,15 +53,26 @@
           </section>
         </div>
         <button id="rematch" class="primary-button" hidden>Rematch</button>
+        <nav class="compact-actions" aria-label="Table controls">
+          <button id="open-settings" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet">Game <span aria-hidden="true">☰</span></button>
+          <button id="quick-view" class="quiet-button" title="View the table from above">Overhead</button>
+          <button id="open-spin" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet">Spin</button>
+          <button id="open-pockets" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Call pocket</button>
+          <button id="cancel-gesture" class="quiet-button" hidden>Cancel</button>
+        </nav>
         <div class="control-dock">
           <div class="control-group"><label class="eyebrow" for="game-mode">Game</label><select id="game-mode"><option value="local">Local 8-ball</option><option value="computer">Vs Computer</option><option value="online">Play a Friend</option><option value="free">Free Play</option></select></div>
-          <div id="difficulty-group" class="control-group" hidden><label class="eyebrow" for="difficulty">Difficulty</label><select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></div>
+          <div id="difficulty-group" class="control-group" hidden><label class="eyebrow" for="difficulty">Difficulty</label><select id="difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></div>
           <div id="interaction-group" class="control-group"><span class="eyebrow">Play your way</span><div id="mode" class="segmented" role="group" aria-label="Interaction mode"><button data-mode="cue" aria-pressed="true" title="Shoot with the cue">Cue</button><button data-mode="fling" aria-pressed="false" title="Grab and throw any ball">Fling</button></div></div>
           <div class="control-group"><span class="eyebrow">On the table</span><div id="style" class="segmented" role="group" aria-label="Ball appearance"><button data-style="heads" aria-pressed="false">Heads</button><button data-style="balls" aria-pressed="true">Balls</button></div></div>
           <div class="dock-actions"><button id="overhead-view" class="quiet-button">Overhead</button><button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button><button id="rerack" class="quiet-button" title="Re-rack (R)">Re-rack <span aria-hidden="true">↻</span></button></div>
         </div>
       </div>
     </div>
+    <dialog id="hud-sheet" aria-labelledby="sheet-title">
+      <header class="sheet-heading"><h2 id="sheet-title"></h2><button id="close-sheet" class="quiet-button" autofocus>Done</button></header>
+      <div id="sheet-content"></div>
+    </dialog>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
