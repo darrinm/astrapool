@@ -40,9 +40,16 @@
       </section>
       <div class="bottom-hud">
         <div class="guidance"><div id="status" role="status"></div><p id="hint"></p></div>
-        <div id="pocket-call" class="pocket-call" hidden>
-          <span class="eyebrow">Call the 8-ball pocket · break end on the left</span>
-          <div class="pocket-map"><button data-pocket="0" aria-pressed="false">Near left</button><button data-pocket="1" aria-pressed="false">Side left</button><button data-pocket="2" aria-pressed="false">Far left</button><button data-pocket="3" aria-pressed="false">Near right</button><button data-pocket="4" aria-pressed="false">Side right</button><button data-pocket="5" aria-pressed="false">Far right</button></div>
+        <div class="shot-controls">
+          <div id="pocket-call" class="pocket-call" hidden>
+            <span class="eyebrow">Call the 8-ball pocket · break end on the left</span>
+            <div class="pocket-map"><button data-pocket="0" aria-pressed="false">Near left</button><button data-pocket="1" aria-pressed="false">Side left</button><button data-pocket="2" aria-pressed="false">Far left</button><button data-pocket="3" aria-pressed="false">Near right</button><button data-pocket="4" aria-pressed="false">Side right</button><button data-pocket="5" aria-pressed="false">Far right</button></div>
+          </div>
+          <section id="spin-control" class="spin-panel" aria-label="Cue spin" hidden>
+            <div class="spin-heading"><span class="eyebrow">Cue spin</span><button id="reset-spin" class="text-button">Reset</button></div>
+            <button id="spin" aria-label="Set cue spin. Click a point or use arrow keys; Home centers." title="Click to set spin · arrow keys adjust · Home centers"><span class="dot"></span></button>
+            <span class="spin-caption">Aim the contact point</span>
+          </section>
         </div>
         <button id="rematch" class="primary-button" hidden>Rematch</button>
         <div class="control-dock">
@@ -53,11 +60,6 @@
           <div class="dock-actions"><button id="overhead-view" class="quiet-button">Overhead</button><button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button><button id="rerack" class="quiet-button" title="Re-rack (R)">Re-rack <span aria-hidden="true">↻</span></button></div>
         </div>
       </div>
-      <section id="spin-control" class="spin-panel" aria-label="Cue spin" hidden>
-        <div class="spin-heading"><span class="eyebrow">Cue spin</span><button id="reset-spin" class="text-button">Reset</button></div>
-        <button id="spin" aria-label="Set cue spin. Click a point or use arrow keys; Home centers." title="Click to set spin · arrow keys adjust · Home centers"><span class="dot"></span></button>
-        <span class="spin-caption">Aim the contact point</span>
-      </section>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>

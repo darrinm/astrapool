@@ -49,6 +49,7 @@ export class OnlineRoom {
     socket.addEventListener('close', e => {
       if (generation !== this.generation) return;
       clearInterval(this.heartbeat); this.waiting = false; this.connected = [false, false];
+      this.onMessage({ type: 'presence', connected: this.connected });
       if (e.code === 4001 || e.code === 4002) { this.onStatus(e.reason || 'This room is no longer available.'); return; }
       this.onStatus('Connection lost. Reconnecting…');
       this.retry++; this.reconnect = setTimeout(() => this.connect(), Math.min(10000, 1000 * this.retry));

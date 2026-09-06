@@ -568,14 +568,19 @@ function overheadView() {
   endGesture(); controls.target.set(0, 0, FELT_Z);
   camera.position.set(0, -0.01, FELT_Z + Math.max(105, 105 / camera.aspect)); controls.update();
 }
-function startGame(mode) {
-  if (shots && (gameMode === 'free' || match.winner === null) && !window.confirm('Start a new game and clear this rack?')) return false;
+function startGame(mode, roomId = null) {
+  if (!roomId && shots && (gameMode === 'free' || match.winner === null) && !window.confirm('Start a new game and clear this rack?')) return false;
   online.leave(); history.replaceState(null, '', location.pathname);
-  gameMode = mode; document.getElementById('rematch').disabled = false; document.getElementById('rematch').textContent = 'Rematch'; match = newMatch(); layout();
-  if (mode === 'online') void online.create();
+  gameMode = mode; document.getElementById('game-mode').value = mode;
+  document.getElementById('rematch').disabled = false; document.getElementById('rematch').textContent = 'Rematch'; match = newMatch(); layout();
+  if (mode === 'online') { if (roomId) online.join(roomId); else void online.create(); }
   setInteractionMode('cue');
   if (mode !== 'free') setBallStyle('balls');
   return true;
+}
+function joinInvite() {
+  const roomId = /^#room=([0-9a-f-]{36})$/.exec(location.hash)?.[1];
+  if (roomId && (gameMode !== 'online' || online.id !== roomId)) startGame('online', roomId);
 }
 function restart() {
   if (gameMode === 'online') { if (match.winner !== null) online.send('rematch'); return; }
@@ -704,7 +709,10 @@ function applyOnlineSnapshot(snapshot) {
 }
 function receiveOnline(data) {
   if (gameMode !== 'online') return;
-  if (data.type === 'presence') { updateScore(); return; }
+  if (data.type === 'presence') {
+    if (remoteTurn()) endGesture();
+    updateScore(); return;
+  }
   if (data.type !== 'state' && data.type !== 'shot') return;
   // A resync during the same shot preserves the running simulation.
   if (data.pending && onlineShotSeq === data.seq) return;
@@ -762,10 +770,11 @@ export default {
     setHeadRadius(R); world.gravity = { x: 0, y: 0, z: -G };
     RectAreaLightUniformsLib.init();
     build(); layout(); setupCamera(); setLook(true); showGameControls(true); capsOn = true; setBallStyle('balls');
-    const roomId = /^#room=([0-9a-f-]{36})$/.exec(location.hash)?.[1];
-    if (roomId) { gameMode = 'online'; document.getElementById('game-mode').value = 'online'; online.join(roomId); updateScore(); }
+    window.addEventListener('hashchange', joinInvite);
+    joinInvite();
   },
   exit() {
+    window.removeEventListener('hashchange', joinInvite); online.leave();
     endGesture();
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     controls?.dispose(); controls = null; setLook(false);
@@ -808,7 +817,8 @@ export default {
     return meshUnderPointer(e, [cue.mesh]) === cue.mesh && cueReady();
   },
   pointerup(e) {
-    if (computerTurn() || remoteTurn()) return;
+    if (remoteTurn()) { endGesture(); return; }
+    if (computerTurn()) return;
     if (placing) { movePlacement(e); finishPlacement(); }
     else if (dragging) { sampleDrag(e); endDrag(true); }
     else if (aiming) { shoot(); endAim(); }

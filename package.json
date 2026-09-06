@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test physics/*.test.mjs server/protocol.test.mjs",
+    "test": "node --test physics/*.test.mjs src/*.test.mjs server/protocol.test.mjs",
     "physics-test": "node physics/validate.mjs",
     "deploy": "npm run build && wrangler deploy",
     "dev:online": "npm run build && wrangler dev --port 8787",
