@@ -39,5 +39,7 @@ sampled audio, the 14 head maps, and the sound-effect pipeline. The head-map pip
 ## Complete gameplay stages (2026-09-06)
 - [x] Stage 1: local two-player house 8-ball, turn and group HUD, fouls, ball-in-hand, called 8, wins, rematch, Free Play.
 - [x] Stage 1 validation: 40 unit tests, 26 physics checks, production build; Chrome break → scratch → placement → early 8 loss → rematch, all 16 balls restored.
-- [ ] Stage 2: computer opponent with difficulty selection and the same match rules.
+- [x] Stage 2: computer opponent with difficulty selection and the same match rules.
 - [ ] Stage 3: private invite-link online matches, disconnect handling, and deployment.
+
+- [x] Stage 2 validation: 47 tests; Chrome computer break and four following shots pocketed seven balls, assigned groups, and returned a legal turn to the human.

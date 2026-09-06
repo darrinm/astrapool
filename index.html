@@ -42,7 +42,8 @@
         </div>
         <button id="rematch" class="primary-button" hidden>Rematch</button>
         <div class="control-dock">
-          <div class="control-group"><label class="eyebrow" for="game-mode">Game</label><select id="game-mode"><option value="local">Local 8-ball</option><option value="free">Free Play</option></select></div>
+          <div class="control-group"><label class="eyebrow" for="game-mode">Game</label><select id="game-mode"><option value="local">Local 8-ball</option><option value="computer">Vs Computer</option><option value="free">Free Play</option></select></div>
+          <div id="difficulty-group" class="control-group" hidden><label class="eyebrow" for="difficulty">Difficulty</label><select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></div>
           <div id="interaction-group" class="control-group"><span class="eyebrow">Play your way</span><div id="mode" class="segmented" role="group" aria-label="Interaction mode"><button data-mode="cue" aria-pressed="true" title="Shoot with the cue">Cue</button><button data-mode="fling" aria-pressed="false" title="Grab and throw any ball">Fling</button></div></div>
           <div class="control-group"><span class="eyebrow">On the table</span><div id="style" class="segmented" role="group" aria-label="Ball appearance"><button data-style="heads" aria-pressed="true">Heads</button><button data-style="balls" aria-pressed="false">Balls</button></div></div>
           <div class="dock-actions"><button id="overhead-view" class="quiet-button">Overhead</button><button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button><button id="rerack" class="quiet-button" title="Re-rack (R)">Re-rack <span aria-hidden="true">↻</span></button></div>

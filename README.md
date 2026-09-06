@@ -36,7 +36,11 @@ foul with the 8, or wrong pocket loses. The 8 is spotted after a break; a dry br
 to a cushion, otherwise the incoming player breaks a fresh rack. Regular shots need no call. These simplified break
 and call-shot rules are intentional; this is not a tournament rules implementation.
 
-`npm test` checks rules and pointer behavior. The pure rules engine lives in `src/eight-ball.js`.
+**Vs Computer** adds Easy / Normal / Hard opponents. You are Player 1; the computer is Player 2.
+It evaluates clear pots, legal contact and one-cushion escapes, places the cue after fouls, and calls the 8.
+Difficulty changes shot selection and aiming error; the rules and physics stay the same.
+
+`npm test` checks rules, computer shot selection and actual potting power, and pointer behavior. The pure rules engine lives in `src/eight-ball.js`.
 
 Press `Esc` while lining up a cue shot to cancel without shooting.
 Drag back from the cue ball to shoot; the further the pull, the harder the hit (up to 24 mph / 10.7 m/s). The ball

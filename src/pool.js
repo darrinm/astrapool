@@ -14,6 +14,7 @@ import { noiseBump, feltMap, woodMap, carpetMap, clothNormal, radialShadow, grad
 import { bakeCap, authenticBall } from './ballcaps.js';
 import { PoolAudio } from './sounds.js';
 import { flingVelocity, pushSample } from './fling.js';
+import { computerShot, computerPlacement } from './computer.js';
 import { newMatch, targets, groupBalls, shotRecord, resolveShot } from './eight-ball.js';
 import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
 
@@ -30,6 +31,9 @@ let ballStyle = localStorage.getItem('playful.ballStyle') || 'heads';   // 'head
 let interactionMode = 'cue', dragging = null;
 let gameMode = 'local', match = newMatch(), activeShot = null, calledPocket = null;
 let settledFor = 0, physicsTime = 0, placing = null, pocketMarker;
+let computerWait = 0, computerPlan = null;
+let difficulty = 'normal';
+const computerTurn = () => gameMode === 'computer' && match.turn === 1 && match.winner === null;
 const cushionHandles = new Set();
 const numberOf = ball => ball.number ?? ballNumber(rackIndexOfHead(heads.indexOf(ball)));
 // The cue ball is always a plain white ball, and the plain black 8 sits at the centre of the rack. The 14 heads
@@ -254,7 +258,7 @@ function layout() {
   for (let row = 0; row < 5 && j < rack.length; row++)
     for (let k = 0; k <= row && j < rack.length; k++, j++) spot(rack[j], HW * 0.5 + row * R * 1.74, (k - row / 2) * R * 2.01, rackRot(rack[j]));
   pocketed = 0; shots = 0; pocketedSet = new Set(); respotAt = 0; belowSince.clear(); inWell.clear();
-  activeShot = null; settledFor = 0; calledPocket = null;
+  activeShot = null; settledFor = 0; calledPocket = null; computerWait = 0; computerPlan = null;
   updateScore();
 }
 function spot(h, x, y, rot) { h.body.setTranslation({ x, y, z: BALL_Z }, true); h.body.setRotation(rot, true); h.body.setLinvel({ x: 0, y: 0, z: 0 }, true); h.body.setAngvel({ x: 0, y: 0, z: 0 }, true); }
@@ -439,6 +443,7 @@ function showGameControls(show) {
       const next = games.value;
       if (!startGame(next)) games.value = gameMode;
     });
+    document.getElementById('difficulty').addEventListener('change', e => { difficulty = e.target.value; });
     document.getElementById('overhead-view').addEventListener('click', overheadView);
     document.getElementById('rematch').addEventListener('click', restart);
     document.querySelectorAll('#pocket-call button').forEach(b => b.addEventListener('click', () => {
@@ -510,18 +515,19 @@ function updateScore() {
   document.getElementById('pocketed-count').textContent = pocketed;
   document.getElementById('shot-count').textContent = shots;
   const free = gameMode === 'free';
+  document.getElementById('difficulty-group').hidden = gameMode !== 'computer';
   document.getElementById('free-score').hidden = !free;
   document.getElementById('match-score').hidden = free;
   document.getElementById('interaction-group').hidden = !free;
   document.getElementById('rerack').textContent = free ? 'Re-rack ↻' : 'New rack ↻';
   document.getElementById('rematch').hidden = free || match.winner === null;
-  document.getElementById('pocket-call').hidden = free || match.winner !== null || !!activeShot || match.ballInHand || !onEight();
+  document.getElementById('pocket-call').hidden = free || match.winner !== null || !!activeShot || match.ballInHand || computerTurn() || !onEight();
   document.querySelectorAll('#pocket-call button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.pocket) === calledPocket)));
   if (!free) for (let i = 0; i < 2; i++) {
     const card = document.getElementById(`player-${i}`);
     card.classList.toggle('active', match.winner === null && match.turn === i);
     card.classList.toggle('winner', match.winner === i);
-    card.querySelector('.player-name').textContent = `Player ${i + 1}`;
+    card.querySelector('.player-name').textContent = gameMode === 'computer' ? (i === 0 ? 'You' : 'Computer') : `Player ${i + 1}`;
     card.querySelector('.rack-wins').textContent = match.wins[i];
     card.querySelector('.player-group').textContent = match.groups[i] || 'Open table';
     const numbers = match.groups[i] ? groupBalls(match.groups[i]) : [];
@@ -538,6 +544,7 @@ function updateScore() {
   ui.hint(free ? (interactionMode === 'fling' ? 'Grab any ball. Release to fling. Hold still to place.' : 'Pull back from the cue ball. Release to shoot.') :
     match.winner !== null ? 'A rack well played. Rematch to switch the break.' :
     activeShot ? 'Waiting for the balls to settle.' :
+    computerTurn() ? 'The computer is lining up its shot.' :
     match.ballInHand ? 'Ball in hand: click an empty spot on the felt, or drag the white ball into place.' :
     onEight() && calledPocket === null ? 'Choose a pocket for the 8-ball below, then take your shot.' :
     'Pull back from the white ball. Release to shoot.');
@@ -619,13 +626,40 @@ function endAim() {
   updateScore();
 }
 function shoot() {
-  const { c, dir, pull } = aimVector();
+  const { dir, pull } = aimVector();
   if (pull < 0.3) return;
-  const speed = pull * SPEED_PER_PULL;
+  takeShot(dir, pull * SPEED_PER_PULL, spin);
+}
+function takeShot(dir, speed, shotSpin = { x: 0, y: 0 }) {
+  const c = cue.body.translation();
   if (gameMode !== 'free') { activeShot = shotRecord(calledPocket); settledFor = 0; }
-  strike(cue.body, dir, speed, spin);
+  strike(cue.body, dir, speed, shotSpin);
   shots++;
   const at = spatial(c); audio.cueTip(speed / MAX_SPEED, at.pan, at.dist);
+}
+
+function tablePositions() {
+  return allBalls().filter(b => !pocketedSet.has(b)).map(b => ({ number: numberOf(b), ...b.body.translation() }));
+}
+function updateComputer(dt) {
+  if (!computerTurn() || activeShot || !tableStill()) { computerWait = 0; return; }
+  computerWait += dt;
+  if (computerWait < 0.8) return;
+  if (!computerPlan) {
+    if (match.ballInHand) {
+      const position = computerPlacement(tablePositions(), match, validPlacement) || findSpot(cue, -HW * 0.5);
+      spot(cue, position.x, position.y, IDENTITY); match = { ...match, ballInHand: false };
+    }
+    computerPlan = computerShot(tablePositions(), match, difficulty);
+    calledPocket = computerPlan.pocket;
+    const c = cue.body.translation(), pull = computerPlan.speed / SPEED_PER_PULL;
+    setSpin(0, 0);
+    aiming = { to: new THREE.Vector3(c.x - computerPlan.dir.x * pull, c.y - computerPlan.dir.y * pull, BALL_Z) };
+    guide.visible = true; cueStick.visible = true; updateScore();
+  }
+  if (computerWait < 1.6) return;
+  const plan = computerPlan; computerPlan = null; computerWait = 0;
+  takeShot(plan.dir, plan.speed); endAim();
 }
 
 // ---------- per-step physics extras ----------
@@ -681,7 +715,7 @@ export default {
   resize() {},
   pointerdown(e) {
     audio.ensure();
-    if (e.button !== 0 || dragging || aiming || placing) return false;
+    if (computerTurn() || e.button !== 0 || dragging || aiming || placing) return false;
     if (gameMode !== 'free' && match.winner === null && match.ballInHand && !activeShot && tableStill()) {
       controls.enabled = false;
       placing = { ball: cue, original: { ...cue.body.translation() }, valid: false };
@@ -702,6 +736,7 @@ export default {
   },
   // Only the captured pointer's moves arrive during a gesture; otherwise the return value is the hover state.
   pointermove(e) {
+    if (computerTurn()) return false;
     if (placing) { movePlacement(e); return; }
     if (dragging) {
       const coalesced = e.getCoalescedEvents?.();
@@ -714,6 +749,7 @@ export default {
     return meshUnderPointer(e, [cue.mesh]) === cue.mesh && cueReady();
   },
   pointerup(e) {
+    if (computerTurn()) return;
     if (placing) { movePlacement(e); finishPlacement(); }
     else if (dragging) { sampleDrag(e); endDrag(true); }
     else if (aiming) { shoot(); endAim(); }
@@ -727,6 +763,7 @@ export default {
     physicsTime += world.timestep;
     collectPocketed();
     settleShot(world.timestep);
+    updateComputer(world.timestep);
   },
   matchState: () => ({ mode: gameMode, match: structuredClone(match), shot: activeShot && structuredClone(activeShot), calledPocket }),
   balls: allBalls,
