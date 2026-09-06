@@ -1,5 +1,10 @@
-// On small screens, lend the desktop controls to a native modal. Keeping the
-// same elements preserves their values, listeners, and hidden game states.
+// Keep setup out of the way for the rest of this visit, including subsequent racks.
+export function markPlaying() {
+  document.getElementById('hud').classList.add('playing');
+}
+
+// Lend the controls to a native modal. Keeping the same elements preserves
+// their values, listeners, and hidden game states.
 export function connectHud(game) {
   const compact = matchMedia('(max-width: 1100px), (max-height: 600px)');
   const sheet = document.getElementById('hud-sheet');
@@ -13,7 +18,6 @@ export function connectHud(game) {
   }
   function close() { sheet.close(); restore(); }
   function open(label, selectors) {
-    if (!compact.matches) return;
     game.key('escape');
     restore();
     title.textContent = label;

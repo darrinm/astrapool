@@ -65,7 +65,7 @@ Press `Esc` while lining up a cue shot to cancel without shooting.
 Drag back from the cue ball to shoot; the further the pull, the harder the hit (up to 24 mph / 10.7 m/s). The ball
 widget (bottom right) sets follow / draw / english; Reset centers the contact point. Left-drag the table to orbit, right-drag to pan, wheel to zoom,
 `C` resets the view. Numbered **Balls** are the default. Heads / Balls buttons (or `B`) swap the heads for authentic numbered balls. `M` mutes,
-`R` re-racks. The bottom dock groups play mode, ball appearance, reset view, and re-rack.
+`R` re-racks. The desktop setup dock groups play mode, ball appearance, reset view, and re-rack. It hides after the first shot or fling and stays tucked away between racks; the small **Game** button reopens these settings.
 The header shows pocketed balls and shots, with sound and a Help menu for controls and shortcuts.
 
 Choose **Fling** (or press `F`) to grab any ball and slide it across the felt. Release while moving to

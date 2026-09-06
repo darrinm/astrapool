@@ -15,6 +15,7 @@ import { bakeCap, authenticBall } from './ballcaps.js';
 import { PoolAudio } from './sounds.js';
 import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
+import { markPlaying } from './hud.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
 import { newMatch, targets, groupBalls, shotRecord, resolveShot } from './eight-ball.js';
@@ -408,6 +409,7 @@ function moveBall(body, velocity) {
 function endDrag(fling = false) {
   if (!dragging) return;
   const { ball, samples } = dragging;
+  if (fling) markPlaying();
   moveBall(ball.body, fling ? flingOnTable(ball, flingVelocity(samples)) : { x: 0, y: 0 });
   dragging = null; controls.enabled = true; updateGestureControls();
 }
@@ -531,6 +533,7 @@ function tableStill() {
   });
 }
 function updateScore() {
+  if (shots > 0) markPlaying();
   updateGestureControls();
   document.getElementById('pocketed-count').textContent = pocketed;
   document.getElementById('shot-count').textContent = shots;

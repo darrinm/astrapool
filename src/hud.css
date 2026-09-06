@@ -153,3 +153,11 @@ button:disabled { opacity: .6; cursor: default; }
   .online-panel > div { display: none; }
   .primary-button { min-height: 44px; margin-bottom: 8px; }
 }
+
+/* Once play starts, desktop setup is available on demand via a single button. */
+#hud.playing .control-dock { display: none; }
+@media (min-width: 1101px) and (min-height: 601px) {
+  #hud.playing .compact-actions { display: block; position: fixed; left: 32px; bottom: 24px; pointer-events: auto; }
+  #hud.playing .compact-actions > button:not(#open-settings) { display: none; }
+  #hud.playing #open-settings { background: var(--panel); border-color: var(--line); }
+}
