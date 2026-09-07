@@ -1,8 +1,10 @@
 import { test } from 'node:test';
+import { PerspectiveCamera, Vector3 } from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import assert from 'node:assert/strict';
 import { newMatch, resolveShot, shotRecord } from '../src/eight-ball.js';
 import { groupLabel, playerText } from '../src/match-copy.js';
-import { overheadDistance, withinCueTarget } from '../src/table-view.js';
+import { overheadDistance, setOverheadCamera, withinCueTarget } from '../src/table-view.js';
 import { placeCue } from '../server/protocol.js';
 import { rackPositions } from '../src/table-state.js';
 
@@ -67,3 +69,38 @@ test('small cue balls have a forgiving touch target without capturing distant dr
   assert.ok(!withinCueTarget({ x: 120, y: 100 }, center, 5, false));
   assert.ok(!withinCueTarget({ x: 125, y: 100 }, center, 5, true));
 });
+
+for (const [width, height, top, bottom, right] of [
+  [390, 844, 88, 110, 12], [320, 568, 88, 145, 12],
+  [768, 1024, 88, 110, 12], [844, 390, 88, 12, 250],
+  [1440, 900, 140, 210, 12], [390, 844, 88, 560, 12],
+]) {
+  test(`overhead camera fills the available space and holds its orientation at ${width} × ${height}, bottom ${bottom}`, () => {
+    const camera = new PerspectiveCamera(48, width / height, 0.1, 800);
+    camera.up.set(0, 0, 1);
+    camera.position.set(-60, 0, 21);
+    const controls = new OrbitControls(camera, null);
+    controls.minPolarAngle = 0.05;
+    controls.enableDamping = true;
+    controls.rotateLeft(0.8); // Leave an unfinished orbit when Overhead is pressed.
+    const halfWidth = 43.7, halfHeight = 24.2, left = 12, surfaceZ = 2.1;
+    setOverheadCamera(camera, controls, { width, height, halfWidth, halfHeight, surfaceZ, top, bottom, left, right });
+    const before = camera.position.clone();
+    for (let frame = 0; frame < 120; frame++) controls.update();
+    assert.ok(before.distanceTo(camera.position) < 0.00001, 'orbit damping must not move the fitted table');
+    camera.updateMatrixWorld();
+    const screen = (x, y) => {
+      const p = new Vector3(x, y, surfaceZ).project(camera);
+      return { x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2 };
+    };
+    const corners = [-1, 1].flatMap(x => [-1, 1].map(y => screen(x * halfWidth, y * halfHeight)));
+    const xs = corners.map(p => p.x), ys = corners.map(p => p.y);
+    assert.ok(Math.min(...xs) >= left - 0.01 && Math.max(...xs) <= width - right + 0.01);
+    assert.ok(Math.min(...ys) >= top - 0.01 && Math.max(...ys) <= height - bottom + 0.01);
+    const tableWidth = Math.max(...xs) - Math.min(...xs), tableHeight = Math.max(...ys) - Math.min(...ys);
+    assert.ok(Math.abs(tableWidth - (width - left - right)) < 0.01 || Math.abs(tableHeight - (height - top - bottom)) < 0.01,
+      'table must fill at least one available dimension');
+    assert.equal(tableHeight > tableWidth, height > width, 'long rails follow the viewport orientation');
+    assert.ok(controls.enableDamping);
+  });
+}

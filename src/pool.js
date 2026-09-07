@@ -17,7 +17,7 @@ import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
 import { markPlaying } from './hud.js';
 import { groupLabel, playerName, playerText } from './match-copy.js';
-import { overheadDistance, withinCueTarget } from './table-view.js';
+import { setOverheadCamera, withinCueTarget } from './table-view.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
 import { newMatch, targets, groupBalls, shotRecord, resolveShot } from './eight-ball.js';
@@ -38,7 +38,7 @@ let gameMode = 'local', match = newMatch(), activeShot = null, calledPocket = nu
 let settledFor = 0, physicsTime = 0, placing = null, pocketMarker;
 let computerWait = 0, computerPlan = null, computerWorker = null;
 let difficulty = 'medium', onlineShotSeq = null, onlineShooter = null;
-let overhead = false;
+let overhead = false, hudObserver;
 const online = new OnlineRoom(receiveOnline, text => {
   document.getElementById('online-status').textContent = text;
   document.getElementById('invite-link').value = online.id ? `${location.origin}/#room=${online.id}` : '';
@@ -282,13 +282,18 @@ function setupCamera() {
   controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
   controls.panSpeed = 1.2; controls.minDistance = 10; controls.maxDistance = 200;
   controls.minPolarAngle = 0.05; controls.maxPolarAngle = Math.PI / 2 - 0.1;
-  controls.addEventListener('start', () => { overhead = false; });
+  controls.addEventListener('start', () => { overhead = false; controls.minPolarAngle = 0.05; });
   resetView();
+  hudObserver = new ResizeObserver(() => {
+    if (overhead && !aiming && !placing && !dragging) fitOverhead();
+  });
+  for (const selector of ['.topbar', '.bottom-hud']) hudObserver.observe(document.querySelector(selector));
 }
 function resetView() {
   if (innerHeight > innerWidth || innerHeight <= 600) { overheadView(); return; }
   overhead = false;
   camera.clearViewOffset();
+  controls.minPolarAngle = 0.05;
   controls.target.set(0, 0, FELT_Z); camera.position.set(-HW * 1.6, 0, FELT_Z + 21); controls.update();
 }
 
@@ -621,20 +626,17 @@ function overheadView() {
 }
 function fitOverhead() {
   if (!controls) return;
-  const compact = innerWidth <= 1100 || innerHeight <= 600;
   const short = innerWidth > innerHeight && innerHeight <= 600;
-  const top = Math.max(compact ? 90 : 110, document.querySelector('.topbar').getBoundingClientRect().bottom + 12);
-  const bottom = short ? 16 : Math.max(compact ? 160 : 140, document.querySelector('.bottom-hud').getBoundingClientRect().height + 24);
-  const left = 12, right = short ? 250 : 12;
-  const distance = overheadDistance(innerWidth, innerHeight, HW + RAIL_W + 2, HH + RAIL_W + 2,
-    camera.fov, top, bottom, left, right);
-  controls.maxDistance = Math.max(200, distance);
-  camera.setViewOffset(innerWidth, innerHeight, (right - left) / 2, (bottom - top) / 2, innerWidth, innerHeight);
-  // Keep world Z as camera up for OrbitControls; azimuth turns the long rail vertical.
-  controls.target.set(0, 0, FELT_Z);
-  const portrait = innerHeight > innerWidth;
-  camera.position.set(portrait ? -0.01 : 0, portrait ? 0 : -0.01, FELT_Z + distance);
-  controls.update();
+  const header = document.querySelector('.topbar').getBoundingClientRect();
+  const hud = document.querySelector('.bottom-hud').getBoundingClientRect();
+  const top = header.bottom + 12;
+  const bottom = short ? 12 : innerHeight - hud.top + 12;
+  const left = 12, right = short ? innerWidth - hud.left + 12 : 12;
+  setOverheadCamera(camera, controls, {
+    width: innerWidth, height: innerHeight,
+    halfWidth: HW + CUSH + RAIL_W + 0.5, halfHeight: HH + CUSH + RAIL_W + 0.5,
+    surfaceZ: FELT_Z + RAIL_H + 0.5, top, bottom, left, right,
+  });
 }
 function startGame(mode, roomId = null) {
   if (!roomId && shots && (gameMode === 'free' || match.winner === null) && !window.confirm('Start a new game and clear this rack?')) return false;
@@ -882,6 +884,7 @@ export default {
     window.removeEventListener('hashchange', joinInvite); online.leave();
     endGesture();
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
+    hudObserver?.disconnect(); hudObserver = null;
     controls?.dispose(); controls = null; setLook(false);
   },
   key(k) { if (k === 'escape') endGesture(); if (k === 'r') restart(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue'); },
