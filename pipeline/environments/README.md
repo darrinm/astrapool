@@ -6,7 +6,9 @@ Minimal keeps its original code, textures, lighting, and silence.
 - `prompts.json`: exact prompts used with the built-in image generation tool.
 - `corner.blend`, `desert.blend`, `tokyo.blend`, `orbital.blend`: editable furniture scenes.
 - `build.py`: deterministic Blender 5.x builder. It runs in an isolated background process and does not modify an open Blender project.
-- `../../public/environments/*.webp`: generated 1774 × 887 full-sphere room panoramas, encoded as WebP at quality 88. These also serve as chooser previews.
+- `../../public/environments/{corner,desert,tokyo,orbital}.webp`: 4096 × 2048 full-sphere room panoramas, encoded as WebP at quality 90.
+- `../../public/environments/*-preview.webp`: separate 640 × 320 chooser previews at quality 88. Opening the picker does not download four full-size backgrounds.
+- `upscale.py`: resumable, offline asset-production step using Topaz High Fidelity V2 through fal. The game never uses the fal key or API.
 - `../../public/environments/*-furniture.glb`: furniture exported from Blender, with bevels, weighted normals and physically based materials, joined by material to limit draw calls.
 
 Rebuild the furniture from the repository root (Blender must be installed):
@@ -25,3 +27,31 @@ Room direction:
 - **Orbital Lounge:** the Earth through panoramic glazing, titanium sled chairs and ivory upholstery.
 
 The game uses Three.js GroundedSkybox for nearby floor parallax and a surrounding photographic dome. This is a lightweight hybrid environment, not fully modeled architecture: large camera translations can reveal projection distortion. The normal play and overhead views stay within the intended viewing area. No external image service is contacted during play.
+
+## Upscaling the room art
+
+The original 1774 × 887 image-generation PNGs were upscaled 4× to 7096 × 3548
+with `topaz/upscale/image/precision`, model `High Fidelity V2`. Face enhancement
+and cropping are disabled; no generative prompt is used. A Lanczos reduction to
+4096 × 2048 retains sharper architectural detail while limiting each panorama to
+about 43 MiB of RGBA texture memory including mipmaps. Only the chosen room loads;
+a room transition temporarily retains the old room until its replacement is ready.
+Minimal does not load a panorama.
+
+Use the original lossless source PNG, not a previously upscaled file. Install
+`pipeline/requirements.txt` in the local virtual environment first. The existing
+`pipeline/falenv.py` helper reads the key from `~/src/iris/.env`; credentials never
+enter the published assets. This command makes a billed fal request. Its adjacent
+JSON record preserves the request ID so rerunning resumes the existing job.
+
+```sh
+.venv/bin/python pipeline/environments/upscale.py /path/to/original.png /path/to/masters/corner.png
+magick /path/to/masters/corner.png -filter Lanczos -resize 4096x2048 /tmp/corner-4k.png
+cwebp -q 90 /tmp/corner-4k.png -o public/environments/corner.webp
+cwebp -q 88 -resize 640 320 /path/to/original.png -o public/environments/corner-preview.webp
+```
+
+Keep PNG masters and request records outside `public/`. Repeat for `desert`,
+`tokyo`, and `orbital`. Check both the normal camera and portrait overhead view.
+Upscaling improves sharpness; it does not change the panorama's projection or
+turn the photographed architecture into geometry.
