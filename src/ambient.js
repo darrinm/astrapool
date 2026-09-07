@@ -1,5 +1,14 @@
 // Quiet, procedural room beds. Created only after a user gesture; no downloads
 // or speech. One graph is owned by the active room and torn down on a change.
+const noiseBeds = {
+  desert: { cutoff: 460, sweep: 180, rate: 0.13 },
+  tokyo: { cutoff: 2600 },
+  alpine: { cutoff: 780, crackle: true },
+  glasshouse: { cutoff: 1200, sweep: 260, rate: 0.09 },
+  coast: { cutoff: 680, swell: 0.35, rate: 0.10 },
+  riad: { cutoff: 1900, swell: 0.12, rate: 0.27 },
+};
+
 export class RoomAmbience {
   constructor(ctx, destination, id) {
     this.nodes = []; this.sources = [];
@@ -20,14 +29,21 @@ export class RoomAmbience {
         lfo.connect(depth).connect(amplitude); lfo.start(); this.sources.push(lfo);
       });
     } else {
+      const bed = noiseBeds[id] || noiseBeds.desert;
       const buffer = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate), data = buffer.getChannelData(0);
-      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      let crackle = 0;
+      for (let i = 0; i < data.length; i++) {
+        // Sparse, decaying embers sit quietly inside the low fireplace noise.
+        if (bed.crackle) crackle = Math.random() < 3 / ctx.sampleRate ? 0.6 : crackle * 0.97;
+        data[i] = (Math.random() * 2 - 1) * (bed.crackle ? 0.35 + crackle : 1);
+      }
       const source = this.node(ctx.createBufferSource()), filter = this.node(ctx.createBiquadFilter());
-      source.buffer = buffer; source.loop = true; filter.type = 'lowpass'; filter.frequency.value = id === 'tokyo' ? 2600 : 460; filter.Q.value = 0.4;
-      source.connect(filter).connect(gain); source.start(); this.sources.push(source);
-      if (id === 'desert') {
+      source.buffer = buffer; source.loop = true; filter.type = 'lowpass'; filter.frequency.value = bed.cutoff; filter.Q.value = 0.4;
+      const level = this.node(ctx.createGain()); level.gain.value = 1 - (bed.swell || 0);
+      source.connect(filter).connect(level).connect(gain); source.start(); this.sources.push(source);
+      if (bed.sweep || bed.swell) {
         const wind = this.node(ctx.createOscillator()), depth = this.node(ctx.createGain());
-        wind.frequency.value = 0.13; depth.gain.value = 180; wind.connect(depth).connect(filter.frequency); wind.start(); this.sources.push(wind);
+        wind.frequency.value = bed.rate; depth.gain.value = bed.sweep || bed.swell; wind.connect(depth).connect(bed.sweep ? filter.frequency : level.gain); wind.start(); this.sources.push(wind);
       }
     }
   }

@@ -12,7 +12,7 @@ test('saved room choices accept known IDs and recover from stale or unavailable 
   assert.equal(readEnvironment({ getItem() { throw new Error('storage blocked'); } }), 'minimal');
   assert.equal(environmentById(null).id, 'minimal');
   assert.equal(readEnvironment({ getItem: () => null }), 'minimal');
-  assert.equal(ENVIRONMENTS.length, 5);
+  assert.equal(ENVIRONMENTS.length, 9);
 });
 
 test('shipped room models leave the table clear and release all their graphics resources', async () => {

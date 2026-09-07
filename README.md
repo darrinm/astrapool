@@ -44,7 +44,8 @@ competitive anti-cheat. There are no accounts, public matchmaking, or rankings.
 ## Environments
 Choose **Room** in the desktop dock, or **Game → Room** on compact screens and after play starts.
 **Minimal** is the default: the original green cloth, walnut table, dark room, and table sounds only.
-The four optional rooms—The Corner Pocket, Desert Modern, Tokyo Rooftop, and Orbital Lounge—each have their own cloth,
+The eight optional rooms—The Corner Pocket, Desert Modern, Tokyo Rooftop, Orbital Lounge, Alpine Lodge,
+The Glasshouse, Amalfi Terrace, and Atlas Courtyard—each have their own cloth,
 rail finishes, architecture, scenery, lighting, and quiet procedural ambience. Select a card to preview;
 **Play here** saves your choice on this device. Closing or pressing Escape restores the previous room.
 Changing rooms preserves the rack, turn, custom camera, and physics; online players choose their own scenery.
