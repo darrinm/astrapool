@@ -182,7 +182,7 @@ button:disabled { opacity: .6; cursor: default; }
 /* Room chooser: illustrated previews, with the current rack still behind it. */
 #open-environments { gap: 12px; }
 #environment-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: var(--accent); }
-#environment-dialog { width: min(760px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 26px; color: #f4efe4; background: #121a18f5; border: 1px solid #ffffff30; border-radius: 24px; box-shadow: 0 30px 100px #0009; }
+#environment-dialog { --room-padding: 26px; width: min(760px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: var(--room-padding); color: #f4efe4; background: #121a18f5; border: 1px solid #ffffff30; border-radius: 24px; box-shadow: 0 30px 100px #0009; }
 #environment-dialog::backdrop { background: #0005; backdrop-filter: blur(3px); }
 .environment-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .environment-heading h2 { margin: 6px 0 0; font: 500 30px/1.15 Georgia, serif; letter-spacing: -.6px; }
@@ -200,26 +200,22 @@ button:disabled { opacity: .6; cursor: default; }
 .room-table::before, .room-table::after { content: ''; position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #080d11; box-shadow: 105px 0 #080d11, 52px 0 #080d11; left: -1px; }
 .room-table::before { top: -1px; }.room-table::after { bottom: -1px; }
 .room-table i { position: absolute; left: 25px; top: 29px; width: 5px; height: 5px; border-radius: 50%; background: #fffbe5; box-shadow: 47px -4px #d8a135, 52px 0 #477fa3, 48px 5px #a24751; }
-.room-scenery { position: absolute; inset: 0; }
-.room-corner .room-scenery::before { content: 'OPEN LATE'; position: absolute; left: 33%; top: 22px; color: #fba3bd; letter-spacing: 4px; font-size: 11px; text-shadow: 0 0 12px #fb518c; }
-.room-desert .room-art { background: linear-gradient(#bc9192, #f8d4a0 70%, #bfa188); }
-.room-desert .room-scenery { background: #957c80; clip-path: polygon(0 70%, 20% 30%, 40% 62%, 65% 22%, 85% 65%, 100% 40%, 100% 100%, 0 100%); }
-.room-desert .room-table { background: #698f69; border-color: #c5a176; }
-.room-tokyo .room-art { background: linear-gradient(#081226, #202d48); }
-.room-tokyo .room-scenery { inset: 20px 10px 0; background: repeating-linear-gradient(90deg, transparent 0 10px, #6cb6d344 10px 13px, transparent 13px 24px), repeating-linear-gradient(0deg, #192039 0 10px, #ce719855 10px 12px); clip-path: polygon(0 30%, 15% 30%, 15% 50%, 30% 50%, 30% 0, 45% 0, 45% 35%, 60% 35%, 60% 18%, 80% 18%, 80% 45%, 100% 45%, 100% 100%, 0 100%); }
-.room-tokyo .room-table { background: #284f7b; border-color: #121d30; box-shadow: -12px 10px 24px #da5f9c33, 12px 10px 24px #56cde533; }
-.room-orbital .room-art { background: radial-gradient(circle at 20% 28%, #d2edff 0 1px, transparent 2px), radial-gradient(circle at 76% 20%, #d2edff 0 1px, transparent 2px), #061221; }
-.room-orbital .room-scenery::before { content: ''; position: absolute; width: 110px; height: 110px; border-radius: 50%; left: 44%; top: -27px; background: radial-gradient(circle at 75% 35%, transparent, #030b26 75%), repeating-linear-gradient(-23deg, #528795 0 9px, #b1d3cb 10px 12px, #5482ac 16px 30px); box-shadow: 0 0 18px #54bdeb66; }
-.room-orbital .room-table { background: #25666d; border-color: #8a9fa7; }
+/* Room artwork doubles as its preview, so opening the chooser warms the image cache. */
+.room-photo { width: 100%; height: 100%; display: block; object-fit: cover; transition: transform 220ms ease; }
+.environment-card:hover .room-photo { transform: scale(1.035); }
+.room-number { z-index: 1; text-shadow: 0 1px 5px #000; }
+.room-check { z-index: 1; }
+#apply-environment:disabled { opacity: .5; cursor: wait; }
+@media (prefers-reduced-motion: reduce) { .room-photo { transition: none; } }
 .room-copy { display: flex; flex-direction: column; gap: 7px; padding: 14px 16px 17px; }
 .room-copy .eyebrow { font-size: 8px; letter-spacing: 1px; color: #bfb9a9; }
 .room-copy strong { font: 500 21px/1.15 Georgia, serif; }
 .room-copy > span:last-child { font-size: 12px; line-height: 1.5; color: #b5b4a9; }
-.environment-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 22px; }
+.environment-footer { position: sticky; bottom: calc(-1 * var(--room-padding)); z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 22px calc(-1 * var(--room-padding)) calc(-1 * var(--room-padding)); padding: 16px var(--room-padding); background: #121a18; border-top: 1px solid #ffffff18; }
 .environment-footer p { margin: 0; color: #b5b4a9; font-size: 12px; }
 .environment-footer .primary-button { margin: 0; white-space: nowrap; min-height: 44px; }
 @media (max-width: 540px) {
-  #environment-dialog { padding: 18px; border-radius: 18px; }
+  #environment-dialog { --room-padding: 18px; border-radius: 18px; }
   .environment-heading h2 { font-size: 25px; }
   .environment-intro { font-size: 12px; margin-bottom: 16px; }
   .environment-options { gap: 10px; }

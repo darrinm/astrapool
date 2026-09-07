@@ -47,9 +47,16 @@ Choose **Room** in the desktop dock, or **Game → Room** on compact screens and
 The four optional rooms—The Corner Pocket, Desert Modern, Tokyo Rooftop, and Orbital Lounge—each have their own cloth,
 rail finishes, architecture, scenery, lighting, and quiet procedural ambience. Select a card to preview;
 **Play here** saves your choice on this device. Closing or pressing Escape restores the previous room.
-Changing rooms preserves the rack, turn, camera, and physics; online players choose their own scenery.
+Changing rooms preserves the rack, turn, custom camera, and physics; online players choose their own scenery.
+Optional rooms get a wider composition from the original desktop starting view; portrait and short windows keep the overhead view.
 Ambient sound starts only after interaction, follows **Sound** / **M**, and mutes while the page is hidden.
-Scenery is generated locally; switching rooms disposes the previous room's graphics and audio resources.
+The optional rooms use generated photographic panoramas projected onto a floor and surrounding dome, plus
+Blender-modeled furniture and matching reflection lighting. Artwork and models load only when needed; the current
+room remains playable during loading. Failed or cancelled downloads keep the existing room, and switching releases
+the old room's graphics and audio resources. Minimal requires no room downloads.
+
+Art prompts, editable Blender files, and the reproducible asset builder live in
+[`pipeline/environments`](pipeline/environments/README.md). Runtime WebP and GLB files are in `public/environments`.
 
 ## Playing
 Choose **Local 8-ball** to play a match with another person on this device, or **Free Play** for Cue / Fling.

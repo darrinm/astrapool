@@ -67,13 +67,28 @@ const FACE_UP = TOWARD_FAR_RAIL.clone().multiply(new THREE.Quaternion().setFromU
 const rackRot = (ball) => { const q = (heads.includes(ball) && ballStyle === 'heads') ? FACE_UP : NUMBER_UP; return { x: q.x, y: q.y, z: q.z, w: q.w }; };
 const IDENTITY = { x: 0, y: 0, z: 0, w: 1 };
 const saved = {};
-let environmentId = readEnvironment(localStorage), room, tableFinish, tableLights;
-function setEnvironment(id) {
-  const theme = environmentById(id); environmentId = theme.id;
-  if (!tableFinish) return;
-  if (room?.group.name === `environment-${theme.id}`) return;
-  endGesture();
+let environmentId = readEnvironment(localStorage), room, pendingRoom, tableFinish, tableLights;
+let environmentRequest = 0;
+async function setEnvironment(id) {
+  const theme = environmentById(id), request = ++environmentRequest;
+  pendingRoom?.dispose(); pendingRoom = null;
+  if (!tableFinish) return false;
+  if (room?.group.name === `environment-${theme.id}`) return true;
   const minimal = theme.id === 'minimal';
+  const next = buildEnvironment(theme, FELT_Z - 1.2 - 4 - 24);
+  pendingRoom = next;
+  try { if (!minimal) await next.ready; }
+  catch (error) {
+    next.dispose();
+    if (request === environmentRequest) pendingRoom = null;
+    console.warn(`Could not load ${theme.name}`, error);
+    return false;
+  }
+  if (request !== environmentRequest) { next.dispose(); return false; }
+  pendingRoom = null;
+  const atDefaultView = !overhead && camera.position.distanceTo(new THREE.Vector3(-HW * 1.6, 0, FELT_Z + 21)) < 0.1;
+  environmentId = theme.id;
+  endGesture();
   const original = tableFinish.original;
   if (tableFinish.felt.map !== original.felt) tableFinish.felt.map.dispose();
   tableFinish.felt.map = minimal ? original.felt : feltMap(512, 6, theme.felt);
@@ -91,19 +106,28 @@ function setEnvironment(id) {
       material.map = map;
     }
     if (old !== initial) old.dispose();
+    material.envMapIntensity = minimal ? 0.08 : 0.6;
     material.metalness = theme.id === 'orbital' ? 0.45 : 0;
     material.roughness = theme.id === 'tokyo' ? 0.3 : 0.6;
   });
   tableFinish.trim.color.set(minimal ? '#1a0d05' : theme.trim);
   tableFinish.shade.color.set(minimal || theme.id === 'corner' ? '#12301f' : theme.trim);
-  tableLights.forEach((light, index) => light.color.set(minimal ? original.lights[index] : theme.lamp));
+  tableLights.forEach((light, index) => {
+    light.color.set(minimal ? original.lights[index] : theme.lamp);
+    light.intensity = original.intensities[index] * (minimal ? 1 : 1.2);
+  });
   lights.hemi.intensity = theme.hemi;
   renderer.toneMappingExposure = theme.exposure;
   scene.background = new THREE.Color(theme.sky); scene.fog = minimal ? new THREE.Fog(theme.sky, 140, 330) : null;
-  room?.dispose(); room = buildEnvironment(theme, FELT_Z - 1.2 - 4 - 24); scene.add(room.group);
+  scene.environment = minimal ? envTex : next.environmentMap;
+  scene.environmentRotation.set(minimal ? 0 : Math.PI / 2, 0, 0);
+  scene.environmentIntensity = minimal ? 0.5 : 0.8;
+  room?.dispose(); room = next; scene.add(room.group);
   document.documentElement.dataset.environment = theme.id;
   const label = document.getElementById('environment-name'); if (label) label.textContent = theme.name;
   audio.setEnvironment(theme.id);
+  if (!minimal && atDefaultView) resetView();
+  return true;
 }
 
 // ---------- table ----------
@@ -215,7 +239,7 @@ function build() {
 
   tableFinish = { felt: feltMat, wood: [slabWood, railLong, railShort, apronWood, apronWoodEnd, legWood], trim: mouldMat, shade: shade.material };
   tableLights = [area, spot];
-  tableFinish.original = { felt: feltMat.map, wood: tableFinish.wood.map(material => material.map), lights: tableLights.map(light => light.color.clone()) };
+  tableFinish.original = { felt: feltMat.map, wood: tableFinish.wood.map(material => material.map), lights: tableLights.map(light => light.color.clone()), intensities: tableLights.map(light => light.intensity) };
 
   // ---- contact shadows under the balls, and occlusion strips where the cushions meet the felt ----
   const shadowTex = radialShadow();
@@ -325,7 +349,10 @@ function resetView() {
   overhead = false;
   camera.clearViewOffset();
   controls.minPolarAngle = 0.05;
-  controls.target.set(0, 0, FELT_Z); camera.position.set(-HW * 1.6, 0, FELT_Z + 21); controls.update();
+  controls.target.set(0, 0, FELT_Z);
+  if (environmentId === 'minimal') camera.position.set(-HW * 1.6, 0, FELT_Z + 21);
+  else { camera.position.set(-115, -65, FELT_Z + 40); controls.target.z = FELT_Z - 7; }
+  controls.update();
 }
 
 // ---------- look: dark room, tone mapping, environment reflections, glossy balls ----------
@@ -906,7 +933,11 @@ export default {
   enter() {
     setHeadRadius(R); world.gravity = { x: 0, y: 0, z: -G };
     RectAreaLightUniformsLib.init();
-    build(); layout(); setupCamera(); setLook(true); setEnvironment(environmentId); showGameControls(true); capsOn = true; setBallStyle(ballStyle);
+    build(); layout(); setupCamera(); setLook(true);
+    const initialEnvironment = environmentId;
+    setEnvironment('minimal');
+    if (initialEnvironment !== 'minimal') setEnvironment(initialEnvironment);
+    showGameControls(true); capsOn = true; setBallStyle(ballStyle);
     window.addEventListener('hashchange', joinInvite);
     joinInvite();
   },
@@ -914,6 +945,7 @@ export default {
     cancelComputerSearch();
     window.removeEventListener('hashchange', joinInvite); online.leave();
     endGesture();
+    ++environmentRequest; pendingRoom?.dispose(); pendingRoom = null;
     room?.dispose(); room = null; audio.stopAmbient();
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     hudObserver?.disconnect(); hudObserver = null;
@@ -988,7 +1020,6 @@ export default {
   audio,
   frame() {
     controls?.update();
-    room?.setCameraHeight(camera.position.z);
     audio.setMuted(!!window.playful?.mute || document.hidden);
     const fade = THREE.MathUtils.clamp((fixtureFade[1] - camera.position.z) / (fixtureFade[1] - fixtureFade[0]), 0, 1);   // lamp fixture fades as the camera climbs to it
     for (const m of fixture) { m.visible = fade > 0; m.material.opacity = fade; }
