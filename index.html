@@ -16,9 +16,9 @@
           <div><span class="eyebrow">Shots</span><b id="shot-count" class="score">0</b></div>
         </div>
         <div id="match-score" class="match-score" aria-label="Match score">
-          <div id="player-0" class="player-card"><div class="player-heading"><strong class="player-name">Player 1</strong><b class="rack-wins">0</b></div><span class="player-group">Open table</span><div class="remaining-balls"></div></div>
-          <span class="versus">8-ball</span>
-          <div id="player-1" class="player-card"><div class="player-heading"><strong class="player-name">Player 2</strong><b class="rack-wins">0</b></div><span class="player-group">Open table</span><div class="remaining-balls"></div></div>
+          <div id="player-0" class="player-card"><div class="player-heading"><strong class="player-name">Player 1</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
+          <span class="versus"><strong>8-ball</strong><span>Racks won</span></span>
+          <div id="player-1" class="player-card"><div class="player-heading"><strong class="player-name">Player 2</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
         </div>
         <div class="utilities">
           <button id="sound" class="quiet-button" aria-pressed="true" title="Toggle sound (M)">Sound <span id="sound-state">on</span></button>
@@ -40,6 +40,7 @@
         <div><input id="invite-link" aria-label="Invite link" readonly><button id="copy-invite" class="quiet-button">Copy invite</button><button id="online-retry" class="quiet-button">Reconnect</button></div>
       </section>
       <div class="bottom-hud">
+        <div id="shot-result" class="shot-result" hidden><span class="eyebrow">Last shot</span><p id="shot-result-text" role="status"></p></div>
         <div class="guidance"><div id="status" role="status"></div><p id="hint"></p></div>
         <div class="shot-controls">
           <div id="pocket-call" class="pocket-call" hidden>
@@ -55,7 +56,7 @@
         <button id="rematch" class="primary-button" hidden>Rematch</button>
         <nav class="compact-actions" aria-label="Table controls">
           <button id="open-settings" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet">Game <span aria-hidden="true">☰</span></button>
-          <button id="quick-view" class="quiet-button" title="View the table from above">Overhead</button>
+          <button id="quick-view" class="quiet-button" title="View the whole table from above">Overhead</button>
           <button id="open-spin" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet">Spin</button>
           <button id="open-pockets" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Call pocket</button>
           <button id="cancel-gesture" class="quiet-button" hidden>Cancel</button>

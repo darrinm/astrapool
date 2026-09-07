@@ -44,6 +44,10 @@ competitive anti-cheat. There are no accounts, public matchmaking, or rankings.
 ## Playing
 Choose **Local 8-ball** to play a match with another person on this device, or **Free Play** for Cue / Fling.
 Local matches track turns, remaining solids / stripes, fouls, rack wins, and rematches with alternating breaks.
+The score is labeled **Racks won**. Player cards show **Groups not assigned** until a group is claimed,
+then a remaining-ball count and colored ball markers. **Last shot** explains pocketed balls, group assignment,
+fouls, and rack results; it stays visible through the next player's turn and online reconnects. Computer and
+online messages use **You**, **Computer**, and **Friend** consistently with the player cards.
 After a foul, click clear felt or drag the cue ball to place it. Choose a pocket before shooting the 8; the selected
 pocket glows gold on the table. **Overhead** gives a top-down view.
 
@@ -60,6 +64,11 @@ Easy favors sensible, simple pots with forgiving aim and loose power control; it
 `npm test` checks rules, computer shot selection and actual potting power, Hard scratch/safety/run-out regressions, pointer behavior, and the server protocol. `npm run benchmark:computer` compares Easy, Medium and Hard on eight reproducible, shared endgame layouts, measuring run-outs, pots and fouls (four seeded visits per layout for the randomized levels, one for deterministic Hard); it is a diagnostic benchmark, not a human win-rate estimate. The pure rules engine lives in `src/eight-ball.js`.
 
 On phones, tablets, and short windows, a compact action bar keeps settings off the table. **Game** opens mode, difficulty, appearance, sound, and help; **Room** also contains the invite and reconnect controls during online play. **Spin** opens a larger contact-point control, and **Call pocket** appears when you reach the 8. Drag empty space to orbit and use two fingers to pan or pinch to zoom. While holding a shot or placement, tap **Cancel** with another finger to abandon it.
+
+Portrait screens start overhead with the table running lengthwise and fitted between the score and controls.
+Short landscape screens put the controls beside the table. Overhead remains available after the first shot on
+desktop, along with a visible Cancel button while aiming. The cue ball has a forgiving grab area (larger for
+touch); grabbing slightly beside it preserves the direction of the drag and never steals a direct hit on another ball.
 
 Press `Esc` while lining up a cue shot to cancel without shooting.
 Drag back from the cue ball to shoot; the further the pull, the harder the hit (up to 24 mph / 10.7 m/s). The ball

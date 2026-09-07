@@ -1,9 +1,10 @@
 // Pool house rules. Pure state transitions shared by local, computer, and online matches.
+import { shotSummary } from './match-copy.js';
 export const groupOf = (n) => n >= 1 && n <= 7 ? 'solids' : n >= 9 && n <= 15 ? 'stripes' : null;
 export const groupBalls = (group) => Array.from({ length: 7 }, (_, i) => i + (group === 'solids' ? 1 : 9));
 export function newMatch(breaker = 0, wins = [0, 0]) {
   return { turn: breaker, breaker, wins: [...wins], groups: [null, null], down: [], breaking: true,
-    ballInHand: false, winner: null, message: `Player ${breaker + 1} to break.`, shots: 0 };
+    ballInHand: false, winner: null, message: `Player ${breaker + 1} to break.`, lastShot: null, shots: 0 };
 }
 export function targets(state, player = state.turn) {
   const group = state.groups[player];
@@ -20,6 +21,11 @@ export function shotRecord(calledPocket = null) {
 // Rails contains distinct ball numbers driven to a cushion AFTER the cue's first object contact.
 // Pocketed entries are { number, pocket }; off-table balls never count as legal pots.
 export function resolveShot(previous, shot) {
+  const result = resolveRules(previous, shot);
+  if (previous.winner === null) result.state.lastShot = shotSummary(previous, shot, result);
+  return result;
+}
+function resolveRules(previous, shot) {
   if (previous.winner !== null) return { state: previous, respot: [], rerack: false };
   const state = { ...previous, groups: [...previous.groups], down: [...previous.down], wins: [...previous.wins],
     breaking: false, ballInHand: false, shots: previous.shots + 1 };

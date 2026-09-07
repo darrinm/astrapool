@@ -11,11 +11,13 @@ import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUnifo
 import { RAPIER, DEPTH, renderer, scene, camera, world, eventQueue, heads, lights, DEFAULT_LIGHTS, resetHeads, placeHead, hideHead,
   setHeadRadius, addMesh, addBody, addStaticCollider, registerProp, clearProps, pointerToPlane, meshUnderPointer, ui } from './core.js';
 import { noiseBump, feltMap, woodMap, carpetMap, clothNormal, radialShadow, gradientStrip } from './textures.js';
-import { bakeCap, authenticBall } from './ballcaps.js';
+import { bakeCap, authenticBall, BALL_COLORS } from './ballcaps.js';
 import { PoolAudio } from './sounds.js';
 import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
 import { markPlaying } from './hud.js';
+import { groupLabel, playerName, playerText } from './match-copy.js';
+import { overheadDistance, withinCueTarget } from './table-view.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
 import { newMatch, targets, groupBalls, shotRecord, resolveShot } from './eight-ball.js';
@@ -36,6 +38,7 @@ let gameMode = 'local', match = newMatch(), activeShot = null, calledPocket = nu
 let settledFor = 0, physicsTime = 0, placing = null, pocketMarker;
 let computerWait = 0, computerPlan = null, computerWorker = null;
 let difficulty = 'medium', onlineShotSeq = null, onlineShooter = null;
+let overhead = false;
 const online = new OnlineRoom(receiveOnline, text => {
   document.getElementById('online-status').textContent = text;
   document.getElementById('invite-link').value = online.id ? `${location.origin}/#room=${online.id}` : '';
@@ -279,9 +282,15 @@ function setupCamera() {
   controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
   controls.panSpeed = 1.2; controls.minDistance = 10; controls.maxDistance = 200;
   controls.minPolarAngle = 0.05; controls.maxPolarAngle = Math.PI / 2 - 0.1;
+  controls.addEventListener('start', () => { overhead = false; });
   resetView();
 }
-function resetView() { controls.target.set(0, 0, FELT_Z); camera.position.set(-HW * 1.6, 0, FELT_Z + 21); controls.update(); }
+function resetView() {
+  if (innerHeight > innerWidth || innerHeight <= 600) { overheadView(); return; }
+  overhead = false;
+  camera.clearViewOffset();
+  controls.target.set(0, 0, FELT_Z); camera.position.set(-HW * 1.6, 0, FELT_Z + 21); controls.update();
+}
 
 // ---------- look: dark room, tone mapping, environment reflections, glossy balls ----------
 function setLook(on) {
@@ -379,6 +388,17 @@ function ballUnderPointer(e) {
   const balls = allBalls().filter((h) => h.mesh.visible), mesh = meshUnderPointer(e, balls.map((h) => h.mesh));
   const ball = balls.find((h) => h.mesh === mesh);
   return ball && onTable(ball) ? ball : undefined;
+}
+function cueUnderPointer(e) {
+  const hit = ballUnderPointer(e);
+  if (hit) return hit === cue; // Never steal a direct hit on another ball.
+  const position = new THREE.Vector3().copy(cue.body.translation());
+  const center = position.clone().project(camera);
+  if (center.z < -1 || center.z > 1) return false;
+  const edge = position.clone().add(new THREE.Vector3(R, 0, 0).applyQuaternion(camera.quaternion)).project(camera);
+  return withinCueTarget({ x: e.clientX, y: e.clientY },
+    { x: (center.x + 1) * innerWidth / 2, y: (1 - center.y) * innerHeight / 2 },
+    Math.abs(edge.x - center.x) * innerWidth / 2, e.pointerType === 'touch');
 }
 function dragTarget(e) {
   const p = pointerToPlane(e, BALL_Z).add(dragging.offset);
@@ -558,20 +578,32 @@ function updateScore() {
     const card = document.getElementById(`player-${i}`);
     card.classList.toggle('active', match.winner === null && match.turn === i);
     card.classList.toggle('winner', match.winner === i);
-    card.querySelector('.player-name').textContent = gameMode === 'computer' ? (i === 0 ? 'You' : 'Computer') : gameMode === 'online' ? `Player ${i + 1}${i === online.seat ? ' · You' : ''}` : `Player ${i + 1}`;
+    card.querySelector('.player-name').textContent = playerName(i, gameMode, online.seat);
     card.querySelector('.rack-wins').textContent = match.wins[i];
-    card.querySelector('.player-group').textContent = match.groups[i] || 'Open table';
+    card.querySelector('.rack-wins').setAttribute('aria-label', `${match.wins[i]} racks won`);
+    card.querySelector('.player-group').textContent = groupLabel(match.groups[i], match.down);
     const numbers = match.groups[i] ? groupBalls(match.groups[i]) : [];
     card.querySelector('.remaining-balls').replaceChildren(...numbers.map(n => {
-      const chip = document.createElement('span'); chip.textContent = n;
+      const chip = document.createElement('span');
+      const digit = document.createElement('span'); digit.textContent = n; chip.append(digit);
+      chip.style.setProperty('--ball-color', BALL_COLORS[((n - 1) % 8) + 1]);
       chip.className = `ball-chip${n > 8 ? ' stripe' : ''}${match.down.includes(n) ? ' down' : ''}`;
       chip.title = `${n}${match.down.includes(n) ? ' pocketed' : ' remaining'}`;
+      chip.setAttribute('aria-label', chip.title);
       return chip;
     }));
   }
+  const lastShot = free ? '' : playerText(match.lastShot || '', gameMode, online.seat);
+  document.getElementById('shot-result').hidden = !lastShot;
+  const resultText = document.getElementById('shot-result-text');
+  if (resultText.textContent !== lastShot) resultText.textContent = lastShot;
   lastStatus = '';
+  const nextAction = match.winner !== null ? `Player ${match.winner + 1} wins the rack!` :
+    match.ballInHand ? `Player ${match.turn + 1}: place the cue ball.` :
+    match.breaking ? `Player ${match.turn + 1} to break.` :
+    `Player ${match.turn + 1}’s turn${match.groups[match.turn] ? ` · ${match.groups[match.turn]}` : ''}.`;
   ui.status(free ? (pocketed === 15 ? `Table cleared in ${shots} shots. Ready for another rack?` : '') :
-    activeShot ? `Player ${match.turn + 1} shooting…` : gameMode === 'online' && online.pending ? 'Waiting for the shot result…' : match.message);
+    activeShot ? playerText(`Player ${match.turn + 1} shooting…`, gameMode, online.seat) : gameMode === 'online' && online.pending ? 'Waiting for the shot result…' : playerText(nextAction, gameMode, online.seat));
   ui.hint(free ? (interactionMode === 'fling' ? 'Grab any ball. Release to fling. Hold still to place.' : 'Pull back from the cue ball. Release to shoot.') :
     match.winner !== null ? 'A rack well played. Rematch to switch the break.' :
     activeShot ? 'Waiting for the balls to settle.' :
@@ -580,11 +612,29 @@ function updateScore() {
     remoteTurn() ? (online.connected.every(Boolean) ? 'Your friend is lining up a shot.' : 'Share the invite link. Play begins when both players are connected.') :
     match.ballInHand ? 'Ball in hand: click an empty spot on the felt, or drag the white ball into place.' :
     onEight() && calledPocket === null ? 'Choose a pocket for the 8-ball below, then take your shot.' :
+    !match.groups[match.turn] && !match.breaking ? 'Pocket a solid or stripe on a legal shot to claim your group.' :
     'Pull back from the white ball. Release to shoot.');
+  if (overhead && !aiming) fitOverhead();
 }
 function overheadView() {
-  endGesture(); controls.target.set(0, 0, FELT_Z);
-  camera.position.set(0, -0.01, FELT_Z + Math.max(105, 105 / camera.aspect)); controls.update();
+  endGesture(); overhead = true; fitOverhead();
+}
+function fitOverhead() {
+  if (!controls) return;
+  const compact = innerWidth <= 1100 || innerHeight <= 600;
+  const short = innerWidth > innerHeight && innerHeight <= 600;
+  const top = Math.max(compact ? 90 : 110, document.querySelector('.topbar').getBoundingClientRect().bottom + 12);
+  const bottom = short ? 16 : Math.max(compact ? 160 : 140, document.querySelector('.bottom-hud').getBoundingClientRect().height + 24);
+  const left = 12, right = short ? 250 : 12;
+  const distance = overheadDistance(innerWidth, innerHeight, HW + RAIL_W + 2, HH + RAIL_W + 2,
+    camera.fov, top, bottom, left, right);
+  controls.maxDistance = Math.max(200, distance);
+  camera.setViewOffset(innerWidth, innerHeight, (right - left) / 2, (bottom - top) / 2, innerWidth, innerHeight);
+  // Keep world Z as camera up for OrbitControls; azimuth turns the long rail vertical.
+  controls.target.set(0, 0, FELT_Z);
+  const portrait = innerHeight > innerWidth;
+  camera.position.set(portrait ? -0.01 : 0, portrait ? 0 : -0.01, FELT_Z + distance);
+  controls.update();
 }
 function startGame(mode, roomId = null) {
   if (!roomId && shots && (gameMode === 'free' || match.winner === null) && !window.confirm('Start a new game and clear this rack?')) return false;
@@ -835,7 +885,10 @@ export default {
     controls?.dispose(); controls = null; setLook(false);
   },
   key(k) { if (k === 'escape') endGesture(); if (k === 'r') restart(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue'); },
-  resize() {},
+  resize() {
+    if (overhead || innerHeight > innerWidth || innerHeight <= 600) overheadView();
+    else camera.clearViewOffset();
+  },
   pointerdown(e) {
     audio.ensure();
     if (computerTurn() || remoteTurn() || e.button !== 0 || dragging || aiming || placing) return false;
@@ -854,9 +907,11 @@ export default {
       sampleDrag(e); updateGestureControls();
       return true;
     }
-    if (meshUnderPointer(e, [cue.mesh]) !== cue.mesh || !cueReady()) return false;
+    if (!cueReady() || !cueUnderPointer(e)) return false;
     controls.enabled = false;
-    aiming = { to: pointerToPlane(e, BALL_Z) }; guide.visible = true; cueStick.visible = true; updateGestureControls(); return true;
+    const center = new THREE.Vector3().copy(cue.body.translation());
+    aiming = { to: center.clone(), offset: center.clone().sub(pointerToPlane(e, BALL_Z)) };
+    guide.visible = true; cueStick.visible = true; updateGestureControls(); return true;
   },
   // Only the captured pointer's moves arrive during a gesture; otherwise the return value is the hover state.
   pointermove(e) {
@@ -868,9 +923,9 @@ export default {
       dragging.to = dragTarget(e); // Project once per event; coalesced samples only contribute velocity.
       return;
     }
-    if (aiming) { aiming.to = pointerToPlane(e, BALL_Z); return; }
+    if (aiming) { aiming.to = pointerToPlane(e, BALL_Z).add(aiming.offset); return; }
     if (interactionMode === 'fling') return !!ballUnderPointer(e);
-    return meshUnderPointer(e, [cue.mesh]) === cue.mesh && cueReady();
+    return cueReady() && cueUnderPointer(e);
   },
   pointerup(e) {
     if (remoteTurn()) { endGesture(); return; }
