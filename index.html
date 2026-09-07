@@ -21,7 +21,7 @@
           <div id="player-1" class="player-card"><div class="player-heading"><strong class="player-name">Player 2</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
         </div>
         <div class="utilities">
-          <button id="sound" class="quiet-button" aria-pressed="true" title="Toggle sound (M)">Sound <span id="sound-state">on</span></button>
+          <button id="sound" data-sound-toggle class="quiet-button" aria-pressed="true" title="Toggle sound (M)">Sound <span id="sound-state" data-sound-state>on</span></button>
           <details class="help">
             <summary class="quiet-button" title="Controls and shortcuts">Help <span aria-hidden="true">?</span></summary>
             <div class="help-panel">
@@ -66,13 +66,19 @@
           <div id="difficulty-group" class="control-group" hidden><label class="eyebrow" for="difficulty">Difficulty</label><select id="difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></div>
           <div id="interaction-group" class="control-group"><span class="eyebrow">Play your way</span><div id="mode" class="segmented" role="group" aria-label="Interaction mode"><button data-mode="cue" aria-pressed="true" title="Shoot with the cue">Cue</button><button data-mode="fling" aria-pressed="false" title="Grab and throw any ball">Fling</button></div></div>
           <div class="control-group"><span class="eyebrow">On the table</span><div id="style" class="segmented" role="group" aria-label="Ball appearance"><button data-style="heads" aria-pressed="false">Heads</button><button data-style="balls" aria-pressed="true">Balls</button></div></div>
-          <div class="dock-actions"><button id="overhead-view" class="quiet-button">Overhead</button><button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button><button id="rerack" class="quiet-button" title="Re-rack (R)">Re-rack <span aria-hidden="true">↻</span></button></div>
+          <div class="dock-actions"><button id="open-environments" class="quiet-button" aria-haspopup="dialog" aria-controls="environment-dialog">Room <span id="environment-name">Minimal</span></button><button id="overhead-view" class="quiet-button">Overhead</button><button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button><button id="rerack" class="quiet-button" title="Re-rack (R)">Re-rack <span aria-hidden="true">↻</span></button></div>
         </div>
       </div>
     </div>
     <dialog id="hud-sheet" aria-labelledby="sheet-title">
       <header class="sheet-heading"><h2 id="sheet-title"></h2><button id="close-sheet" class="quiet-button" autofocus>Done</button></header>
       <div id="sheet-content"></div>
+    </dialog>
+    <dialog id="environment-dialog" aria-labelledby="environment-title">
+      <header class="environment-heading"><div><span class="eyebrow">A change of scenery</span><h2 id="environment-title">Where shall we play?</h2></div><div class="environment-utilities"><button id="environment-sound" data-sound-toggle class="quiet-button" aria-pressed="true" title="Toggle sound (M)">Sound <span data-sound-state>on</span></button><button id="cancel-environment" class="quiet-button" aria-label="Close room chooser">✕</button></div></header>
+      <p class="environment-intro">The original room and four new settings. Choose one to preview.</p>
+      <div id="environment-options" class="environment-options" role="group" aria-label="Room previews"></div>
+      <footer class="environment-footer"><p id="environment-preview-status" role="status"></p><button id="apply-environment" class="primary-button">Play here</button></footer>
     </dialog>
     <script type="module" src="/src/main.js"></script>
   </body>

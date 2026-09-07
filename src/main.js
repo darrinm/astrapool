@@ -3,6 +3,7 @@ import { renderer, scene, camera, world, eventQueue, syncMeshes, snapshotPoses, 
 import pool from './pool.js';
 import { connectPointerInput } from './pointer-input.js';
 import { connectHud } from './hud.js';
+import { connectEnvironmentPicker } from './environment-picker.js';
 
 const current = pool;
 const STEP = 1 / current.stepRate;   // 480 Hz: see the note on stepRate in pool.js
@@ -10,23 +11,28 @@ let accumulator = 0;
 world.timestep = STEP;
 current.enter();
 connectHud(current);
+connectEnvironmentPicker(current);
 
 // ---------- input ----------
 connectPointerInput(renderer.domElement, current);
 addEventListener('keydown', (e) => {
   if (e.key === 'Escape') document.querySelector('.help').open = false;
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.target.closest('input, textarea, select, [contenteditable]')) return;
-  if (document.getElementById('hud-sheet').open) return;
   const k = e.key.toLowerCase();
   if (k === 'm') { toggleSound(); return; }
+  if (document.querySelector('dialog[open]')) return;
   current.key(k);
 });
 function toggleSound() {
   window.playful.mute = !window.playful.mute;
-  document.getElementById('sound').setAttribute('aria-pressed', String(!window.playful.mute));
-  document.getElementById('sound-state').textContent = window.playful.mute ? 'off' : 'on';
+  for (const button of document.querySelectorAll('[data-sound-toggle]')) {
+    button.setAttribute('aria-pressed', String(!window.playful.mute));
+    button.querySelector('[data-sound-state]').textContent = window.playful.mute ? 'off' : 'on';
+  }
+  current.audio.setMuted(window.playful.mute || document.hidden);
 }
-document.getElementById('sound').addEventListener('click', toggleSound);
+document.querySelectorAll('[data-sound-toggle]').forEach(button => button.addEventListener('click', toggleSound));
+document.addEventListener('visibilitychange', () => current.audio.setMuted(!!window.playful?.mute || document.hidden));
 document.getElementById('reset-view').addEventListener('click', () => current.key('c'));
 document.getElementById('rerack').addEventListener('click', () => current.key('r'));
 addEventListener('pointerdown', (e) => {

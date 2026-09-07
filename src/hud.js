@@ -3,6 +3,13 @@ export function markPlaying() {
   document.getElementById('hud').classList.add('playing');
 }
 
+// Dismiss only a tap that starts and ends on the backdrop, never a control drag.
+export function connectBackdropDismiss(dialog, close) {
+  let backdropDown = false;
+  dialog.addEventListener('pointerdown', event => { backdropDown = event.target === dialog; });
+  dialog.addEventListener('click', event => { if (backdropDown && event.target === dialog) close(); });
+}
+
 // Lend the controls to a native modal. Keeping the same elements preserves
 // their values, listeners, and hidden game states.
 export function connectHud(game) {
@@ -41,10 +48,7 @@ export function connectHud(game) {
   document.getElementById('cancel-gesture').addEventListener('click', () => game.key('escape'));
   document.getElementById('quick-view').addEventListener('click', () => document.getElementById('overhead-view').click());
   sheet.addEventListener('close', () => { if (!sheet.open) restore(); });
-  // Dismiss only a tap that starts and ends on the backdrop, never a spin drag.
-  let backdropDown = false;
-  sheet.addEventListener('pointerdown', e => { backdropDown = e.target === sheet; });
-  sheet.addEventListener('click', e => { if (backdropDown && e.target === sheet) close(); });
+  connectBackdropDismiss(sheet, close);
   sheet.addEventListener('click', e => {
     if (e.target.closest('[data-pocket], #overhead-view, #reset-view, #rerack')) close();
   });

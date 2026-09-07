@@ -10,9 +10,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { RAPIER, DEPTH, renderer, scene, camera, world, eventQueue, heads, lights, DEFAULT_LIGHTS, resetHeads, placeHead, hideHead,
   setHeadRadius, addMesh, addBody, addStaticCollider, registerProp, clearProps, pointerToPlane, meshUnderPointer, ui } from './core.js';
-import { noiseBump, feltMap, woodMap, carpetMap, clothNormal, radialShadow, gradientStrip } from './textures.js';
+import { noiseBump, feltMap, woodMap, clothNormal, radialShadow, gradientStrip } from './textures.js';
 import { bakeCap, authenticBall, BALL_COLORS } from './ballcaps.js';
 import { PoolAudio } from './sounds.js';
+import { buildEnvironment, environmentById, readEnvironment } from './environments.js';
 import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
 import { markPlaying } from './hud.js';
@@ -66,6 +67,44 @@ const FACE_UP = TOWARD_FAR_RAIL.clone().multiply(new THREE.Quaternion().setFromU
 const rackRot = (ball) => { const q = (heads.includes(ball) && ballStyle === 'heads') ? FACE_UP : NUMBER_UP; return { x: q.x, y: q.y, z: q.z, w: q.w }; };
 const IDENTITY = { x: 0, y: 0, z: 0, w: 1 };
 const saved = {};
+let environmentId = readEnvironment(localStorage), room, tableFinish, tableLights;
+function setEnvironment(id) {
+  const theme = environmentById(id); environmentId = theme.id;
+  if (!tableFinish) return;
+  if (room?.group.name === `environment-${theme.id}`) return;
+  endGesture();
+  const minimal = theme.id === 'minimal';
+  const original = tableFinish.original;
+  if (tableFinish.felt.map !== original.felt) tableFinish.felt.map.dispose();
+  tableFinish.felt.map = minimal ? original.felt : feltMap(512, 6, theme.felt);
+  if (!minimal) tableFinish.felt.map.colorSpace = THREE.SRGBColorSpace;
+  tableFinish.felt.sheenColor.set(minimal ? '#2f8a55' : theme.felt);
+  // Each finish needs independent UV transforms, but all share the same grain image.
+  const grain = minimal ? null : woodMap(512, 1, 11, theme.wood);
+  if (grain) grain.colorSpace = THREE.SRGBColorSpace;
+  tableFinish.wood.forEach((material, index) => {
+    const initial = original.wood[index], old = material.map;
+    if (minimal) material.map = initial;
+    else {
+      const map = index === 0 ? grain : grain.clone();
+      map.repeat.copy(initial.repeat); map.rotation = initial.rotation; map.center.copy(initial.center);
+      material.map = map;
+    }
+    if (old !== initial) old.dispose();
+    material.metalness = theme.id === 'orbital' ? 0.45 : 0;
+    material.roughness = theme.id === 'tokyo' ? 0.3 : 0.6;
+  });
+  tableFinish.trim.color.set(minimal ? '#1a0d05' : theme.trim);
+  tableFinish.shade.color.set(minimal || theme.id === 'corner' ? '#12301f' : theme.trim);
+  tableLights.forEach((light, index) => light.color.set(minimal ? original.lights[index] : theme.lamp));
+  lights.hemi.intensity = theme.hemi;
+  renderer.toneMappingExposure = theme.exposure;
+  scene.background = new THREE.Color(theme.sky); scene.fog = minimal ? new THREE.Fog(theme.sky, 140, 330) : null;
+  room?.dispose(); room = buildEnvironment(theme, FELT_Z - 1.2 - 4 - 24); scene.add(room.group);
+  document.documentElement.dataset.environment = theme.id;
+  const label = document.getElementById('environment-name'); if (label) label.textContent = theme.name;
+  audio.setEnvironment(theme.id);
+}
 
 // ---------- table ----------
 function build() {
@@ -159,18 +198,6 @@ function build() {
   for (const c of backstopColliders(world, FELT_Z)) registerCollider(c);   // nothing leaves the table area even on a jump
 
   // ---- room: dark walls with a baseboard, dark carpet, and the lamp fixture in frame ----
-  const floorZ = FELT_Z - 1.2 - 4 - 24;
-  const floor = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshStandardMaterial({ map: carpetMap(512, 30, '#121014'), roughness: 1 })));
-  floor.position.z = floorZ; floor.receiveShadow = true;
-  const wallMat = new THREE.MeshStandardMaterial({ color: '#121116', roughness: 1, side: THREE.DoubleSide });
-  const baseMat = new THREE.MeshStandardMaterial({ color: '#0d0c0f', roughness: 0.7 });
-  // Stand each wall up (X), then turn it about the world vertical so it faces the room; a plain Euler with
-  // the default XYZ order would spin it about its own normal instead.
-  for (const [x, y, rz] of [[0, 160, 0], [0, -160, Math.PI], [160, 0, -Math.PI / 2], [-160, 0, Math.PI / 2]]) {
-    const w = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(320, 140), wallMat)); w.position.set(x, y, floorZ + 70);
-    w.rotation.set(Math.PI / 2, 0, 0); w.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), rz); w.receiveShadow = true;
-    const b = addMesh(new THREE.Mesh(new THREE.BoxGeometry(320, 0.6, 2.2), baseMat)); b.position.set(x, y, floorZ + 1.1); b.rotation.z = rz;
-  }
   const LAMP_Z = FELT_Z + 23;
   const shade = addMesh(new THREE.Mesh(new THREE.BoxGeometry(46, 12, 2.4), new THREE.MeshStandardMaterial({ color: '#12301f', roughness: 0.45, metalness: 0.35, transparent: true })));
   shade.position.set(0, 0, LAMP_Z + 1.2); shade.castShadow = false;
@@ -185,6 +212,10 @@ function build() {
   const spot = addMesh(new THREE.SpotLight('#fff3dc', 1000, 0, Math.PI / 3.1, 0.7, 2)); spot.position.set(0, 0, LAMP_Z);
   spot.target.position.set(0, 0, FELT_Z); addMesh(spot.target);
   spot.castShadow = true; spot.shadow.mapSize.set(2048, 2048); spot.shadow.bias = -0.0004; spot.shadow.normalBias = 0.02; spot.shadow.camera.near = 5; spot.shadow.camera.far = 80;
+
+  tableFinish = { felt: feltMat, wood: [slabWood, railLong, railShort, apronWood, apronWoodEnd, legWood], trim: mouldMat, shade: shade.material };
+  tableLights = [area, spot];
+  tableFinish.original = { felt: feltMat.map, wood: tableFinish.wood.map(material => material.map), lights: tableLights.map(light => light.color.clone()) };
 
   // ---- contact shadows under the balls, and occlusion strips where the cushions meet the felt ----
   const shadowTex = radialShadow();
@@ -875,7 +906,7 @@ export default {
   enter() {
     setHeadRadius(R); world.gravity = { x: 0, y: 0, z: -G };
     RectAreaLightUniformsLib.init();
-    build(); layout(); setupCamera(); setLook(true); showGameControls(true); capsOn = true; setBallStyle(ballStyle);
+    build(); layout(); setupCamera(); setLook(true); setEnvironment(environmentId); showGameControls(true); capsOn = true; setBallStyle(ballStyle);
     window.addEventListener('hashchange', joinInvite);
     joinInvite();
   },
@@ -883,6 +914,7 @@ export default {
     cancelComputerSearch();
     window.removeEventListener('hashchange', joinInvite); online.leave();
     endGesture();
+    room?.dispose(); room = null; audio.stopAmbient();
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     hudObserver?.disconnect(); hudObserver = null;
     controls?.dispose(); controls = null; setLook(false);
@@ -948,13 +980,16 @@ export default {
     settleShot(world.timestep);
     updateComputer(world.timestep);
   },
+  setEnvironment,
+  environment: () => environmentId,
   matchState: () => ({ mode: gameMode, match: structuredClone(match), shot: activeShot && structuredClone(activeShot), calledPocket }),
   balls: allBalls,
   controls: () => controls,   // for scripted testing
   audio,
   frame() {
     controls?.update();
-    audio.setMuted(!!window.playful?.mute);
+    room?.setCameraHeight(camera.position.z);
+    audio.setMuted(!!window.playful?.mute || document.hidden);
     const fade = THREE.MathUtils.clamp((fixtureFade[1] - camera.position.z) / (fixtureFade[1] - fixtureFade[0]), 0, 1);   // lamp fixture fades as the camera climbs to it
     for (const m of fixture) { m.visible = fade > 0; m.material.opacity = fade; }
     if (capsOn && capped.size < heads.length) applyCaps();

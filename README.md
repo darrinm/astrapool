@@ -41,6 +41,16 @@ shooting browser reports collisions and final positions, which the server checks
 both players. These are casual friend matches: the server does not independently simulate physics or provide
 competitive anti-cheat. There are no accounts, public matchmaking, or rankings.
 
+## Environments
+Choose **Room** in the desktop dock, or **Game → Room** on compact screens and after play starts.
+**Minimal** is the default: the original green cloth, walnut table, dark room, and table sounds only.
+The four optional rooms—The Corner Pocket, Desert Modern, Tokyo Rooftop, and Orbital Lounge—each have their own cloth,
+rail finishes, architecture, scenery, lighting, and quiet procedural ambience. Select a card to preview;
+**Play here** saves your choice on this device. Closing or pressing Escape restores the previous room.
+Changing rooms preserves the rack, turn, camera, and physics; online players choose their own scenery.
+Ambient sound starts only after interaction, follows **Sound** / **M**, and mutes while the page is hidden.
+Scenery is generated locally; switching rooms disposes the previous room's graphics and audio resources.
+
 ## Playing
 Choose **Local 8-ball** to play a match with another person on this device, or **Free Play** for Cue / Fling.
 Local matches track turns, remaining solids / stripes, fouls, rack wins, and rematches with alternating breaks.

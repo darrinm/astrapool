@@ -8,7 +8,7 @@ function canvasTexture(size, draw, repeat = 1) {
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); t.anisotropy = 8;
   return t;
 }
-const rnd = (seed) => { let s = seed; return () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; }; };
+export const rnd = (seed) => { let s = seed; return () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; }; };
 
 // Fine grain noise for a bump map (felt nap, carpet pile).
 export function noiseBump(size = 512, repeat = 12, seed = 7) {
