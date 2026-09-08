@@ -75,3 +75,12 @@ Carried over from playful-photos when the pool game was extracted (2026-09-05).
   failure state said "Retry, or choose another game" with no retry button anywhere.
 - Rule: when hiding a container by state, check what else is inside it — recovery controls belong
   outside the thing whose absence they recover from.
+
+## 2026-09-07 — The dialog `close` event was not a reliable hook
+- The first-run screen recorded the visit and stopped the camera drift from a `close` listener. Escape
+  left the drift running and the visit unrecorded; a listener added fresh in the console never fired
+  either, so it was not my code but the event.
+- Rule: for a `<dialog>` that must clean up, take `cancel`, `preventDefault()` it, and close it
+  yourself. `close` is fine as a backstop, never as the only path.
+- Rule: assert the cleanup, not the closing. `open === false` was true in every broken run; the tell
+  was `autoRotate` still true and the storage key still null.

@@ -11,6 +11,18 @@
   </head>
   <body>
     <div id="vignette" hidden></div>
+    <dialog id="welcome" aria-labelledby="welcome-title" hidden>
+      <div class="welcome-inner">
+        <h1 id="welcome-title">Pool</h1>
+        <p class="welcome-lede">A seven-foot table in nine rooms, with house rules worth arguing over. Pick a game &mdash; you can change it later.</p>
+        <div class="choices" role="group" aria-label="Choose a game">
+          <button data-game="local"><strong>Local 8-ball</strong><span>Two players, one device</span></button>
+          <button data-game="computer"><strong>Vs Computer</strong><span>Play the house</span></button>
+          <button data-game="online"><strong>Play a Friend</strong><span>Share a private link</span></button>
+          <button data-game="free"><strong>Free Play</strong><span>No rules, just the table</span></button>
+        </div>
+      </div>
+    </dialog>
     <div id="hud" hidden>
       <header class="topbar">
         <div class="brand"><span class="brand-ball" aria-hidden="true">8</span><span>Pool</span></div>

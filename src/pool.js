@@ -17,7 +17,6 @@ import { trackShadowChanges } from './shadow-updates.js';
 import { buildEnvironment, environmentById, readEnvironment } from './environments.js';
 import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
-import { markPlaying } from './hud.js';
 import { groupLabel, playerName, playerText } from './match-copy.js';
 import { setOverheadCamera, withinCueTarget } from './table-view.js';
 import { rackPositions, canPlace } from './table-state.js';
@@ -518,7 +517,6 @@ function moveBall(body, velocity) {
 function endDrag(fling = false) {
   if (!dragging) return;
   const { ball, samples } = dragging;
-  if (fling) markPlaying();
   moveBall(ball.body, fling ? flingOnTable(ball, flingVelocity(samples)) : { x: 0, y: 0 });
   dragging = null; controls.enabled = true; updateGestureControls();
 }
@@ -708,7 +706,6 @@ function layoutPocketMap() {
 }
 
 function updateScore() {
-  if (shots > 0) markPlaying();
   updateGestureControls();
   document.getElementById('pocketed-count').textContent = pocketed;
   document.getElementById('shot-count').textContent = shots;
@@ -1114,6 +1111,7 @@ export default {
   },
   setEnvironment,
   environment: () => environmentId,
+  setGame: (mode) => startGame(mode),
   matchState: () => ({ mode: gameMode, match: structuredClone(match), shot: activeShot && structuredClone(activeShot), calledPocket }),
   balls: allBalls,
   controls: () => controls,   // for scripted testing

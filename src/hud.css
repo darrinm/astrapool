@@ -204,6 +204,34 @@ button:disabled { opacity: .45; cursor: default; }
 .room-copy strong { font: 500 var(--t-lead)/1.3 var(--display); }
 #room-status { margin: 0; color: var(--ink-faint); font-size: var(--t-micro); min-height: 1.2em; }
 
+/* ---------------------------------------------------------------- welcome */
+/* Shown once. The table is the pitch, so it stays visible above the title and
+   drifts gently behind it; the scrim only darkens what sits under the words. */
+#welcome { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: 0; color: var(--ink); background: none; }
+/* Light: the room behind is the pitch, and the scrim below carries the words. */
+#welcome::backdrop { background: #0b09084d; }
+/* No scoreboard or controls behind a title screen — there is no game yet. */
+body:has(#welcome[open]) #hud { visibility: hidden; }
+.welcome-inner {
+  position: absolute; inset: auto 0 0 0; display: grid; justify-items: center; gap: var(--s3);
+  padding: var(--s6) max(var(--s5), env(safe-area-inset-left)) max(var(--s6), env(safe-area-inset-bottom));
+  /* Reaches full strength early: the title sits over bright felt in some rooms,
+     and the lede measured only 4.6:1 against the Orbital table before this. */
+  background: linear-gradient(#0b090800, #0b0908b3 22%, #0b0908f0 60%);
+  text-align: center;
+}
+#welcome h1 { margin: 0; font: 400 clamp(44px, 9vw, 68px)/1 var(--display); letter-spacing: -.02em; }
+.welcome-lede { max-width: 54ch; margin: 0 0 var(--s3); color: var(--ink-dim); font-size: var(--t-lead); line-height: 1.55; text-wrap: balance; }
+#welcome .choices { width: min(560px, 100%); text-align: left; }
+/* A shade more present than in the sheet: here they are the only thing to do. */
+#welcome .choices button { background: #ffffff14; border-color: var(--edge-strong); }
+#welcome .choices button:hover { background: #ffffff24; border-color: var(--accent); }
+@media (max-height: 620px) {
+  .welcome-inner { gap: var(--s2); padding-top: var(--s5); }
+  #welcome h1 { font-size: 38px; }
+  .welcome-lede { font-size: var(--t-body); margin-bottom: var(--s2); }
+}
+
 /* ------------------------------------------------------------ pocket call */
 .pocket-call { display: grid; gap: var(--s3); justify-items: center; }
 .pocket-map { position: relative; width: min(100%, 240px); aspect-ratio: 2 / 1; border-radius: 8px; background: #1e4b36; box-shadow: 0 0 0 7px #6b4a2e, 0 0 0 8px #0006; }

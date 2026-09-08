@@ -1,8 +1,3 @@
-// Keep setup out of the way for the rest of this visit, including subsequent racks.
-export function markPlaying() {
-  document.getElementById('hud').classList.add('playing');
-}
-
 // Dismiss only a tap that starts and ends on the backdrop, never a control drag.
 export function connectBackdropDismiss(dialog, close) {
   let backdropDown = false;

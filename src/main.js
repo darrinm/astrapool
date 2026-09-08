@@ -4,6 +4,7 @@ import pool from './pool.js';
 import { connectPointerInput } from './pointer-input.js';
 import { connectHud } from './hud.js';
 import { connectEnvironmentPicker } from './environment-picker.js';
+import { connectWelcome } from './welcome.js';
 
 const current = pool;
 const STEP = 1 / current.stepRate;   // 480 Hz: see the note on stepRate in pool.js
@@ -12,6 +13,7 @@ world.timestep = STEP;
 current.enter();
 connectHud(current);
 connectEnvironmentPicker(current);
+connectWelcome(current);
 
 // ---------- input ----------
 connectPointerInput(renderer.domElement, current);

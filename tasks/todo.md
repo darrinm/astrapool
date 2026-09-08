@@ -106,6 +106,14 @@ The defect pass fixed what was measurably wrong inside the old structure; this r
       create can still be retried
 
 ### Still open
-- [ ] No first-run moment: you land mid-table with no title or invitation. Deliberately not invented —
-      it changes how the product opens, which is a product call rather than a finish.
 - [ ] Fraunces is the display face; it carries most of the new character and is one token to change.
+
+## First run (2026-09-07)
+- [x] A title over the live table, shown once: wordmark, one line, and the four games as the choice.
+      Picking one starts it; Escape keeps the default. Recorded in `pool.visited`.
+- [x] The table drifts slowly behind it (OrbitControls `autoRotate`), stopped on dismiss and skipped
+      under `prefers-reduced-motion`.
+- [x] An invite link (`#room=`) skips the title entirely and does not spend the first visit — someone
+      following a friend's link is joining, not arriving.
+- [x] The HUD is hidden behind it: there is no game yet, so there is no scoreboard.
+- [x] Removed `markPlaying()`, which added a `.playing` class the redesign left unstyled.
