@@ -85,3 +85,14 @@ finer so they read at human scale beside the modeled pool table. This is an
 artwork correction; the 1.6 m ground projection, camera and GLB furniture scale
 stay unchanged. The edited source was upscaled through the same Topaz pipeline
 and replaces both `orbital.webp` and its chooser preview.
+
+### Glasshouse floor correction
+
+`glasshouse-floor-edit` in `prompts.json` records the built-in imagegen edit that
+removed photographed interior chairs, planters, and low foliage from the panorama.
+These objects were flattening into the GroundedSkybox floor. The revised artwork
+keeps a clear limestone floor with botanical planting beyond the glazing; the
+existing 3D furniture and palm remain. `glasshouse-floor-seam-edit` records the
+follow-up that softens floor joints to reduce the visible panoramic wrap.
+The edit uses the same Topaz upscale and
+4096 × 2048 / 640 × 320 WebP outputs as the other room assets.
