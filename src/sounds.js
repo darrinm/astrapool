@@ -1,4 +1,3 @@
-import { RoomAmbience } from './ambient.js';
 // Pool table audio. Impacts are recorded-style samples (generated with ElevenLabs Sound Effects, measured and
 // trimmed by pipeline/sfx_analyze.py, listed in public/sfx/manifest.json); each hit picks a random take and
 // varies pitch, level and brightness with impact strength so repeats never sound identical. There is no rolling
@@ -18,7 +17,6 @@ export class PoolAudio {
     this.wet = ctx.createGain(); this.wet.gain.value = 0.18; this.reverb.connect(this.wet).connect(this.master);
     this.dry = ctx.createGain(); this.dry.gain.value = 1; this.dry.connect(this.master);
     this.master.gain.value = this.enabled ? 0.9 : 0;
-    if (this.environment) this.ambient = new RoomAmbience(ctx, this.master, this.environment);
     this.load();
     return ctx;
   }
@@ -110,12 +108,6 @@ export class PoolAudio {
     if (this.mode === 'synth') return this.strike(e.dest, [[480, 8, 0.8, 40], [1100, 9, 0.4, 25]], 4, 900, e.t);
     this.sample('rattle', e.dest, e.s, { lowpass: [2000, 6000], take });
   }
-  setEnvironment(id) {
-    if (this.environment === id) return;
-    this.environment = id; this.stopAmbient();
-    if (this.ctx) this.ambient = new RoomAmbience(this.ctx, this.master, id);
-  }
-  stopAmbient() { this.ambient?.dispose(); this.ambient = null; }
   setMuted(m) {
     if (this.enabled === !m) return;
     this.enabled = !m;

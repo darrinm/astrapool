@@ -4,19 +4,19 @@ import { Raycaster, Scene, Vector3, Texture, Group, Mesh, BoxGeometry, MeshStand
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { readFile } from 'node:fs/promises';
 import { ENVIRONMENTS, buildEnvironment, environmentById, readEnvironment } from './environments.js';
-import { RoomAmbience } from './ambient.js';
 
 test('saved room choices accept known IDs and recover from stale or unavailable storage', () => {
   for (const { id } of ENVIRONMENTS) assert.equal(readEnvironment({ getItem: () => id }), id);
-  assert.equal(readEnvironment({ getItem: () => 'old-room' }), 'minimal');
-  assert.equal(readEnvironment({ getItem() { throw new Error('storage blocked'); } }), 'minimal');
-  assert.equal(environmentById(null).id, 'minimal');
-  assert.equal(readEnvironment({ getItem: () => null }), 'minimal');
+  assert.equal(readEnvironment({ getItem: () => 'old-room' }), 'orbital');
+  assert.equal(readEnvironment({ getItem() { throw new Error('storage blocked'); } }), 'orbital');
+  assert.equal(environmentById(null).id, 'orbital');
+  assert.equal(readEnvironment({ getItem: () => null }), 'orbital');
   assert.equal(ENVIRONMENTS.length, 9);
 });
 
 test('shipped room models leave the table clear and release all their graphics resources', async () => {
-  const original = globalThis.document;
+  const original = globalThis.document, originalSelf = globalThis.self;
+  globalThis.self = globalThis;
   const paint = new Proxy({}, { get: (_, key) => ['createLinearGradient', 'createRadialGradient'].includes(key) ? () => ({ addColorStop() {} }) : () => {} });
   globalThis.document = { createElement: () => ({ getContext: () => paint }) };
   try {
@@ -26,12 +26,43 @@ test('shipped room models leave the table clear and release all their graphics r
         panorama: async () => new Texture(),
         furniture: async url => {
           const file = await readFile(new URL(`../public${url}`, import.meta.url));
-          return (await new GLTFLoader().parseAsync(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength), '')).scene;
+          const loader = new GLTFLoader().register(parser => {
+            // Node has no image decoder. Validate each embedded PNG at the decoding
+            // boundary; keep GLTFLoader's material, sampler, UV and buffer parsing.
+            parser.textureLoader = { load(url, onLoad, _, onError) {
+              fetch(url).then(response => response.arrayBuffer()).then(buffer => {
+                const png = Buffer.from(buffer);
+                assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+                const width = png.readUInt32BE(16), height = png.readUInt32BE(20);
+                assert.equal(width, 512); assert.equal(height, 512);
+                onLoad(new Texture({ width, height }));
+              }).catch(onError);
+            } };
+            return { name: 'node-png-decoder' };
+          });
+          const gltf = await loader.parseAsync(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength), '');
+          let surfaces = 0;
+          gltf.scene.traverse(mesh => {
+            if (!mesh.material?.userData.surface) return;
+            surfaces++;
+            const mat = mesh.material;
+            assert.ok(mat.map && mat.normalMap && mat.roughnessMap && mat.metalnessMap, `${theme.id}: ${mat.name} must retain its PBR maps`);
+            const uv = mesh.geometry.getAttribute('uv');
+            assert.ok(uv?.count > 0 && uv.array.every(Number.isFinite), `${theme.id}: ${mat.name} needs valid texture coordinates`);
+          });
+          assert.ok(surfaces > 0, `${theme.id} must contain textured surfaces`);
+          return gltf.scene;
         },
       });
       await room.ready; scene.add(room.group);
       const resources = new Set();
-      room.group.traverse(mesh => { if (mesh.geometry) resources.add(mesh.geometry); if (mesh.material) resources.add(mesh.material); if (mesh.material?.map) resources.add(mesh.material.map); });
+      room.group.traverse(mesh => {
+        if (mesh.geometry) resources.add(mesh.geometry);
+        for (const mat of [mesh.material].flat().filter(Boolean)) {
+          resources.add(mat);
+          for (const value of Object.values(mat)) if (value?.isTexture) resources.add(value);
+        }
+      });
       assert.ok(resources.size > 0, 'the room must own graphics resources to exercise disposal');
       room.group.updateMatrixWorld(true);
       for (const x of [-44, 0, 44]) for (const y of [-24, 0, 24]) {
@@ -44,24 +75,7 @@ test('shipped room models leave the table clear and release all their graphics r
       assert.equal(scene.children.length, 0);
       assert.equal(released.size, resources.size, `${theme.id} should release all GPU resources`);
     }
-  } finally { globalThis.document = original; }
-});
-
-test('each ambient room stops its sources and disconnects its graph when replaced', () => {
-  for (const { id } of ENVIRONMENTS) {
-    const nodes = [], sources = [];
-    const node = () => {
-      const result = { gain: {}, frequency: {}, Q: {}, connect() { return this; }, disconnect() { this.disconnected = true; }, start() { sources.push(this); }, stop() { this.stopped = true; } };
-      nodes.push(result); return result;
-    };
-    const ctx = { sampleRate: 100, createGain: node, createOscillator: node, createBufferSource: node, createBiquadFilter: node, createBuffer: (_, size) => ({ getChannelData: () => new Float32Array(size) }) };
-    const ambient = new RoomAmbience(ctx, {}, id);
-    assert.equal(sources.length > 0, id !== 'minimal');
-    if (id === 'minimal') assert.equal(nodes.length, 0, 'the original room has no ambient audio graph');
-    ambient.dispose(); ambient.dispose();
-    assert.ok(nodes.every(node => node.disconnected), id);
-    assert.ok(sources.every(source => source.stopped), id);
-  }
+  } finally { globalThis.document = original; globalThis.self = originalSelf; }
 });
 
 function delayedAssets() {

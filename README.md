@@ -43,18 +43,19 @@ competitive anti-cheat. There are no accounts, public matchmaking, or rankings.
 
 ## Environments
 Choose **Room** in the desktop dock, or **Game → Room** on compact screens and after play starts.
-**Minimal** is the default: the original green cloth, walnut table, dark room, and table sounds only.
+**Orbital Lounge** is the default for new players. A saved room choice takes precedence.
+**Minimal** remains available with the original green cloth, walnut table, dark room, and table sounds only.
 The eight optional rooms—The Corner Pocket, Desert Modern, Tokyo Rooftop, Orbital Lounge, Alpine Lodge,
 The Glasshouse, Amalfi Terrace, and Atlas Courtyard—each have their own cloth,
-rail finishes, architecture, scenery, lighting, and quiet procedural ambience. Select a card to preview;
+rail finishes, architecture, scenery, lighting, and textured furnishings. Select a card to preview;
 **Play here** saves your choice on this device. Closing or pressing Escape restores the previous room.
 Changing rooms preserves the rack, turn, custom camera, and physics; online players choose their own scenery.
 Optional rooms get a wider composition from the original desktop starting view; portrait and short windows keep the overhead view.
-Ambient sound starts only after interaction, follows **Sound** / **M**, and mutes while the page is hidden.
+Every room is quiet between shots. **Sound** / **M** controls only the pool effects, which mute while the page is hidden.
 The optional rooms use generated photographic panoramas projected onto a floor and surrounding dome, plus
 Blender-modeled furniture and matching reflection lighting. Artwork and models load only when needed; the current
 room remains playable during loading. Failed or cancelled downloads keep the existing room, and switching releases
-the old room's graphics and audio resources. Minimal requires no room downloads.
+the old room's graphics resources. Minimal requires no room downloads.
 
 Art prompts, editable Blender files, and the reproducible asset builder live in
 [`pipeline/environments`](pipeline/environments/README.md). Runtime WebP and GLB files are in `public/environments`.

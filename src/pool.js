@@ -125,7 +125,6 @@ async function setEnvironment(id) {
   room?.dispose(); room = next; scene.add(room.group);
   document.documentElement.dataset.environment = theme.id;
   const label = document.getElementById('environment-name'); if (label) label.textContent = theme.name;
-  audio.setEnvironment(theme.id);
   if (!minimal && atDefaultView) resetView();
   return true;
 }
@@ -946,7 +945,7 @@ export default {
     window.removeEventListener('hashchange', joinInvite); online.leave();
     endGesture();
     ++environmentRequest; pendingRoom?.dispose(); pendingRoom = null;
-    room?.dispose(); room = null; audio.stopAmbient();
+    room?.dispose(); room = null;
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     hudObserver?.disconnect(); hudObserver = null;
     controls?.dispose(); controls = null; setLook(false);

@@ -17,6 +17,14 @@ Rebuild the furniture from the repository root (Blender must be installed):
 /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python pipeline/environments/build.py -- "$PWD"
 ```
 
+`materials.py` generates tileable 512 × 512 color, tangent-space normal, and packed
+roughness/metallic maps. Surfaces include leather pebbling, woven textiles, wood
+grain, stone veining, brushed metal, ceramic and foliage. Box-projected UVs use
+one repeat per 40 cm, preserving grain scale across individual furniture parts.
+The maps are embedded in each GLB and packed into its editable `.blend`; no
+texture generation runs in the browser. Only the selected room's maps load, and
+all maps are disposed when leaving that room. Glass keeps its smooth finish.
+
 Blender coordinates are meters and Z-up. GLB export converts to Y-up; the game rotates it back to Z-up and scales by 1 / 0.026. The photo capture height is 1.6 m. Furniture remains outside the table footprint and has no physics colliders.
 
 Room direction:
@@ -66,9 +74,7 @@ Rebuild selected furniture only by appending room IDs after the repository path:
 ```
 
 The four additional rooms use the same 1.6 m panorama capture height, floor
-projection, and asset ownership as the original four. Their ambient beds are
-quiet procedural fire noise, leaf rustle, swelling surf and fountain noise.
-Audio starts only after a gesture and follows the existing sound toggle.
+projection, and asset ownership as the original four. All environments are silent between shots; only pool sound effects remain.
 
 ### Orbital Lounge scale correction
 

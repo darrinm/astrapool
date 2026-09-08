@@ -5,6 +5,8 @@ All dimensions are meters. No existing interactive Blender file is touched.
 import bpy, math, random, sys
 from pathlib import Path
 from mathutils import Vector
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from materials import add_surface, project_uv
 ROOT = Path(sys.argv[sys.argv.index('--') + 1])
 OUT = ROOT / 'public' / 'environments'
 OUT.mkdir(parents=True, exist_ok=True)
@@ -15,6 +17,7 @@ def material(name, color, roughness=.5, metal=0):
     m=bpy.data.materials.new(name); m.diffuse_color=(*color,1); m.use_nodes=True
     p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*color,1)
     p.inputs['Roughness'].default_value=roughness; p.inputs['Metallic'].default_value=metal
+    add_surface(m,name,color,roughness,metal)
     return m
 
 def finish(obj,name,mat):
@@ -192,8 +195,7 @@ if any(theme not in catalog for theme in themes): raise ValueError('Unknown room
 for theme in themes:
     # Factory startup is isolated from the user's open .blend. Only this script's scene is replaced.
     bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
-    for m in list(bpy.data.materials):
-        if not m.users: bpy.data.materials.remove(m)
+    bpy.data.orphans_purge(do_recursive=True)
     if theme=='corner':
         leather=material('Oxblood aniline leather',(.10,.025,.026),.42)
         frame=material('Patinated brass',(.31,.19,.07),.32,.72)
@@ -256,6 +258,8 @@ for theme in themes:
         brass=material('Antique hammered brass',(.41,.25,.07),.38,.74)
         stone=material('Warm limestone',(.52,.39,.24),.81)
         pouf(-.15,2.15,leather,thread); pouf(.8,2.15,leather,thread); table(-.95,2.15,stone,brass); lantern(2.7,1.75,brass)
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'MESH': project_uv(obj)
     # Merge by material, retaining baked bevels but keeping GPU draw calls low.
     for mat in list(bpy.data.materials):
         objects=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.active_material==mat]
@@ -263,7 +267,8 @@ for theme in themes:
         bpy.ops.object.select_all(action='DESELECT')
         for o in objects: o.select_set(True)
         bpy.context.view_layer.objects.active=objects[0]; bpy.ops.object.join()
-    bpy.ops.export_scene.gltf(filepath=str(OUT/f'{theme}-furniture.glb'),export_format='GLB',use_active_scene=True,export_animations=False,export_apply=True,export_yup=True)
+    bpy.ops.export_scene.gltf(filepath=str(OUT/f'{theme}-furniture.glb'),export_format='GLB',use_active_scene=True,export_animations=False,export_apply=True,export_yup=True,export_extras=True)
+    bpy.data.orphans_purge(do_recursive=True)
     # Retain an editable native source in addition to the reproducible script.
     bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'pipeline'/'environments'/f'{theme}.blend'))
     print(theme, 'triangles',sum(len(o.data.polygons) for o in bpy.context.scene.objects if o.type=='MESH'))

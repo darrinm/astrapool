@@ -9,7 +9,7 @@ export function connectEnvironmentPicker(game) {
   function update() {
     options.querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.room === preview)));
     const theme = environmentById(preview);
-    document.getElementById('environment-preview-status').textContent = error || (loading ? `Opening ${theme.name}…` : `${theme.name} · ${theme.sound}`);
+    document.getElementById('environment-preview-status').textContent = error || (loading ? `Opening ${theme.name}…` : theme.name);
     options.setAttribute('aria-busy', String(loading));
     apply.disabled = loading;
   }
@@ -20,7 +20,7 @@ export function connectEnvironmentPicker(game) {
     button.innerHTML = `<span class="room-art" aria-hidden="true">${theme.id === 'minimal' ? '<span class="room-table"><i></i></span>' : `<img class="room-photo" src="/environments/${theme.id}-preview.webp" alt="" loading="lazy" width="640" height="320">`}<span class="room-number">${theme.id === 'minimal' ? '•' : `0${ENVIRONMENTS.indexOf(theme)}`}</span><span class="room-check">✓</span></span><span class="room-copy"><span class="eyebrow">${theme.time}</span><strong>${theme.name}</strong><span>${theme.description}</span></span>`;
     button.addEventListener('click', async () => {
       const current = ++request;
-      preview = theme.id; loading = true; error = ''; game.audio.ensure(); update();
+      preview = theme.id; loading = true; error = ''; update();
       const applied = await game.setEnvironment(preview);
       if (current !== request) return;
       loading = false;
