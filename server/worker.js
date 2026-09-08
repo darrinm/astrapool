@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { PROTOCOL_VERSION, initialSnapshot, validateShot, placeCue, finishShot } from './protocol.js';
+import { PROTOCOL_VERSION, initialSnapshot, validateAim, validateShot, placeCue, finishShot } from './protocol.js';
 const DAY = 24 * 60 * 60 * 1000;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export class PoolRoom extends DurableObject {
@@ -47,11 +47,24 @@ export class PoolRoom extends DurableObject {
   async webSocketMessage(ws, raw) {
     if (typeof raw !== 'string' || raw.length > 12000) { ws.close(1009, 'Message too large'); return; }
     const connection = ws.deserializeAttachment();
-    if (Date.now() - connection.since > 10000) { connection.count = 0; connection.since = Date.now(); }
-    connection.count++; ws.serializeAttachment(connection);
-    if (connection.count > 40) { ws.close(1008, 'Too many requests'); return; }
     let message;
     try { message = JSON.parse(raw); } catch { ws.close(1008, 'Invalid message'); return; }
+    if (Date.now() - connection.since > 10000) { connection.count = 0; connection.aimCount = 0; connection.since = Date.now(); }
+    // Cue previews have their own budget so lining up a shot cannot exhaust game actions.
+    const preview = message?.type === 'aim' && Number.isInteger(connection.seat);
+    const counter = preview ? 'aimCount' : 'count';
+    connection[counter] = (connection[counter] || 0) + 1; ws.serializeAttachment(connection);
+    if (connection[counter] > (preview ? 300 : 40)) { ws.close(1008, 'Too many requests'); return; }
+    if (preview) {
+      const { snapshot, seq, pending } = this.room;
+      if (message.seq !== seq || connection.seat !== snapshot.match.turn || pending ||
+          snapshot.match.ballInHand || snapshot.match.winner !== null || !this.#connected().every(Boolean)) return;
+      // Transient previews never advance or persist the authoritative table. Ignore stale/malformed ones.
+      let aim;
+      try { aim = validateAim(message.aim); } catch { return; }
+      this.#broadcast({ type: 'aim', seq, seat: connection.seat, aim }, ws);
+      return;
+    }
     try {
       if (connection.seat === null) {
         if (message?.type !== 'hello' || message.version !== PROTOCOL_VERSION || !uuid.test(message.token)) throw new Error('Refresh Pool to join this room.');

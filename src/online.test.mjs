@@ -2,6 +2,59 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { OnlineRoom, roomToken } from './online.js';
 
+const aim = { dir: { x: 1, y: 0 }, pull: 8, spin: { x: 0.2, y: -0.3 } };
+
+test('aim previews are throttled, refreshed while held, and never block a shot or its cancellation', t => {
+  const { room } = setup(t);
+  assert.equal(room.sendAim(aim, 0), true);
+  assert.equal(room.canAct, true);
+  assert.equal(room.sendAim({ ...aim, pull: 10 }, 25), false);
+  assert.equal(room.sendAim({ ...aim, pull: 10 }, 50), true);
+  assert.equal(room.sendAim({ ...aim, pull: 10 }, 1000), false);
+  assert.equal(room.sendAim({ ...aim, pull: 10 }, 1050), true);
+  assert.equal(room.send('shoot', { action: {} }), true);
+  assert.equal(room.sendAim(aim, 1100), false);
+  assert.equal(room.sendAim(null, 1101), true, 'clear immediately even while awaiting the shot');
+  assert.equal(room.sendAim(null, 1102), false);
+  assert.deepEqual(room.socket.sent.map(m => m.type), ['aim', 'aim', 'aim', 'shoot', 'aim']);
+  assert.equal(room.socket.sent.at(-1).aim, null);
+});
+
+test('remote previews ignore old tables and own seat without changing action availability or status', t => {
+  const { room, messages, statuses } = setup(t), statusCount = statuses.length;
+  for (const data of [{ seq: -1, seat: 1 }, { seq: 0, seat: 0 }]) room.socket.message({ type: 'aim', aim, ...data });
+  assert.equal(room.remoteAim, null);
+  room.socket.message({ type: 'aim', seq: 0, seat: 1, aim });
+  assert.deepEqual(room.remoteAim, aim);
+  assert.equal(room.canAct, true); assert.equal(statuses.length, statusCount); assert.deepEqual(messages, []);
+  room.socket.message({ type: 'aim', seq: 0, seat: 1, aim: null });
+  assert.equal(room.remoteAim, null);
+});
+
+for (const event of [
+  { type: 'state', seq: 1, pending: null },
+  { type: 'shot', seq: 1, pending: { seat: 1 } },
+  { type: 'presence', connected: [true, false] },
+]) test(`remote cue clears on ${event.type}`, t => {
+  const { room } = setup(t);
+  room.socket.message({ type: 'aim', seq: 0, seat: 1, aim });
+  room.socket.message(event);
+  assert.equal(room.remoteAim, null);
+});
+
+test('remote cues expire and clear on local disconnect and leaving', t => {
+  const { room } = setup(t);
+  let now = 0; t.mock.method(performance, 'now', () => now);
+  const preview = { type: 'aim', seq: 0, seat: 1, aim };
+  room.socket.message(preview); now = 2501;
+  assert.equal(room.remoteAim, null);
+  room.socket.message(preview); assert.deepEqual(room.remoteAim, aim);
+  room.socket.close(); assert.equal(room.remoteAim, null);
+  room.connect();
+  room.socket.message({ type: 'state', seq: 0, seat: 0, pending: null, connected: [true, true] });
+  room.socket.message(preview); room.leave(); assert.equal(room.remoteAim, null);
+});
+
 function setup(t) {
   class Socket extends EventTarget {
     static OPEN = 1;

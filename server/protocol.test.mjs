@@ -1,8 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialSnapshot, validateShot, placeCue, finishShot, MAX_SPEED } from './protocol.js';
+import { initialSnapshot, validateAim, validateShot, placeCue, finishShot, MAX_SPEED } from './protocol.js';
 import { shotRecord } from '../src/eight-ball.js';
 const action = { dir: { x: 1, y: 0 }, speed: 100, spin: { x: 0, y: 0 }, calledPocket: null };
+test('cue previews validate bounded direction, pullback and spin, including cancellation and zero power', () => {
+  const aim = { dir: { x: 1, y: 0 }, pull: 0, spin: { x: 0, y: 0 } };
+  assert.equal(validateAim(null), null);
+  assert.deepEqual(validateAim({ ...aim, seat: 1 }), aim);
+  assert.deepEqual(validateAim({ ...aim, pull: 24 }), { ...aim, pull: 24 });
+  for (const bad of [undefined, [], false, { ...aim, pull: -1 }, { ...aim, pull: 25 }, { ...aim, pull: NaN },
+    { ...aim, dir: { x: 0, y: 0 } }, { ...aim, dir: { x: Infinity, y: 0 } },
+    { ...aim, spin: { x: 0.7, y: 0.7 } }, { ...aim, spin: null }]) assert.throws(() => validateAim(bad));
+});
 test('server validates finite shot parameters and the physical limits', () => {
   const snapshot = initialSnapshot(); assert.deepEqual(validateShot(snapshot, action), action);
   for (const bad of [{ speed: NaN }, { speed: MAX_SPEED + 1 }, { dir: { x: 2, y: 0 } }, { spin: { x: 1, y: 0 } }, { calledPocket: 9 }]) assert.throws(() => validateShot(snapshot, { ...action, ...bad }));

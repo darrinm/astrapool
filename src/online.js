@@ -12,6 +12,7 @@ export class OnlineRoom {
     this.id = null; this.socket = null; this.seq = 0; this.seat = null;
     this.connected = [false, false]; this.pending = false; this.waiting = false;
     this.generation = 0; this.retry = 0; this.synced = false; this.result = null; this.error = null; this.errorResync = false;
+    this.aim = null; this.aimReceivedAt = 0; this.lastAim = null;
   }
   get canAct() { return this.socket?.readyState === WebSocket.OPEN && this.seat !== null && this.connected.every(Boolean) && !this.pending && !this.waiting; }
   async create() {
@@ -45,8 +46,14 @@ export class OnlineRoom {
     socket.addEventListener('message', e => {
       if (generation !== this.generation || e.data === 'pong') return;
       const data = JSON.parse(e.data);
+      if (data.type === 'aim') {
+        if (!this.synced || this.pending || !this.connected.every(Boolean) || data.seq !== this.seq || data.seat !== 1 - this.seat) return;
+        this.aim = data.aim; this.aimReceivedAt = performance.now();
+        return;
+      }
       if (data.type === 'error') { this.error = data.message; this.errorResync = true; this.result = null; this.onStatus(data.message); return; }
       if (data.type === 'state' || data.type === 'shot') {
+        this.aim = null; this.lastAim = null;
         this.synced = true;
         if (!this.errorResync && data.seq !== this.seq) this.error = null;
         this.errorResync = false;
@@ -54,6 +61,7 @@ export class OnlineRoom {
         if (data.seat !== undefined) this.seat = data.seat;
       }
       if (data.connected) this.connected = data.connected;
+      if (!this.connected.every(Boolean)) { this.aim = null; this.lastAim = null; }
       this.onMessage(data);
       if (data.type === 'state' || data.type === 'shot') this.flushResult();
       this.showStatus();
@@ -61,6 +69,7 @@ export class OnlineRoom {
     socket.addEventListener('close', e => {
       if (generation !== this.generation) return;
       clearInterval(this.heartbeat); this.synced = false; this.waiting = false; this.connected = [false, false];
+      this.aim = null; this.lastAim = null;
       this.onMessage({ type: 'presence', connected: this.connected });
       if (e.code === 4001 || e.code === 4002) { this.onStatus(e.reason || 'This room is no longer available.'); return; }
       this.onStatus('Connection lost. Reconnecting…');
@@ -87,9 +96,25 @@ export class OnlineRoom {
     this.error = null; this.errorResync = false; this.showStatus();
     this.waiting = true; this.socket.send(JSON.stringify({ type, seq: this.seq, ...payload })); return true;
   }
+  sendAim(aim, now = performance.now()) {
+    if (!this.synced || this.socket?.readyState !== WebSocket.OPEN || this.seat === null) return false;
+    if (aim !== null && !this.canAct) return false;
+    if (aim === null && !this.lastAim) return false;
+    const encoded = JSON.stringify(aim);
+    if (aim !== null && this.lastAim && (now - this.lastAim.at < 50 ||
+        (encoded === this.lastAim.encoded && now - this.lastAim.at < 1000))) return false;
+    // Do not set waiting: previews are unacknowledged and must never block the shot.
+    this.socket.send(JSON.stringify({ type: 'aim', seq: this.seq, aim }));
+    this.lastAim = aim === null ? null : { encoded, at: now };
+    return true;
+  }
+  get remoteAim() {
+    return this.aim && performance.now() - this.aimReceivedAt < 2500 ? this.aim : null;
+  }
   leave() {
     this.generation++; clearTimeout(this.reconnect); clearInterval(this.heartbeat);
     this.socket?.close(); this.synced = false; this.socket = null; this.id = null; this.seat = null;
     this.connected = [false, false]; this.pending = false; this.waiting = false; this.result = null; this.error = null; this.errorResync = false;
+    this.aim = null; this.lastAim = null;
   }
 }

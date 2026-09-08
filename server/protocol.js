@@ -7,6 +7,15 @@ export const initialSnapshot = (breaker = 0, wins = [0, 0]) => ({ match: newMatc
 const ballNumber = n => Number.isInteger(n) && n >= 0 && n <= 15;
 const pocketNumber = n => Number.isInteger(n) && n >= 0 && n < 6;
 const requireValue = (valid, message) => { if (!valid) throw new Error(message); };
+export function validateAim(aim) {
+  if (aim === null) return null;
+  requireValue(aim && typeof aim === 'object' && !Array.isArray(aim), 'Invalid aim.');
+  const { dir, pull, spin } = aim;
+  requireValue(Number.isFinite(dir?.x) && Number.isFinite(dir?.y) && Math.abs(Math.hypot(dir.x, dir.y) - 1) < 0.001, 'Invalid aim direction.');
+  requireValue(Number.isFinite(pull) && pull >= 0 && pull <= 24, 'Invalid aim power.');
+  requireValue(Number.isFinite(spin?.x) && Number.isFinite(spin?.y) && Math.hypot(spin.x, spin.y) <= 0.701, 'Invalid spin.');
+  return { dir: { x: dir.x, y: dir.y }, pull, spin: { x: spin.x, y: spin.y } };
+}
 export function validateShot(snapshot, action) {
   requireValue(action && typeof action === 'object' && !Array.isArray(action), 'Invalid shot.');
   const { match } = snapshot, { dir, speed, spin, calledPocket } = action;

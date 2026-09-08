@@ -618,7 +618,7 @@ function wireOnce(group, onClick) {
 }
 function aimVector() {
   const c = cue.body.translation(), d = new THREE.Vector2(c.x - aiming.to.x, c.y - aiming.to.y);
-  return { c, dir: d.clone().normalize(), pull: Math.min(d.length(), MAX_PULL) };
+  return { c, dir: d.lengthSq() ? d.clone().normalize() : new THREE.Vector2(1, 0), pull: Math.min(d.length(), MAX_PULL) };
 }
 const ballShape = new RAPIER.Ball(R);
 function updateGuide() {
@@ -646,11 +646,15 @@ function updateGuide() {
       }
     }
   }
+  updateCueStick(c, dir, pull, spin);
+  if (gameMode === 'online') online.sendAim({ dir: { x: dir.x, y: dir.y }, pull, spin });
+  const txt = `Power ${Math.round((pull / MAX_PULL) * 100)}%${spin.x || spin.y ? ' · spin applied' : ''}`;
+  if (txt !== lastStatus) { lastStatus = txt; ui.status(txt); }
+}
+function updateCueStick(c, dir, pull, spin) {
   // cue stick behind the ball, pulled back with the power, slightly elevated
   const h = cueStick.holder, right = new THREE.Vector2(dir.y, -dir.x);   // shooter's right-hand side
   h.position.set(c.x - dir.x * (R + 0.5 + pull * 0.6) + right.x * spin.x * R * 0.7, c.y - dir.y * (R + 0.5 + pull * 0.6) + right.y * spin.x * R * 0.7, BALL_Z + 0.15 + spin.y * R * 0.7);
-  const txt = `Power ${Math.round((pull / MAX_PULL) * 100)}%${spin.x || spin.y ? ' · spin applied' : ''}`;
-  if (txt !== lastStatus) { lastStatus = txt; ui.status(txt); }
   // Elevate the cue so the butt clears the rail behind the ball: find how far back the nearest cushion line is
   // along the stick, and pitch the stick so it is above the rail top there (a player's cue over the rail).
   const railDist = (() => { let d = Infinity; if (dir.x > 1e-6) d = Math.min(d, (c.x + HW) / dir.x); if (dir.x < -1e-6) d = Math.min(d, (c.x - HW) / dir.x); if (dir.y > 1e-6) d = Math.min(d, (c.y + HH) / dir.y); if (dir.y < -1e-6) d = Math.min(d, (c.y - HH) / dir.y); return Math.max(d, 1); })();
@@ -869,6 +873,7 @@ function settleShot(dt) {
   setSpin(0, 0); updateScore();
 }
 function endAim() {
+  if (gameMode === 'online') online.sendAim(null);
   aiming = null; guide.visible = false; cueStick.visible = false; if (controls) controls.enabled = true;
   updateScore();
 }
@@ -1116,6 +1121,12 @@ export default {
   frame() {
     controls?.update();
     if (aiming) updateGuide();
+    else {
+      const aim = gameMode === 'online' && match.turn !== online.seat && !activeShot &&
+        !match.ballInHand && match.winner === null && onTable(cue) && online.remoteAim;
+      cueStick.visible = !!aim;
+      if (aim) updateCueStick(cue.body.translation(), aim.dir, aim.pull, aim.spin);
+    }
     audio.setMuted(!!window.playful?.mute || document.hidden);
     const fade = THREE.MathUtils.clamp((fixtureFade[1] - camera.position.z) / (fixtureFade[1] - fixtureFade[0]), 0, 1);   // lamp fixture fades as the camera climbs to it
     for (const m of fixture) { m.visible = fade > 0; m.material.opacity = fade; }

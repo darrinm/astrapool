@@ -25,7 +25,7 @@ async function connect(id, token = crypto.randomUUID()) {
   const ws = new WebSocket(`${base.replace('http:', 'ws:')}/api/rooms/${id}/socket`, { headers: { Origin: base } });
   const messages = [], listeners = new Set();
   ws.on('message', bytes => { const value = JSON.parse(bytes.toString()); messages.push(value); for (const listener of listeners) listener(); });
-  const client = { ws, token, seq: 0, send(type, payload = {}) { ws.send(JSON.stringify({ type, seq: this.seq, ...payload })); }, async wait(predicate) {
+  const client = { ws, token, messages, seq: 0, send(type, payload = {}) { ws.send(JSON.stringify({ type, seq: this.seq, ...payload })); }, async wait(predicate) {
     const take = () => { const i = messages.findIndex(predicate); if (i < 0) return; const value = messages.splice(i, 1)[0]; if (value.seq !== undefined) this.seq = value.seq; return value; };
     const value = take(); if (value) return value;
     return new Promise((resolve, reject) => {
@@ -76,6 +76,38 @@ test('private room: seats, turn enforcement, results, placement, reconnect, inte
   assert.equal(vote.snapshot.match.winner, 1);
   rejoined.send('rematch'); const rematch = await returned.wait(m => m.type === 'state' && m.seq > vote.seq);
   assert.equal(rematch.snapshot.match.winner, null); assert.equal(rematch.snapshot.match.breaker, 1); assert.deepEqual(rematch.snapshot.match.wins, [0, 1]); assert.equal(rematch.snapshot.balls.length, 16);
+});
+
+test('live cues relay only the active player, preserve the table, and do not consume shot requests', async () => {
+  const { id } = await (await fetch(base + '/api/rooms', { method: 'POST', headers: { Origin: base } })).json();
+  const one = await connect(id), initial = await one.wait(m => m.type === 'state');
+  const two = await connect(id); await two.wait(m => m.type === 'state');
+  await one.wait(m => m.type === 'presence' && m.connected.every(Boolean));
+  const aim = { dir: { x: 0.6, y: 0.8 }, pull: 12, spin: { x: -0.3, y: 0.4 } };
+  two.send('aim', { aim });
+  one.send('aim', { aim, seq: -1 });
+  one.send('aim', { aim: { ...aim, pull: 25 } });
+  one.send('aim', { aim, seat: 1 });
+  assert.deepEqual(await two.wait(m => m.type === 'aim'), { type: 'aim', seq: 0, seat: 0, aim });
+  for (let i = 0; i < 45; i++) one.send('aim', { aim: { ...aim, pull: i / 2 } });
+  one.send('aim', { aim: null });
+  await two.wait(m => m.type === 'aim' && m.aim === null);
+  const action = { dir: { x: 1, y: 0 }, speed: 100, spin: { x: 0, y: 0 }, calledPocket: null };
+  one.send('shoot', { action });
+  const shot = await one.wait(m => m.type === 'shot'); await two.wait(m => m.type === 'shot');
+  assert.equal(shot.seq, 1); assert.deepEqual(shot.snapshot, initial.snapshot);
+  assert.equal(one.messages.some(m => m.type === 'aim' || m.type === 'error'), false);
+  assert.equal(two.messages.filter(m => m.type === 'aim').length, 45);
+  two.messages.length = 0;
+  one.send('aim', { aim }); // Cannot show a cue while balls are moving.
+  one.send('result', { report: { first: null, rails: [], pocketed: [], offTable: [] }, balls: initial.snapshot.balls });
+  const state = await one.wait(m => m.type === 'state' && m.seq > shot.seq);
+  await two.wait(m => m.type === 'state' && m.seq === state.seq);
+  assert.equal(two.messages.some(m => m.type === 'aim'), false);
+  assert.equal(state.snapshot.match.turn, 1);
+  two.send('aim', { aim });
+  assert.equal((await one.wait(m => m.type === 'aim')).seat, 1);
+  one.ws.close(); two.ws.close();
 });
 
 test('nonexistent rooms return a readable terminal WebSocket rejection', async () => {
