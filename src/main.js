@@ -16,7 +16,6 @@ connectEnvironmentPicker(current);
 // ---------- input ----------
 connectPointerInput(renderer.domElement, current);
 addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') document.querySelector('.help').open = false;
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.target.closest('input, textarea, select, [contenteditable]')) return;
   const k = e.key.toLowerCase();
   if (k === 'm') { toggleSound(); return; }
@@ -27,6 +26,7 @@ function toggleSound() {
   window.playful.mute = !window.playful.mute;
   for (const button of document.querySelectorAll('[data-sound-toggle]')) {
     button.setAttribute('aria-pressed', String(!window.playful.mute));
+    if (button.hasAttribute('aria-label')) button.setAttribute('aria-label', window.playful.mute ? 'Sound off' : 'Sound on');
     button.querySelector('[data-sound-state]').textContent = window.playful.mute ? 'off' : 'on';
   }
   current.audio.setMuted(window.playful.mute || document.hidden);
@@ -35,9 +35,6 @@ document.querySelectorAll('[data-sound-toggle]').forEach(button => button.addEve
 document.addEventListener('visibilitychange', () => current.audio.setMuted(!!window.playful?.mute || document.hidden));
 document.getElementById('reset-view').addEventListener('click', () => current.key('c'));
 document.getElementById('rerack').addEventListener('click', () => current.key('r'));
-addEventListener('pointerdown', (e) => {
-  if (!e.target.closest('.help')) document.querySelector('.help').open = false;
-});
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
   current.resize();

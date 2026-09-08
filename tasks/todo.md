@@ -84,3 +84,28 @@ and the WebGL framebuffer rather than judged from screenshots.
 ### Not done
 - [ ] Room previews are still raw equirectangular panoramas (bowed horizons). They want rendered
       perspective stills from the game camera — an asset-pipeline job, not a CSS one.
+
+## HUD redesign (2026-09-07)
+The defect pass fixed what was measurably wrong inside the old structure; this replaces the structure.
+
+- [x] One design system: 6 spacing steps, 3 radii, 5 type sizes, colour with roles (was 13 radii,
+      12 font sizes, 15 gaps, 75 hexes)
+- [x] The HUD is one grid over the viewport; the scoreline, guidance and control bar sit in real cells
+- [x] The accent comes from the room — `environments.js` already carried `accent`, `time` and
+      `description` for all nine and the UI used none of them
+- [x] One setup surface: rooms are a section of the sheet, not a second full-screen dialog reached by
+      closing the first. The live preview is the commit, so Cancel / "Play here" are gone
+- [x] Deleted the borrow-and-restore machinery (29 override rules); the sheet owns three panels
+- [x] Controls differ by consequence: mode is choice cards, difficulty segmented, sound a switch,
+      New rack marked destructive and no longer the largest element
+- [x] Room previews are renders from the game camera, table racked and in frame, replacing the
+      equirectangular source textures with their bowed horizons. Minimal uses its render too, so the
+      CSS stand-in table is gone
+- [x] During play: one pill, one line of text, a scrim — not three cards at three heights
+- [x] Online: the invite row appears only once a room exists; Reconnect sits outside it so a failed
+      create can still be retried
+
+### Still open
+- [ ] No first-run moment: you land mid-table with no title or invitation. Deliberately not invented —
+      it changes how the product opens, which is a product call rather than a finish.
+- [ ] Fraunces is the display face; it carries most of the new character and is one token to change.

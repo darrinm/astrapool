@@ -1,51 +1,45 @@
 import { ENVIRONMENTS, environmentById, readEnvironment } from './environments.js';
-import { connectBackdropDismiss } from './hud.js';
 
+// Rooms are a section of the settings sheet, not a dialog of their own. Choosing
+// one loads it live under the open sheet, so that preview *is* the commit and
+// there is nothing to confirm or cancel.
 export function connectEnvironmentPicker(game) {
-  const dialog = document.getElementById('environment-dialog');
   const options = document.getElementById('environment-options');
-  let selected = readEnvironment(localStorage), preview = selected, request = 0, loading = false, error = '';
-  const apply = document.getElementById('apply-environment');
+  const status = document.getElementById('room-status');
+  let selected = readEnvironment(localStorage), request = 0, loading = false, error = '';
+
   function update() {
-    options.querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.room === preview)));
-    const theme = environmentById(preview);
-    // Silent at rest: the checked card already names the room.
-    document.getElementById('environment-preview-status').textContent = error || (loading ? `Opening ${theme.name}…` : '');
+    options.querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.room === selected)));
+    const theme = environmentById(selected);
+    status.textContent = error || (loading ? `Opening ${theme.name}…` : theme.description || '');
     options.setAttribute('aria-busy', String(loading));
-    apply.disabled = loading;
   }
+
   for (const theme of ENVIRONMENTS) {
-    const button = document.createElement('button'); button.className = `environment-card room-${theme.id}`; button.dataset.room = theme.id;
-    button.setAttribute('aria-label', `Preview ${theme.name}`);
+    const button = document.createElement('button');
+    button.className = `environment-card room-${theme.id}`;
+    button.dataset.room = theme.id;
+    button.setAttribute('aria-pressed', 'false');
     // All copy and IDs come from the fixed, local room catalog.
-    button.innerHTML = `<span class="room-art" aria-hidden="true">${theme.id === 'minimal' ? '<span class="room-table"><i></i></span>' : `<img class="room-photo" src="/environments/${theme.id}-preview.webp" alt="" loading="lazy" width="640" height="320">`}<span class="room-check">✓</span></span><span class="room-copy"><strong>${theme.name}</strong></span>`;
+    const art = `<img class="room-photo" src="/environments/${theme.id}-preview.webp" alt="" loading="lazy" width="640" height="320">`;
+    button.innerHTML = `<span class="room-art" aria-hidden="true">${art}<span class="room-check">✓</span></span>` +
+      `<span class="room-copy"><strong>${theme.name}</strong><span class="room-time">${(theme.time || '').replace(/\s*·\s*DEFAULT$/, '')}</span></span>`;
     button.addEventListener('click', async () => {
+      if (theme.id === selected) return;
       const current = ++request;
-      preview = theme.id; loading = true; error = ''; update();
-      const applied = await game.setEnvironment(preview);
+      const previous = selected;
+      selected = theme.id; loading = true; error = ''; update();
+      const applied = await game.setEnvironment(selected);
       if (current !== request) return;
       loading = false;
-      if (!applied) { preview = game.environment(); error = 'The room could not load. Please try again.'; }
+      if (applied) {
+        try { localStorage.setItem('pool.environment', selected); } catch { /* The room still works when storage is unavailable. */ }
+      } else {
+        selected = previous; error = 'That room could not load. Please try again.';
+      }
       update();
     });
     options.append(button);
   }
-  document.getElementById('open-environments').addEventListener('click', () => {
-    game.key('escape');
-    const settings = document.getElementById('hud-sheet'); if (settings.open) settings.close();
-    selected = game.environment(); preview = selected; error = ''; update(); dialog.showModal();
-  });
-  apply.addEventListener('click', () => {
-    selected = preview;
-    try { localStorage.setItem('pool.environment', selected); } catch { /* Room still works when storage is unavailable. */ }
-    dialog.close();
-  });
-  document.getElementById('cancel-environment').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('close', () => {
-    ++request; loading = false;
-    // Also cancels a pending download when its room has not become visible yet.
-    game.setEnvironment(selected); preview = selected;
-  });
-  connectBackdropDismiss(dialog, () => dialog.close());
   update();
 }

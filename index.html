@@ -4,13 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Pool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap">
     <link rel="stylesheet" href="/src/hud.css" />
   </head>
   <body>
     <div id="vignette" hidden></div>
     <div id="hud" hidden>
       <header class="topbar">
-        <div class="brand"><span class="brand-ball" aria-hidden="true">8</span><span><strong>Pool</strong></span></div>
+        <div class="brand"><span class="brand-ball" aria-hidden="true">8</span><span>Pool</span></div>
         <div id="free-score" class="scoreboard" aria-label="Game score">
           <div><span class="eyebrow">Pocketed</span><span class="score"><b id="pocketed-count">0</b><span> / 15</span></span></div>
           <div><span class="eyebrow">Shots</span><b id="shot-count" class="score">0</b></div>
@@ -21,66 +24,113 @@
           <div id="player-1" class="player-card"><div class="player-heading"><strong class="player-name">Player 2</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
         </div>
         <div class="utilities">
-          <button id="sound" data-sound-toggle class="quiet-button" aria-pressed="true" title="Toggle sound (M)">Sound <span id="sound-state" data-sound-state>on</span></button>
-          <details class="help">
-            <summary class="quiet-button" title="Controls and shortcuts">Help <span aria-hidden="true">?</span></summary>
-            <div class="help-panel">
-              <h2>How to play</h2>
-              <p class="help-lede">In Cue mode, pull back from the white ball and release to shoot. In Free Play’s Fling mode, grab any ball and throw it — hold still to place it.</p>
-              <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag / two fingers</dd></div><div><dt>Zoom</dt><dd>Scroll / pinch</dd></div></dl>
-              <dl class="shortcuts"><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Heads / balls</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
-              <details class="rules"><summary>House rules</summary>
-                <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>
-                <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack. Regular shots need no pocket call.</p>
-                <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed. All three follow the same rules.</p>
-              </details>
-            </div>
-          </details>
+          <button id="sound" data-sound-toggle class="quiet-button icon-button" aria-pressed="true" aria-label="Sound on" title="Toggle sound (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z"/><path class="wave" d="M15.5 9.2a4 4 0 0 1 0 5.6"/><path class="wave" d="M18.2 6.6a7.7 7.7 0 0 1 0 10.8"/></svg><span data-sound-state hidden>on</span></button>
         </div>
       </header>
-      <section id="online-panel" class="online-panel" aria-label="Private online room" hidden>
-        <p id="online-status" role="status">Create a room and invite a friend.</p>
-        <div><input id="invite-link" aria-label="Invite link" placeholder="Creating room…" readonly><button id="copy-invite" class="quiet-button">Copy invite</button><button id="online-retry" class="quiet-button">Reconnect</button></div>
-      </section>
+
       <div class="bottom-hud">
         <div id="shot-result" class="shot-result" hidden><span class="eyebrow">Last shot</span><p id="shot-result-text" role="status"></p></div>
         <div class="guidance"><div id="status" role="status"></div><p id="hint"></p></div>
-        <div class="shot-controls">
-          <div id="pocket-call" class="pocket-call" hidden>
-            <span class="eyebrow">Call the 8-ball pocket</span>
-            <div id="pocket-map" class="pocket-map" role="group" aria-label="Pocket for the 8-ball"><!-- layoutPocketMap() in pool.js rewrites these labels to match the map it turns to face the camera. --><button data-pocket="0" aria-pressed="false" aria-label="Top left pocket"></button><button data-pocket="1" aria-pressed="false" aria-label="Top middle pocket"></button><button data-pocket="2" aria-pressed="false" aria-label="Top right pocket"></button><button data-pocket="3" aria-pressed="false" aria-label="Bottom left pocket"></button><button data-pocket="4" aria-pressed="false" aria-label="Bottom middle pocket"></button><button data-pocket="5" aria-pressed="false" aria-label="Bottom right pocket"></button></div>
-          </div>
-          <section id="spin-control" class="spin-panel" aria-label="Cue spin" hidden>
-            <div class="spin-heading"><span class="eyebrow">Cue spin</span><button id="reset-spin" class="text-button">Reset</button></div>
-            <button id="spin" aria-label="Set cue spin. Click a point or use arrow keys; Home centers." title="Click to set spin · arrow keys adjust · Home centers"><span class="dot"></span></button>
-            <span class="spin-caption">Aim the contact point</span>
-          </section>
-        </div>
         <button id="rematch" class="primary-button" hidden>Rematch</button>
         <nav class="compact-actions" aria-label="Table controls">
-          <button id="open-settings" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet">Game <span aria-hidden="true">☰</span></button>
-          <button id="quick-view" class="quiet-button" title="View the whole table from above">Overhead</button>
-          <button id="open-spin" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet">Spin</button>
-          <button id="open-pockets" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Call pocket</button>
-          <button id="cancel-gesture" class="quiet-button" hidden>Cancel</button>
+          <button id="open-settings" aria-haspopup="dialog" aria-controls="hud-sheet">Game</button>
+          <button id="quick-view" title="View the whole table from above">Overhead</button>
+          <button id="open-spin" aria-haspopup="dialog" aria-controls="hud-sheet">Spin <span class="spin-bead" aria-hidden="true"></span></button>
+          <button id="open-pockets" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Call pocket</button>
+          <button id="cancel-gesture" hidden>Cancel</button>
         </nav>
-        <div class="control-dock">
-          <div class="control-group"><label class="eyebrow" for="game-mode">Game</label><select id="game-mode"><option value="local">Local 8-ball</option><option value="computer">Vs Computer</option><option value="online">Play a Friend</option><option value="free">Free Play</option></select></div>
-          <div id="difficulty-group" class="control-group" hidden><label class="eyebrow" for="difficulty">Difficulty</label><select id="difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></div>
-          <div id="interaction-group" class="control-group"><span class="eyebrow">Play your way</span><div id="mode" class="segmented" role="group" aria-label="Interaction mode"><button data-mode="cue" aria-pressed="true" title="Shoot with the cue">Cue</button><button data-mode="fling" aria-pressed="false" title="Grab and throw any ball">Fling</button></div></div>
-          <div class="control-group"><span class="eyebrow">On the table</span><div id="style" class="segmented" role="group" aria-label="Ball appearance"><button data-style="heads" aria-pressed="false">Heads</button><button data-style="balls" aria-pressed="true">Balls</button></div></div>
-          <div class="dock-actions"><button id="open-environments" class="quiet-button" aria-haspopup="dialog" aria-controls="environment-dialog">Room <span id="environment-name">Minimal</span></button><button id="overhead-view" class="quiet-button">Overhead</button><button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button><button id="rerack" class="quiet-button" title="Re-rack (R)">Re-rack <span aria-hidden="true">↻</span></button></div>
-        </div>
       </div>
     </div>
+
     <dialog id="hud-sheet" aria-labelledby="sheet-title">
-      <header class="sheet-heading"><h2 id="sheet-title"></h2><button id="close-sheet" class="quiet-button" autofocus>Done</button></header>
-      <div id="sheet-content"></div>
-    </dialog>
-    <dialog id="environment-dialog" aria-labelledby="environment-title">
-      <header class="environment-heading"><h2 id="environment-title">Where shall we play?</h2><div class="environment-utilities"><button id="cancel-environment" class="quiet-button">Cancel</button></div></header>
-      <div id="environment-options" class="environment-options" role="group" aria-label="Room previews"></div>
-      <footer class="environment-footer"><p id="environment-preview-status" role="status"></p><button id="apply-environment" class="primary-button">Play here</button></footer>
+      <header class="sheet-heading"><h2 id="sheet-title">Game</h2><button id="close-sheet" class="text-button" autofocus>Done</button></header>
+      <div id="sheet-content">
+
+        <section id="panel-settings">
+          <div class="field">
+            <span class="eyebrow" id="mode-label">Game</span>
+            <div id="game-mode" class="choices" role="group" aria-labelledby="mode-label">
+              <button data-game="local" aria-pressed="true"><strong>Local 8-ball</strong><span>Two players, one device</span></button>
+              <button data-game="computer" aria-pressed="false"><strong>Vs Computer</strong><span>Play the house</span></button>
+              <button data-game="online" aria-pressed="false"><strong>Play a Friend</strong><span>Share a private link</span></button>
+              <button data-game="free" aria-pressed="false"><strong>Free Play</strong><span>No rules, just the table</span></button>
+            </div>
+          </div>
+
+          <div class="field" id="difficulty-group" hidden>
+            <span class="eyebrow" id="difficulty-label">Difficulty</span>
+            <div id="difficulty" class="segmented" role="group" aria-labelledby="difficulty-label">
+              <button data-difficulty="easy" aria-pressed="false">Easy</button>
+              <button data-difficulty="medium" aria-pressed="true">Medium</button>
+              <button data-difficulty="hard" aria-pressed="false">Hard</button>
+            </div>
+          </div>
+
+          <section id="online-panel" class="field online-panel" aria-label="Private online room" hidden>
+            <span class="eyebrow">Your room</span>
+            <p id="online-status" role="status">Create a room and invite a friend.</p>
+            <div class="online-row">
+              <input id="invite-link" aria-label="Invite link" readonly>
+              <button id="copy-invite" class="quiet-button">Copy invite</button>
+            </div>
+            <button id="online-retry" class="quiet-button" hidden>Reconnect</button>
+          </section>
+
+          <div class="field">
+            <span class="eyebrow" id="room-label">Room</span>
+            <div id="environment-options" class="rooms" role="group" aria-labelledby="room-label"></div>
+            <p id="room-status" role="status"></p>
+          </div>
+
+          <div class="field" id="interaction-group" hidden>
+            <span class="eyebrow" id="play-label">Play your way</span>
+            <div id="mode" class="segmented" role="group" aria-labelledby="play-label">
+              <button data-mode="cue" aria-pressed="true" title="Shoot with the cue">Cue</button>
+              <button data-mode="fling" aria-pressed="false" title="Grab and throw any ball">Fling</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="eyebrow" id="table-label">On the table</span>
+            <div id="style" class="segmented" role="group" aria-labelledby="table-label">
+              <button data-style="heads" aria-pressed="false">Heads</button>
+              <button data-style="balls" aria-pressed="true">Balls</button>
+            </div>
+            <button class="switch" data-sound-toggle aria-pressed="true"><span>Sound</span><span class="switch-track" aria-hidden="true"></span><span data-sound-state hidden>on</span></button>
+          </div>
+
+          <div class="sheet-actions">
+            <button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button>
+            <button id="overhead-view" class="quiet-button">Overhead</button>
+            <button id="rerack" class="quiet-button danger-button" title="Re-rack (R)">New rack</button>
+          </div>
+
+          <details class="rules">
+            <summary>How to play &amp; house rules</summary>
+            <div class="help-panel">
+              <p>In Cue mode, pull back from the white ball and release to shoot. In Free Play’s Fling mode, grab any ball and throw it — hold still to place it.</p>
+              <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag / two fingers</dd></div><div><dt>Zoom</dt><dd>Scroll / pinch</dd></div></dl>
+              <dl class="shortcuts"><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Heads / balls</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
+              <h3>House rules</h3>
+              <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>
+              <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack.</p>
+              <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed.</p>
+            </div>
+          </details>
+        </section>
+
+        <section id="panel-spin" class="spin-panel" hidden>
+          <div class="spin-heading"><span class="eyebrow">Contact point</span><button id="reset-spin" class="text-button">Centre</button></div>
+          <button id="spin" aria-label="Set cue spin. Click a point or use arrow keys; Home centers." title="Click to set spin · arrow keys adjust · Home centers"><span class="dot"></span></button>
+          <span class="spin-caption">Center ball</span>
+        </section>
+
+        <section id="panel-pockets" class="pocket-call" hidden>
+          <span class="eyebrow">Which pocket for the 8-ball?</span>
+          <div id="pocket-map" class="pocket-map" role="group" aria-label="Pocket for the 8-ball"><button data-pocket="0" aria-pressed="false" aria-label="Top left pocket"></button><button data-pocket="1" aria-pressed="false" aria-label="Top middle pocket"></button><button data-pocket="2" aria-pressed="false" aria-label="Top right pocket"></button><button data-pocket="3" aria-pressed="false" aria-label="Bottom left pocket"></button><button data-pocket="4" aria-pressed="false" aria-label="Bottom middle pocket"></button><button data-pocket="5" aria-pressed="false" aria-label="Bottom right pocket"></button></div>
+        </section>
+
+      </div>
     </dialog>
     <script type="module" src="/src/main.js"></script>
   </body>

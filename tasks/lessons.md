@@ -60,3 +60,18 @@ Carried over from playful-photos when the pool game was extracted (2026-09-05).
   5px past the *bottom* edge at every breakpoint — a regression fixing a defect that did not exist.
 - Rule: for a visual finding, measure both edges before and after. A fix that only moves a box can
   trade one overflow for another, and the claim reads just as plausibly either way.
+
+## 2026-09-07 — A timed-out tool call does not stop the page
+- Capturing nine room previews, the first loop exceeded the 45s CDP limit. The *response* timed out;
+  the page's async loop kept running. I started a second loop, both drove `setEnvironment`, and the
+  files interleaved — glasshouse-preview.webp contained the Amalfi Terrace render.
+- Rule: a CDP timeout cancels the answer, not the work. Before re-running anything that mutates page
+  state, reload the frame to kill stray async, and have the loop record what it actually captured
+  (`id=${g.environment()}`) so a mismatch is visible instead of shipping.
+- Rule: long in-page loops belong detached — start them, return immediately, and poll from the shell.
+
+## 2026-09-07 — Hiding a container hides the escape hatch inside it
+- I hid the invite row until a room existed, which was right; Reconnect lived inside that row, so the
+  failure state said "Retry, or choose another game" with no retry button anywhere.
+- Rule: when hiding a container by state, check what else is inside it — recovery controls belong
+  outside the thing whose absence they recover from.

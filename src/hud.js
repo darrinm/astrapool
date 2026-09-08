@@ -10,47 +10,36 @@ export function connectBackdropDismiss(dialog, close) {
   dialog.addEventListener('click', event => { if (backdropDown && event.target === dialog) close(); });
 }
 
-// Lend the controls to a native modal. Keeping the same elements preserves
-// their values, listeners, and hidden game states.
-export function connectHud(game) {
-  const compact = matchMedia('(max-width: 1100px), (max-height: 600px)');
-  const sheet = document.getElementById('hud-sheet');
-  const content = document.getElementById('sheet-content');
-  const title = document.getElementById('sheet-title');
-  let borrowed = [];
+// One sheet, three panels. The controls live in it permanently: nothing is
+// borrowed from the HUD and nothing opens a second dialog on top of this one.
+const PANELS = {
+  settings: { title: 'Game', id: 'panel-settings' },
+  spin: { title: 'Cue spin', id: 'panel-spin' },
+  pockets: { title: 'Call the 8-ball pocket', id: 'panel-pockets' },
+};
 
-  function restore() {
-    for (const { element, anchor } of borrowed) anchor.replaceWith(element);
-    borrowed = [];
-  }
-  function close() { sheet.close(); restore(); }
-  function open(label, selectors) {
+export function connectHud(game) {
+  const sheet = document.getElementById('hud-sheet');
+  const title = document.getElementById('sheet-title');
+
+  function open(which) {
     game.key('escape');
-    restore();
-    title.textContent = label;
-    for (const selector of selectors) {
-      const element = document.querySelector(selector);
-      const anchor = document.createComment('HUD control home');
-      element.before(anchor);
-      borrowed.push({ element, anchor });
-      content.append(element);
-    }
-    sheet.showModal();
+    for (const [name, panel] of Object.entries(PANELS)) document.getElementById(panel.id).hidden = name !== which;
+    title.textContent = PANELS[which].title;
+    if (!sheet.open) sheet.showModal();
   }
-  document.getElementById('open-settings').addEventListener('click', () => open('Game & settings', ['.control-dock', '.utilities', '#online-panel']));
-  document.getElementById('open-spin').addEventListener('click', () => open('Cue spin', ['#spin-control']));
-  document.getElementById('open-pockets').addEventListener('click', () => open('Call the 8-ball pocket', ['#pocket-call']));
+  const close = () => sheet.close();
+
+  document.getElementById('open-settings').addEventListener('click', () => open('settings'));
+  document.getElementById('open-spin').addEventListener('click', () => open('spin'));
+  document.getElementById('open-pockets').addEventListener('click', () => open('pockets'));
   document.getElementById('close-sheet').addEventListener('click', close);
-  document.getElementById('cancel-gesture').addEventListener('pointerdown', e => {
-    e.preventDefault();
-    game.key('escape');
-  });
+  document.getElementById('cancel-gesture').addEventListener('pointerdown', e => { e.preventDefault(); game.key('escape'); });
   document.getElementById('cancel-gesture').addEventListener('click', () => game.key('escape'));
   document.getElementById('quick-view').addEventListener('click', () => document.getElementById('overhead-view').click());
-  sheet.addEventListener('close', () => { if (!sheet.open) restore(); });
-  connectBackdropDismiss(sheet, close);
+  // Choosing a pocket or a view is the whole errand, so the sheet gets out of the way.
   sheet.addEventListener('click', e => {
     if (e.target.closest('[data-pocket], #overhead-view, #reset-view, #rerack')) close();
   });
-  compact.addEventListener('change', close);
+  connectBackdropDismiss(sheet, close);
 }

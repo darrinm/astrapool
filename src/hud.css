@@ -1,271 +1,275 @@
-:root { font: 13px/1.4 system-ui, sans-serif; color: #f4efe4; color-scheme: dark; --muted: #b5b4a9; --accent: #e7c58b; --line: #ffffff1c; --panel: #161d19ed; }
+/* ============================================================================
+   Pool HUD
+   The chrome is made of the room's materials: a warm near-black panel, one
+   accent taken from the environment itself (environments.js owns the value),
+   and a serif that belongs to the club rather than to the browser.
+   ========================================================================= */
+
+:root {
+  /* Space: 6 steps. Nothing between them. */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  /* Radius: small controls, panels, pills. Three. */
+  --r-sm: 8px; --r-md: 14px; --r-pill: 999px;
+  /* Type: five sizes. */
+  --t-micro: 11px; --t-body: 13px; --t-lead: 15px; --t-title: 20px; --t-display: 30px;
+
+  --ink: #f7f2e9;
+  --ink-dim: #b6ae9f;
+  --ink-faint: #8a8275;
+
+  --panel: #171310ee;
+  --panel-solid: #171310;
+  --raise: #ffffff0d;
+  --raise-hover: #ffffff1a;
+  --edge: #ffffff1c;
+  --edge-strong: #ffffff33;
+
+  /* Set per-room from environments.js; this is the fallback (brass). */
+  --accent: #e7c58b;
+  --accent-ink: #191307;
+  --accent-wash: #e7c58b1f;
+  --danger: #e09079;
+  --felt: #4f9673;
+
+  --shadow: 0 18px 48px #0007;
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --ui: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  font: 400 var(--t-body)/1.5 var(--ui);
+  color: var(--ink);
+  color-scheme: dark;
+}
+
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #111711; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0b09; }
 canvas { display: block; touch-action: none; }
-button, summary { font: inherit; -webkit-tap-highlight-color: transparent; }
-button { cursor: pointer; }
-button, summary { transition: background .15s, color .15s; }
-button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 [hidden] { display: none !important; }
-#vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 50%, #0008 100%); }
-#hud { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
-.topbar { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; padding: 24px 32px; background: linear-gradient(#080d0bb3, transparent); }
-.brand { grid-column: 1; justify-self: start; }
+button, summary, select, input { font: inherit; -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--r-sm); }
+button:disabled { opacity: .45; cursor: default; }
+
+/* ---------------------------------------------------------------- scaffold */
+#vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 45%, #000a 100%); }
+/* The HUD is one grid over the viewport, so every cluster sits in a real cell
+   instead of being positioned independently and hoping the edges agree. */
+#hud {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  display: grid; grid-template-rows: auto 1fr auto;
+  padding: max(var(--s5), env(safe-area-inset-top)) max(var(--s5), env(safe-area-inset-right))
+           max(var(--s5), env(safe-area-inset-bottom)) max(var(--s5), env(safe-area-inset-left));
+}
+#hud > * { pointer-events: none; }
+#hud button, #hud select, #hud input, #hud summary, #hud a { pointer-events: auto; }
+
+/* ----------------------------------------------------------------- top row */
+.topbar::before { content: ''; position: fixed; left: 0; right: 0; top: 0; height: 22vh; pointer-events: none; background: linear-gradient(#0b0908cc, #0000); }
+.topbar > * { position: relative; }
+.topbar { grid-row: 1; position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: var(--s5); }
+.brand { display: flex; align-items: center; gap: var(--s2); font: 500 var(--t-lead)/1 var(--display); letter-spacing: .02em; }
+.brand-ball { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #17130f; font: 700 10px/1 var(--ui); }
+.utilities { display: flex; justify-self: end; gap: var(--s1); }
+
+/* Scoreboards share the centre cell, so both are centred by construction. */
 .scoreboard, .match-score { grid-column: 2; justify-self: center; }
-.utilities { grid-column: 3; justify-self: end; }
-.brand { display: flex; align-items: center; gap: 10px; font-size: 18px; letter-spacing: -.6px; white-space: nowrap; }
-.brand strong { font-weight: 700; }
-.brand-ball { display: grid; place-items: center; width: 28px; height: 28px; border: 6px solid #e7c58b; border-radius: 50%; background: #f4efe4; color: #17201a; font-size: 11px; font-weight: 800; letter-spacing: 0; }
-.scoreboard { display: flex; gap: 28px; }
-.scoreboard > div { display: flex; align-items: center; gap: 10px; }
-.scoreboard > div + div { padding-left: 28px; border-left: 1px solid var(--line); }
-.eyebrow { display: block; color: var(--muted); font-size: 10px; font-weight: 650; letter-spacing: 1.5px; text-transform: uppercase; }
-.score { font-size: 21px; font-weight: 550; font-variant-numeric: tabular-nums; }
-.score span { color: var(--muted); font-size: 13px; }
-.utilities { display: flex; align-items: center; gap: 8px; pointer-events: auto; }
-.quiet-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 40px; padding: 8px 12px; color: #edece3; border: 1px solid transparent; border-radius: 8px; background: transparent; white-space: nowrap; }
-.quiet-button:hover, .help[open] > summary { background: #ffffff0e; border-color: var(--line); }
-[data-sound-state] { color: var(--accent); }
-[data-sound-toggle][aria-pressed="false"] [data-sound-state] { color: var(--muted); }
-.help { position: relative; }
-.help summary { cursor: pointer; list-style: none; }
-.help summary::-webkit-details-marker { display: none; }
-.help summary span { display: grid; place-items: center; border: 1px solid #ffffff50; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; }
-.help-panel { position: absolute; top: calc(100% + 12px); right: 0; width: 310px; padding: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 48px #0005; backdrop-filter: blur(18px); max-height: calc(100dvh - 110px); overflow: auto; }
-.help-panel h2 { font-size: 17px; margin: 0 0 10px; font-weight: 600; }
-.help-panel p { color: var(--muted); margin: 0 0 20px; line-height: 1.65; }
-.help-panel .help-lede { margin-bottom: 16px; }
-.help-panel dl { margin: 0; }
-.help-panel dl + dl { margin-top: 14px; }
-.help-panel .rules { margin-top: 18px; border-top: 1px solid var(--line); }
-.help-panel .rules summary { padding: 10px 0 4px; color: var(--accent); font-size: 12px; }
-.help-panel .rules summary::-webkit-details-marker { display: none; }
-.help-panel .rules p { margin: 10px 0 0; font-size: 12px; line-height: 1.6; }
-.help-panel dl > div { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 7px 0; border-top: 1px solid var(--line); }
-.help-panel dd { margin: 0; color: var(--muted); font-size: 12px; }
-kbd { display: inline-block; min-width: 22px; padding: 1px 5px; text-align: center; border: 1px solid var(--line); border-radius: 4px; font: 11px system-ui; color: var(--accent); }
-.bottom-hud { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 0; right: 0; margin-inline: auto; width: max-content; max-width: calc(100% - 40px); display: flex; flex-direction: column; }
-/* Ordered last so it sits on the bottom line with the compact bar and the spin panel, and so
-   hiding the setup dock cannot move the one line the player is reading. */
-.guidance { order: 10; align-self: center; max-width: 100%; text-align: center; margin: 14px 0 0; padding: 9px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); backdrop-filter: blur(18px); }
-#hint { margin: 0; font-size: 12px; color: #e1e4da; }
-#status { margin-bottom: 6px; color: var(--accent); font-size: 13px; font-weight: 600; }
+
+/* Free play: two quiet figures, no boxes. */
+.scoreboard { display: flex; gap: var(--s6); text-align: center; }
+.eyebrow { display: block; color: var(--ink-faint); font: 500 var(--t-micro)/1 var(--ui); letter-spacing: .12em; text-transform: uppercase; }
+.score { display: block; margin-top: var(--s2); font: 400 var(--t-title)/1 var(--display); font-variant-numeric: tabular-nums; }
+.score span { color: var(--ink-faint); font-size: var(--t-body); }
+
+/* Match: one scoreline. The active player is marked by a rule, not a card. */
+.match-score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: var(--s6); }
+.player-card { display: grid; gap: var(--s2); padding-top: var(--s2); border-top: 2px solid transparent; min-width: 150px; }
+.player-card:last-child { justify-items: end; text-align: right; }
+.player-card.active { border-top-color: var(--accent); }
+.player-card.winner { border-top-color: var(--felt); }
+.player-heading { display: flex; align-items: baseline; gap: var(--s2); }
+.player-card:last-child .player-heading { flex-direction: row-reverse; }
+.player-name { font: 500 var(--t-lead)/1 var(--display); letter-spacing: .01em; }
+.rack-wins { font: 400 var(--t-lead)/1 var(--display); color: var(--accent); font-variant-numeric: tabular-nums; }
+.player-group { color: var(--ink-faint); font-size: var(--t-micro); }
+.versus { display: grid; justify-items: center; gap: var(--s1); padding-top: var(--s2); color: var(--ink-faint); }
+.versus strong { font: 500 var(--t-body)/1 var(--display); color: var(--ink-dim); }
+.versus > span { font-size: var(--t-micro); letter-spacing: .06em; text-transform: uppercase; }
+.remaining-balls { display: flex; gap: var(--s1); }
+.player-card:last-child .remaining-balls { flex-direction: row-reverse; }
+.remaining-balls:empty { display: none; }
+.ball-chip { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--ball-color); color: #17130f; font: 700 8px/1 var(--ui); }
+.ball-chip > span { display: grid; place-items: center; width: 10px; height: 10px; border-radius: 50%; background: #f7f2e9; }
+.ball-chip.stripe { background: linear-gradient(#f7f2e9 22%, var(--ball-color) 22% 78%, #f7f2e9 78%); }
+.ball-chip.down { opacity: .22; }
+
+/* -------------------------------------------------------------- bottom row */
+/* A scrim rather than a floating box: the guidance is legible over any room
+   without becoming another card competing with the controls. */
+.bottom-hud { grid-row: 3; position: relative; display: grid; grid-template-columns: 1fr auto 1fr; grid-template-rows: auto auto auto auto; justify-items: center; gap: var(--s3); }
+.bottom-hud::before { content: ''; position: fixed; left: 0; right: 0; bottom: 0; height: 32vh; pointer-events: none; background: linear-gradient(#0000, #0b0908d9); }
+.bottom-hud > * { position: relative; }
+.guidance { grid-area: 2 / 2; text-align: center; display: grid; gap: var(--s1); }
+#status { color: var(--accent); font: 500 var(--t-lead)/1.3 var(--ui); }
 #status:empty { display: none; }
-.control-dock { display: flex; align-items: stretch; gap: 22px; padding: 14px 18px; border: 1px solid #ffffff24; border-radius: 18px; background: var(--panel); box-shadow: 0 12px 40px #0005; backdrop-filter: blur(18px); pointer-events: auto; }
-.control-group { display: flex; flex-direction: column; }
-.control-group .eyebrow { margin-bottom: 7px; padding-left: 4px; }
-.segmented { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--line); background: #050b0859; border-radius: 10px; }
-.segmented button { min-width: 68px; min-height: 36px; padding: 6px 14px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-weight: 550; }
-.segmented button:hover { background: #ffffff12; color: #fff; }
-#mode button[aria-pressed="true"] { color: #20291f; background: var(--accent); box-shadow: 0 2px 5px #0002; }
-#style button[aria-pressed="true"] { color: #f6f3e9; background: #39463b; }
-.dock-actions { display: flex; flex-direction: column; align-items: stretch; padding-left: 18px; border-left: 1px solid var(--line); }
-.dock-actions .quiet-button { min-height: 32px; padding: 4px 8px; justify-content: space-between; font-size: 12px; }
-/* A pass-through wrapper: the spin panel and pocket call position themselves. */
-.shot-controls { display: contents; }
-.shot-controls:not(:has(> :not([hidden]))) { display: none; }
-.spin-panel { flex: 0 0 auto; width: 136px; padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); pointer-events: auto; backdrop-filter: blur(18px); }
-.spin-heading { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 12px; white-space: nowrap; }
-.text-button { color: var(--accent); background: transparent; padding: 2px; border: 0; font-size: 11px; }
-.text-button:hover { color: white; }
-#spin { display: block; position: relative; margin: auto; width: 72px; height: 72px; border-radius: 50%; background: radial-gradient(circle at 50% 50%, #0000 0 68%, #243d3430 68% 72%, #0000 72%), radial-gradient(circle at 35% 28%, #fffef8, #ddd9c9 65%, #a8ab99); border: 1px solid #fffc; cursor: crosshair; touch-action: none; box-shadow: 0 4px 12px #0005; }
-#spin::before, #spin::after { content: ''; position: absolute; background: #243d3433; }
+#hint { margin: 0; color: var(--ink-dim); font-size: var(--t-body); }
+.shot-result { grid-area: 1 / 2; max-width: 46ch; text-align: center; }
+.shot-result .eyebrow { margin-bottom: var(--s1); }
+.shot-result p { margin: 0; color: var(--ink-dim); font-size: var(--t-body); }
+
+/* One bar. Everything you touch during play lives in it. */
+.compact-actions { grid-area: 4 / 2; display: flex; align-items: center; gap: var(--s1); padding: var(--s1); border: 1px solid var(--edge); border-radius: var(--r-pill); background: var(--panel); box-shadow: var(--shadow); backdrop-filter: blur(20px); }
+.compact-actions button { display: inline-flex; align-items: center; gap: var(--s2); min-height: 40px; padding: 0 var(--s4); border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ink-dim); font-size: var(--t-body); white-space: nowrap; transition: background .15s, color .15s; }
+.compact-actions button:hover { background: var(--raise-hover); color: var(--ink); }
+#cancel-gesture { color: var(--accent); }
+.compact-actions:has(#cancel-gesture:not([hidden])) > button:not(#cancel-gesture) { display: none; }
+
+/* The spin control is the cue ball itself, showing where you are hitting it. */
+#open-spin { padding-inline: var(--s3) var(--s4); }
+.spin-bead { position: relative; width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #fffdf6, #ddd7c6 68%, #a29b8a); box-shadow: inset 0 0 0 1px #0003; flex: none; }
+.spin-bead::after { content: ''; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: #a4402c; transform: translate(calc(var(--sx, 0) * 5px), calc(var(--sy, 0) * -5px)); }
+
+.primary-button { grid-area: 3 / 2; min-height: 44px; padding: 0 var(--s5); border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font: 500 var(--t-lead)/1 var(--ui); }
+.primary-button:hover { filter: brightness(1.08); }
+
+/* ------------------------------------------------------------- shared bits */
+.quiet-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); min-height: 40px; padding: 0 var(--s3); border: 1px solid var(--edge); border-radius: var(--r-sm); background: var(--raise); color: var(--ink); font-size: var(--t-body); white-space: nowrap; transition: background .15s, border-color .15s; }
+.quiet-button:hover { background: var(--raise-hover); border-color: var(--edge-strong); }
+.icon-button { width: 40px; min-height: 40px; padding: 0; border-radius: 50%; }
+.icon-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+[data-sound-toggle][aria-pressed="false"] .wave { opacity: .25; }
+[data-sound-toggle].icon-button[aria-pressed="true"] { color: var(--accent); }
+.text-button { padding: var(--s1) var(--s2); border: 0; background: transparent; color: var(--accent); font-size: var(--t-body); }
+.text-button:hover { color: var(--ink); }
+[data-sound-state] { color: var(--accent); }
+[data-sound-toggle][aria-pressed="false"] [data-sound-state] { color: var(--ink-faint); }
+
+/* -------------------------------------------------------- the one surface */
+/* Rooms, mode, table and help are sections of a single sheet. Nothing here
+   opens another modal. */
+#hud-sheet {
+  width: min(680px, calc(100% - var(--s5))); max-height: calc(100dvh - var(--s6));
+  margin: auto; padding: 0; color: var(--ink);
+  background: var(--panel-solid); border: 1px solid var(--edge-strong); border-radius: var(--r-md);
+  box-shadow: var(--shadow); overscroll-behavior: contain;
+}
+#hud-sheet::backdrop { background: #0009; backdrop-filter: blur(6px); }
+.sheet-heading { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: var(--s4); padding: var(--s4) var(--s5); background: var(--panel-solid); border-bottom: 1px solid var(--edge); }
+.sheet-heading h2 { margin: 0; font: 400 var(--t-title)/1 var(--display); }
+#close-sheet { border: 0; background: transparent; color: var(--accent); }
+#sheet-content { padding: var(--s5); }
+#panel-settings { display: grid; gap: var(--s6); }
+
+.field { display: grid; gap: var(--s3); }
+.field > .eyebrow { margin: 0; }
+
+/* Modes are choices with consequences, so they are cards, not a dropdown. */
+.choices { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s2); }
+.choices button { display: grid; gap: 2px; padding: var(--s3) var(--s4); text-align: left; border: 1px solid var(--edge); border-radius: var(--r-sm); background: var(--raise); transition: background .15s, border-color .15s; }
+.choices button:hover { background: var(--raise-hover); }
+.choices button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-wash); }
+.choices strong { font: 500 var(--t-body)/1.2 var(--ui); }
+.choices span { color: var(--ink-faint); font-size: var(--t-micro); }
+
+.segmented { justify-self: start; display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--edge); border-radius: var(--r-sm); background: #0000004d; }
+.segmented button { min-height: 34px; padding: 0 var(--s4); border: 0; border-radius: 6px; background: transparent; color: var(--ink-dim); font-size: var(--t-body); transition: background .15s, color .15s; }
+.segmented button:hover { color: var(--ink); }
+.segmented button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+/* A switch reads as a state; a button reads as an action. Sound is a state. */
+.switch { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); width: 100%; min-height: 40px; padding: 0; border: 0; background: transparent; font-size: var(--t-body); }
+.switch-track { position: relative; width: 40px; height: 23px; border-radius: var(--r-pill); background: #ffffff26; transition: background .18s; flex: none; }
+.switch-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 17px; height: 17px; border-radius: 50%; background: var(--ink); transition: transform .18s; }
+[aria-pressed="true"] > .switch-track { background: var(--accent); }
+[aria-pressed="true"] > .switch-track::after { transform: translateX(17px); background: var(--accent-ink); }
+
+/* Actions differ by consequence: quiet for view, marked for destructive. */
+.sheet-actions { display: flex; flex-wrap: wrap; gap: var(--s2); padding-top: var(--s5); border-top: 1px solid var(--edge); }
+.sheet-actions .quiet-button { flex: 1 1 auto; }
+.danger-button { border-color: #e0907940; background: #e090791a; color: var(--danger); }
+.danger-button:hover { border-color: var(--danger); background: #e090792e; }
+.sheet-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
+
+/* ------------------------------------------------------------------- rooms */
+/* In the sheet, not behind it. Choosing one loads it under the open panel;
+   that live preview is the commit, so there is nothing to confirm. */
+.rooms { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
+.environment-card { position: relative; display: grid; padding: 0; overflow: hidden; text-align: left; border: 1px solid var(--edge); border-radius: var(--r-sm); background: var(--raise); transition: border-color .15s; }
+.environment-card:hover { border-color: var(--edge-strong); }
+.environment-card[aria-pressed="true"] { border-color: var(--accent); }
+.room-art { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; background: linear-gradient(#14121a, #33262a); }
+.room-photo { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s ease; }
+.environment-card:hover .room-photo { transform: scale(1.04); }
+.room-check { position: absolute; top: var(--s2); right: var(--s2); display: none; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 11px; }
+.environment-card[aria-pressed="true"] .room-check { display: grid; }
+.room-copy { display: grid; gap: 2px; padding: var(--s3); }
+.room-copy > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-copy strong { font: 500 var(--t-lead)/1.3 var(--display); }
+.room-copy .room-time { color: var(--ink-faint); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+#room-status { margin: 0; color: var(--ink-faint); font-size: var(--t-micro); min-height: 1.2em; }
+
+/* ------------------------------------------------------------ pocket call */
+.pocket-call { display: grid; gap: var(--s3); justify-items: center; }
+.pocket-map { position: relative; width: min(100%, 240px); aspect-ratio: 2 / 1; border-radius: 8px; background: #1e4b36; box-shadow: 0 0 0 7px #6b4a2e, 0 0 0 8px #0006; }
+.pocket-map.vertical { aspect-ratio: 1 / 2; width: min(100%, 128px); }
+.pocket-map button { position: absolute; width: 26px; height: 26px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid #ffffff3d; background: #07110b; translate: -50% -50%; transition: border-color .15s, background .15s; }
+.pocket-map button:hover { border-color: #ffffff96; }
+.pocket-map button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+
+/* ------------------------------------------------------------ spin popover */
+.spin-panel { display: grid; gap: var(--s3); justify-items: center; }
+.spin-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); width: 100%; }
+#spin { position: relative; width: 132px; height: 132px; border-radius: 50%; border: 1px solid #ffffffcc; cursor: crosshair; touch-action: none;
+  background: radial-gradient(circle at 50% 50%, #0000 0 68%, #243d3433 68% 72%, #0000 72%), radial-gradient(circle at 34% 28%, #fffef8, #ddd9c9 65%, #a8ab99); }
+#spin::before, #spin::after { content: ''; position: absolute; background: #243d3426; }
 #spin::before { left: 50%; top: 12%; width: 1px; height: 76%; }
 #spin::after { top: 50%; left: 12%; height: 1px; width: 76%; }
-#spin .dot { position: absolute; z-index: 1; left: 50%; top: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%); border-radius: 50%; background: #9d4936; box-shadow: 0 0 0 2px #fff9; }
-.spin-caption { display: block; color: var(--muted); font-size: 9px; text-align: center; margin-top: 10px; }
-@media (prefers-reduced-motion: reduce) { button, summary { transition: none; } }
+#spin .dot { position: absolute; left: 50%; top: 50%; width: 11px; height: 11px; border-radius: 50%; background: #a4402c; box-shadow: 0 0 0 2px #fff9; translate: -50% -50%; }
+.spin-caption { color: var(--ink-dim); font-size: var(--t-body); }
 
-/* Match play shares the table and controls with Free Play. */
-.match-score { display: flex; align-items: center; gap: 12px; }
-.player-card { min-width: 158px; padding: 9px 12px; border: 1px solid transparent; border-radius: 12px; background: #07100bc9; }
-.player-card.active, .player-card.winner { border-color: var(--accent); background: #243326e8; }
-.player-heading { display: flex; justify-content: space-between; gap: 20px; font-size: 13px; }
-.rack-wins { color: var(--accent); }
-.player-group { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
-.versus { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; white-space: nowrap; }
-.versus strong { font-weight: 600; color: #f4efe4; }
-.versus > span { font-size: 9px; }
-.remaining-balls { display: flex; gap: 4px; min-height: 18px; margin-top: 6px; }
-.remaining-balls:empty { display: none; }
-.ball-chip { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid #ffffff60; border-radius: 50%; background: var(--ball-color); color: #17201a; font: 700 9px system-ui; }
-.ball-chip > span { display: grid; place-items: center; width: 12px; height: 12px; background: #f5f1e8; border-radius: 50%; }
-.ball-chip.stripe { background: linear-gradient(#f5f1e8 22%, var(--ball-color) 22% 78%, #f5f1e8 78%); }
-.ball-chip.down { opacity: .3; }
-.shot-result { max-width: 480px; margin: 0 auto 10px; padding: 9px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); text-align: center; }
-.shot-result .eyebrow { font-size: 9px; letter-spacing: 1px; }
-.shot-result p { margin: 4px 0 0; font-size: 12px; line-height: 1.45; color: #edece3; }
-select { color: #f5f1e8; background: #25332b; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: inherit; min-height: 42px; }
-select:focus-visible { outline: 2px solid var(--accent); }
-.primary-button { display: block; margin: 0 auto 12px; padding: 10px 28px; border: 0; border-radius: 9px; background: var(--accent); color: #17201a; font-weight: 650; pointer-events: auto; }
-.pocket-call { flex: 1; min-width: 0; max-width: 360px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); pointer-events: auto; }
-.pocket-call .eyebrow { font-size: 9px; letter-spacing: .6px; text-align: center; }
-/* A schematic table. layoutPocketMap() in pool.js turns it to match the camera and drops each
-   target on the felt edge where its pocket really is, so no copy has to explain the orientation. */
-.pocket-map { position: relative; width: min(100%, 236px); aspect-ratio: 2 / 1; margin: 22px auto 18px; border-radius: 9px; background: #1e4b36; box-shadow: 0 0 0 8px #6b4a2e, 0 0 0 9px #0006; }
-.pocket-map.vertical { aspect-ratio: 1 / 2; width: min(100%, 124px); }
-.pocket-map button { position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid #ffffff40; background: #08120c; transform: translate(-50%, -50%); }
-.pocket-map button:hover { border-color: #ffffff90; }
-.pocket-map button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px #e7c58b40; }
-.online-panel { position: absolute; top: 134px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); pointer-events: auto; }
-.online-panel p { margin: 0 0 6px; font-size: 12px; text-align: center; color: var(--accent); }
-.online-panel > div { display: flex; align-items: center; gap: 4px; }
-.online-panel input { min-width: 0; width: 190px; color: var(--muted); background: #0b150e; border: 1px solid var(--line); padding: 8px; border-radius: 6px; font-size: 11px; }
-.online-panel button { font-size: 11px; min-height: 32px; padding: 5px 8px; }
-#copy-invite { color: var(--accent); border-color: var(--line); background: #e7c58b14; }
-.online-panel input::placeholder { color: var(--faint, #7d8a81); }
-button:disabled { opacity: .6; cursor: default; }
+/* ------------------------------------------------------------------ online */
+.online-panel { display: grid; gap: var(--s3); }
+.online-panel p { margin: 0; color: var(--accent); font-size: var(--t-body); }
+.online-row { display: flex; gap: var(--s2); }
+.online-panel input { flex: 1; min-width: 0; padding: 0 var(--s3); min-height: 40px; color: var(--ink-dim); background: #00000059; border: 1px solid var(--edge); border-radius: var(--r-sm); font-size: var(--t-body); }
+.online-panel input::placeholder { color: var(--ink-faint); }
+#copy-invite { border-color: var(--accent); background: var(--accent-wash); color: var(--accent); }
+#online-retry { justify-self: start; }
 
-.compact-actions { display: none; }
-.spin-panel { position: fixed; bottom: max(24px, env(safe-area-inset-bottom)); right: 28px; }
-.pocket-call { width: min(360px, 100%); margin: 0 auto 12px; }
+/* -------------------------------------------------------------------- help */
+.help-panel { display: grid; gap: var(--s3); }
+.help-panel h3 { margin: 0; font: 400 var(--t-lead)/1 var(--display); }
+.help-panel p { margin: 0; color: var(--ink-dim); font-size: var(--t-body); line-height: 1.6; }
+.help-panel dl { display: grid; gap: 0; margin: 0; }
+.help-panel dl > div { display: flex; justify-content: space-between; gap: var(--s4); padding: var(--s2) 0; border-top: 1px solid var(--edge); }
+.help-panel dt { color: var(--ink-dim); font-size: var(--t-body); }
+.help-panel dd { margin: 0; color: var(--ink-faint); font-size: var(--t-body); }
+kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: center; border: 1px solid var(--edge); border-radius: 4px; font: 11px/1.5 var(--ui); color: var(--accent); }
+.rules summary { padding: var(--s2) 0; color: var(--accent); font-size: var(--t-body); list-style: none; cursor: pointer; }
+.rules summary::-webkit-details-marker { display: none; }
+.rules p + p { margin-top: var(--s3); }
 
-/* One modal hosts the existing controls, so desktop and touch share their state. */
-#hud-sheet { width: min(420px, calc(100% - 24px)); max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); margin: auto; padding: 0; color: inherit; background: #161d19; border: 1px solid #ffffff30; border-radius: 20px; box-shadow: 0 20px 80px #0008; overscroll-behavior: contain; }
-#hud-sheet::backdrop { background: #0007; backdrop-filter: blur(5px); }
-.sheet-heading { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #161d19; border-bottom: 1px solid var(--line); }
-.sheet-heading h2 { margin: 0; font-size: 18px; }
-#close-sheet { color: var(--accent); }
-#sheet-content { padding: 16px; }
-#hud-sheet .control-dock { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 12px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; backdrop-filter: none; }
-#hud-sheet .control-group { min-width: 0; }
-#hud-sheet select { width: 100%; }
-#hud-sheet .segmented button { min-width: 0; flex: 1; padding-inline: 8px; }
-/* A grid, so four actions make two even rows instead of three plus an orphan. */
-#hud-sheet .dock-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 0; border-left: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-#hud-sheet .dock-actions button { justify-content: center; }
-#hud-sheet #rerack { grid-column: 1 / -1; }   /* the destructive one gets its own row */
-#hud-sheet #overhead-view { display: none; }   /* the compact bar already carries Overhead */
-/* The borrowed panels keep the heading they need in the HUD; the sheet supplies its own. */
-#hud-sheet .spin-heading .eyebrow, #hud-sheet .pocket-call > .eyebrow { display: none; }
-#hud-sheet .spin-heading { justify-content: flex-end; margin-bottom: 0; }
-/* Touch never fires :hover, so every control needs a surface at rest. */
-#hud-sheet .quiet-button, .dock-actions .quiet-button, .compact-actions button { border-color: var(--line); background: #ffffff0d; }
-#hud-sheet .quiet-button:hover, .dock-actions .quiet-button:hover, .compact-actions button:hover { background: #ffffff1c; }
-#hud-sheet .utilities { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 8px; margin-top: 12px; }
-#hud-sheet .help { flex: none; }
-#hud-sheet .help-panel { position: static; width: 100%; max-height: none; margin-top: 8px; padding: 12px 0; border: 0; box-shadow: none; background: none; }
-#hud-sheet .utilities:has(.help[open]) .help { grid-column: 1 / -1; }
-#hud-sheet .spin-panel, #hud-sheet .pocket-call, #hud-sheet .online-panel { display: block; position: static; transform: none; width: 100%; max-width: none; margin: 0; padding: 0; border: 0; background: none; backdrop-filter: none; }
-#hud-sheet .online-panel { margin-top: 16px; pointer-events: auto; }
-#hud-sheet .online-panel > div { display: flex; flex-wrap: wrap; }
-#hud-sheet .online-panel input { flex-basis: 100%; width: 100%; font-size: 16px; }
-#hud-sheet .online-panel button { flex: 1; }
-#hud-sheet .spin-caption { font-size: 12px; }
-#hud-sheet #spin { width: 132px; height: 132px; }
-#hud-sheet button, #hud-sheet summary, #hud-sheet select, #hud-sheet input { min-height: 44px; }
-#hud-sheet .text-button { padding: 8px 12px; font-size: 13px; }
-#hud-sheet .pocket-map { gap: 10px; margin-top: 16px; }
-#hud-sheet .pocket-map button { min-height: 54px; font-size: 12px; }
-
-/* Compact in either orientation, including tablets with limited vertical space. */
-@media (max-width: 1100px), (max-height: 600px) {
-  .topbar { padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); gap: 0; grid-template-columns: 1fr; }
-  .scoreboard, .match-score { grid-column: 1; }
-  .brand, .utilities, .control-dock, .shot-controls { display: none; }
-  .match-score { width: 100%; max-width: 440px; gap: 8px; }
-  .player-card { min-width: 0; flex: 1; padding: 6px 7px; border-radius: 10px; }
-  .player-heading { gap: 8px; font-size: 12px; }
-  .player-group { margin-top: 2px; }
-  .remaining-balls { gap: 2px; min-height: 16px; margin-top: 4px; flex-wrap: wrap; }
-  .ball-chip { width: 16px; height: 16px; font-size: 8px; }
-  .ball-chip > span { width: 10px; height: 10px; }
-  .shot-result { margin-bottom: 8px; padding: 7px 10px; }
-  .shot-result p { font-size: 11px; }
-  .versus { font-size: 10px; }
-  .scoreboard { position: static; transform: none; gap: 20px; padding: 8px; }
-  .scoreboard > div { gap: 8px; }
-  .scoreboard > div + div { padding-left: 20px; }
-  .score { font-size: 18px; }
-  .bottom-hud { bottom: max(8px, env(safe-area-inset-bottom)); width: min(480px, calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))); max-width: none; }
-  .guidance { order: 0; margin: 0 0 8px; padding: 7px 12px; }
-  #status { margin-bottom: 3px; font-size: 12px; }
-  #hint { font-size: 11px; }
-  .compact-actions { display: flex; justify-content: space-evenly; gap: 4px; padding: 4px; border: 1px solid #ffffff24; border-radius: 14px; background: var(--panel); pointer-events: auto; box-shadow: 0 6px 24px #0005; }
-  .compact-actions button { flex: 1; min-width: 0; min-height: 44px; padding: 8px 6px; font-size: 12px; }
-  #open-pockets, #cancel-gesture { color: var(--accent); background: #e7c58b12; }
-  #open-spin[data-active="true"]::after { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
-  .compact-actions:has(#cancel-gesture:not([hidden])) > button:not(#cancel-gesture) { display: none; }
-  .online-panel { top: max(88px, calc(80px + env(safe-area-inset-top))); padding: 6px 10px; width: max-content; max-width: calc(100% - 24px); border: 0; pointer-events: none; }
-  .online-panel p { font-size: 11px; margin: 0; }
-  .online-panel > div { display: none; }
-  .primary-button { min-height: 44px; margin-bottom: 8px; }
-  /* Anchored to the bottom edge: a centred sheet puts Done in the far corner of a tall phone. */
-  #hud-sheet { width: 100%; max-width: none; margin: auto auto 0; border-radius: 20px 20px 0 0; border-bottom: 0; max-height: calc(100dvh - 44px - env(safe-area-inset-top)); }
-  #sheet-content { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
-  #hud-sheet .pocket-map button { width: 44px; height: 44px; min-height: 44px; }
+/* --------------------------------------------------------------- compact */
+@media (max-width: 900px), (max-height: 600px) {
+  #hud { padding: max(var(--s3), env(safe-area-inset-top)) max(var(--s3), env(safe-area-inset-right))
+                 max(var(--s3), env(safe-area-inset-bottom)) max(var(--s3), env(safe-area-inset-left)); }
+  .brand, .utilities { display: none; }
+  .topbar { grid-template-columns: 1fr; }
+  .match-score, .scoreboard { grid-column: 1; width: 100%; max-width: 420px; }
+  .match-score { gap: var(--s3); }
+  .player-card { min-width: 0; }
+  .compact-actions button { padding: 0 var(--s3); }
+  #hud-sheet { width: 100%; max-width: none; margin: auto auto 0; border-radius: var(--r-md) var(--r-md) 0 0; border-bottom: 0; max-height: calc(100dvh - var(--s6)); }
+  #sheet-content { padding: var(--s4); padding-bottom: calc(var(--s4) + env(safe-area-inset-bottom)); gap: var(--s5); }
+  .choices { grid-template-columns: 1fr; }
+  .rooms { grid-template-columns: repeat(2, 1fr); }
+  #hud-sheet button, #hud-sheet summary, #hud-sheet select, #hud-sheet input { min-height: 44px; }
+  .pocket-map button { width: 40px; height: 40px; }
 }
-/* Keyboard shortcuts mean nothing on a device with no keyboard. */
-@media (hover: none) { .help-panel .shortcuts { display: none; } }
-
-/* Short landscape screens keep feedback beside the table instead of shrinking it. */
+/* Short landscape: the bar and the guidance keep to the right of the table. */
 @media (orientation: landscape) and (max-height: 600px) {
-  .bottom-hud { left: auto; right: max(12px, env(safe-area-inset-right)); top: auto; bottom: max(12px, env(safe-area-inset-bottom)); width: 250px; display: flex; flex-direction: column; justify-content: flex-end; }
-  .compact-actions { flex-wrap: wrap; }
-  .compact-actions button { flex: 1 1 auto; }
+  .bottom-hud { grid-template-columns: 1fr; justify-items: end; }
+  .guidance, .shot-result, .compact-actions, .primary-button { grid-column: 1; justify-self: end; text-align: right; }
+  .bottom-hud::before { display: none; }
+  .guidance { padding: var(--s2) var(--s3); border-radius: var(--r-sm); background: var(--panel); }
 }
-
-/* Once play starts, keep setup tucked away and the overhead view within reach. */
-#hud.playing .control-dock { display: none; }
-@media (min-width: 1101px) and (min-height: 601px) {
-  #hud.playing .compact-actions { display: flex; gap: 6px; position: fixed; left: 32px; bottom: 24px; pointer-events: auto; }
-  #hud.playing .compact-actions > button:not(#open-settings):not(#quick-view):not(#cancel-gesture) { display: none; }
-  #hud.playing .compact-actions > button { background: var(--panel); border-color: var(--line); }
-}
-
-/* Room chooser: illustrated previews, with the current rack still behind it. */
-#open-environments { gap: 12px; }
-#environment-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: var(--accent); }
-#environment-dialog { --room-padding: 26px; width: min(760px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: var(--room-padding); color: #f4efe4; background: #121a18f5; border: 1px solid #ffffff30; border-radius: 24px; box-shadow: 0 30px 100px #0009; }
-#environment-dialog::backdrop { background: #0005; backdrop-filter: blur(3px); }
-.environment-heading { margin-bottom: 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.environment-heading h2 { margin: 0; font: 500 30px/1.15 Georgia, serif; letter-spacing: -.6px; }
-.environment-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.environment-card { text-align: left; padding: 0; overflow: hidden; color: inherit; background: #1b2520; border: 1px solid #ffffff20; border-radius: 14px; }
-.environment-card:hover { border-color: #e7c58b90; }
-.environment-card[aria-pressed="true"] { border-color: #e7c58b; box-shadow: 0 0 0 2px #e7c58b33; }
-.room-art { position: relative; display: block; height: 126px; overflow: hidden; background: linear-gradient(#100e18 45%, #3b292b); }
-.room-check { display: none; position: absolute; top: 10px; right: 12px; border-radius: 50%; background: #e7c58b; color: #15201a; width: 23px; height: 23px; text-align: center; line-height: 23px; }
-.environment-card[aria-pressed="true"] .room-check { display: block; }
-.room-table { position: absolute; width: 138px; height: 76px; left: calc(50% - 69px); bottom: -2px; border: 9px solid #68452c; border-radius: 5px; background: #722f42; transform: perspective(220px) rotateX(38deg) rotateZ(-13deg); box-shadow: 8px 12px 0 #0a0d1290, inset 0 0 0 2px #0008; }
-.room-table::before, .room-table::after { content: ''; position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #080d11; box-shadow: 105px 0 #080d11, 52px 0 #080d11; left: -1px; }
-.room-table::before { top: -1px; }.room-table::after { bottom: -1px; }
-.room-table i { position: absolute; left: 25px; top: 29px; width: 5px; height: 5px; border-radius: 50%; background: #fffbe5; box-shadow: 47px -4px #d8a135, 52px 0 #477fa3, 48px 5px #a24751; }
-/* Room artwork doubles as its preview, so opening the chooser warms the image cache. */
-.room-photo { width: 100%; height: 100%; display: block; object-fit: cover; transition: transform 220ms ease; }
-.environment-card:hover .room-photo { transform: scale(1.035); }
-.room-check { z-index: 1; }
-#apply-environment:disabled { opacity: .5; cursor: wait; }
-@media (prefers-reduced-motion: reduce) { .room-photo { transition: none; } }
-.room-copy { display: block; padding: 14px 16px 17px; }
-.room-copy strong { font: 500 21px/1.15 Georgia, serif; }
-.environment-footer::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: 30px; background: linear-gradient(#121a1800, #121a18); pointer-events: none; }
-.environment-footer { position: sticky; bottom: calc(-1 * var(--room-padding)); z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 22px calc(-1 * var(--room-padding)) calc(-1 * var(--room-padding)); padding: 16px var(--room-padding); background: #121a18; border-top: 1px solid #ffffff18; }
-.environment-footer p { margin: 0; color: #b5b4a9; font-size: 12px; }
-.environment-footer .primary-button { margin: 0; white-space: nowrap; min-height: 44px; }
-@media (max-width: 540px) {
-  #environment-dialog { --room-padding: 18px; border-radius: 18px; }
-  .environment-heading h2 { font-size: 25px; }
-  .environment-options { gap: 10px; }
-  .room-art { height: 94px; }
-  .room-table { transform: perspective(220px) rotateX(38deg) rotateZ(-13deg) scale(.8); }
-  .room-copy { padding: 12px; }.room-copy strong { font-size: 18px; }.room-copy .eyebrow { font-size: 7px; letter-spacing: .5px; }
-  .environment-footer { gap: 12px; margin-top: 16px; }
-  .environment-footer .primary-button { padding-inline: 20px; }
-}
-
-@media (min-width: 541px) and (max-height: 800px) {
-  .room-art { height: 95px; }
-  #environment-dialog { padding-block: 20px; }
-  .environment-footer { margin-top: 16px; }
-}
-
-.room-minimal .room-art { background: radial-gradient(ellipse at center, #27382a, #0a0a0d); }
-.room-minimal .room-table { background: #27623e; border-color: #694b30; bottom: 18px; }
-
-.environment-utilities { display: flex; align-items: center; gap: 2px; }
-@media (max-width: 540px) {
-  .environment-heading { align-items: flex-start; gap: 6px; }
-  .environment-utilities { flex-direction: column-reverse; align-items: flex-end; }
-  .environment-utilities .quiet-button { min-height: 44px; padding: 8px; }
-}
+@media (hover: none) { .shortcuts { display: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .room-photo { transition: none; } }

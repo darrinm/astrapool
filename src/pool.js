@@ -47,7 +47,10 @@ let difficulty = 'medium', onlineShotSeq = null, onlineShooter = null;
 let overhead = false, hudObserver;
 const online = new OnlineRoom(receiveOnline, text => {
   document.getElementById('online-status').textContent = text;
-  document.getElementById('invite-link').value = online.id ? `${location.origin}/#room=${online.id}` : '';
+  const invite = document.getElementById('invite-link');
+  invite.value = online.id ? `${location.origin}/#room=${online.id}` : '';
+  document.querySelector('.online-row').hidden = !online.id;
+  document.getElementById('online-retry').hidden = !!online.id && online.connected.every(Boolean);
 });
 const remoteTurn = () => gameMode === 'online' && (!online.canAct || match.turn !== online.seat);
 const computerTurn = () => gameMode === 'computer' && match.turn === 1 && match.winner === null;
@@ -131,7 +134,7 @@ async function setEnvironment(id) {
   room?.dispose(); room = next; scene.add(room.group);
   renderer.shadowMap.needsUpdate = true;
   document.documentElement.dataset.environment = theme.id;
-  const label = document.getElementById('environment-name'); if (label) label.textContent = theme.name;
+  applyRoomAccent(theme);
   if (!minimal && atDefaultView) resetView();
   return true;
 }
@@ -368,6 +371,16 @@ function resetView() {
   controls.update();
 }
 
+// The chrome borrows the room's own accent, so the HUD belongs to the table it sits on.
+function applyRoomAccent(theme) {
+  const root = document.documentElement.style;
+  const accent = theme.accent || '#e7c58b';
+  root.setProperty('--accent', accent);
+  root.setProperty('--accent-wash', `${accent}1f`);
+  // Room accents are all light; pick ink dark enough to read on any of them.
+  root.setProperty('--accent-ink', '#191307');
+}
+
 // ---------- look: dark room, tone mapping, environment reflections, glossy balls ----------
 function setLook(on) {
   if (on) {
@@ -453,7 +466,7 @@ function setInteractionMode(mode) {
   endGesture();
   interactionMode = mode;
   document.querySelectorAll('#mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
-  document.getElementById('spin-control').hidden = mode !== 'cue';
+  document.getElementById('open-spin').hidden = mode !== 'cue';
   updateScore();
 }
 const onTable = (h) => h.mesh.visible && h.body.isEnabled() && !pocketedSet.has(h) && h.body.translation().z > BALL_Z - 0.5;
@@ -557,28 +570,26 @@ function showGameControls(show) {
   const games = document.getElementById('game-mode');
   if (!games.dataset.wired) {
     games.dataset.wired = '1';
-    games.addEventListener('change', () => {
-      const next = games.value;
-      if (!startGame(next)) games.value = gameMode;
-    });
+    games.querySelectorAll('button').forEach(b => b.addEventListener('click', () => startGame(b.dataset.game)));
     document.getElementById('online-retry').addEventListener('click', () => { if (online.id) online.join(online.id); else void online.create(); });
     document.getElementById('copy-invite').addEventListener('click', async () => {
       const field = document.getElementById('invite-link');
       try { await navigator.clipboard.writeText(field.value); document.getElementById('online-status').textContent = 'Invite link copied. Send it to your friend.'; }
       catch { field.focus(); field.select(); document.getElementById('online-status').textContent = 'Select and copy this invite link.'; }
     });
-    document.getElementById('difficulty').addEventListener('change', e => {
-      difficulty = e.target.value;
+    document.querySelectorAll('#difficulty button').forEach(b => b.addEventListener('click', () => {
+      difficulty = b.dataset.difficulty;
+      document.querySelectorAll('#difficulty button').forEach(o => o.setAttribute('aria-pressed', String(o.dataset.difficulty === difficulty)));
       if (computerTurn() && !activeShot) { cancelComputerSearch(); computerPlan = null; computerWait = 0; endAim(); }
-    });
+    }));
     document.getElementById('overhead-view').addEventListener('click', overheadView);
     document.getElementById('rematch').addEventListener('click', restart);
-    document.querySelectorAll('#pocket-call button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#pocket-map button').forEach(b => b.addEventListener('click', () => {
       calledPocket = Number(b.dataset.pocket); updateScore();
     }));
   }
   wireOnce(modeEl, (b) => setInteractionMode(b.dataset.mode));
-  if (show) setInteractionMode(interactionMode); else document.getElementById('spin-control').hidden = true;
+  if (show) setInteractionMode(interactionMode);
 }
 function setSpin(x, y) {
   const len = Math.hypot(x, y), scale = len > 0.7 ? 0.7 / len : 1;
@@ -586,6 +597,8 @@ function setSpin(x, y) {
   document.getElementById('open-spin').dataset.active = String(Math.hypot(spin.x, spin.y) > 0.01);
   const dot = spinEl.querySelector('.dot');
   dot.style.left = `${50 + spin.x * 50}%`; dot.style.top = `${50 - spin.y * 50}%`;
+  const bead = document.querySelector('#open-spin .spin-bead');
+  if (bead) { bead.style.setProperty('--sx', spin.x); bead.style.setProperty('--sy', spin.y); }
   const caption = document.querySelector('.spin-caption');
   if (caption) caption.textContent = spinName(spin);
 }
@@ -659,7 +672,7 @@ let pocketMapKey = '', pocketMapEl = null, pocketCallEl = null;
 const projected = new THREE.Vector3();   // scratch: this runs every frame, so it must not allocate
 function layoutPocketMap() {
   const map = pocketMapEl ||= document.getElementById('pocket-map');
-  const panel = pocketCallEl ||= document.getElementById('pocket-call');
+  const panel = pocketCallEl ||= document.getElementById('panel-pockets');
   // Checked by attribute, never by offsetParent: this runs each frame and must not force a reflow.
   if (!map || !panel || panel.hidden || !pockets.length) return;
   const at = (i) => { const v = projected.set(pockets[i].x, pockets[i].y, FELT_Z).project(camera); return { x: v.x, y: -v.y }; };
@@ -704,15 +717,14 @@ function updateScore() {
   document.getElementById('interaction-group').hidden = !free;
   document.getElementById('rerack').textContent = free ? 'Re-rack ↻' : 'New rack ↻';
   document.getElementById('rematch').hidden = free || match.winner === null;
-  document.getElementById('pocket-call').hidden = free || match.winner !== null || !!activeShot || match.ballInHand || computerTurn() || remoteTurn() || !onEight();
+  document.getElementById('panel-pockets').hidden = free || match.winner !== null || !!activeShot || match.ballInHand || computerTurn() || remoteTurn() || !onEight();
   const pocketButton = document.getElementById('open-pockets');
-  pocketButton.hidden = document.getElementById('pocket-call').hidden;
+  pocketButton.hidden = document.getElementById('panel-pockets').hidden;
   pocketButton.textContent = calledPocket === null ? 'Call pocket' : 'Pocket ✓';
   layoutPocketMap();   // before the title below, which quotes the label this rewrites
   pocketButton.title = calledPocket === null ? 'Choose the 8-ball pocket' : document.querySelector(`#pocket-call [data-pocket="${calledPocket}"]`).getAttribute('aria-label');
   document.getElementById('open-spin').hidden = interactionMode !== 'cue' || !!activeShot || computerTurn() || remoteTurn() || (!free && match.winner !== null);
-  document.getElementById('open-settings').firstChild.textContent = gameMode === 'online' ? 'Room ' : 'Game ';
-  document.querySelectorAll('#pocket-call button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.pocket) === calledPocket)));
+  document.querySelectorAll('#pocket-map button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.pocket) === calledPocket)));
   if (!free) for (let i = 0; i < 2; i++) {
     const card = document.getElementById(`player-${i}`);
     card.classList.toggle('active', match.winner === null && match.turn === i);
@@ -775,7 +787,8 @@ function fitOverhead() {
 function startGame(mode, roomId = null) {
   if (!roomId && shots && (gameMode === 'free' || match.winner === null) && !window.confirm('Start a new game and clear this rack?')) return false;
   online.leave(); history.replaceState(null, '', location.pathname);
-  gameMode = mode; document.getElementById('game-mode').value = mode;
+  gameMode = mode;
+  document.querySelectorAll('#game-mode button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.game === mode)));
   document.getElementById('rematch').disabled = false; document.getElementById('rematch').textContent = 'Rematch'; match = newMatch(); layout();
   if (mode === 'online') { if (roomId) online.join(roomId); else void online.create(); }
   setInteractionMode('cue');
