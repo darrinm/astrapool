@@ -39,6 +39,11 @@ export const eventQueue = new RAPIER.EventQueue(true);   // drained by scenes th
 // ---------- heads ----------
 const loader = new THREE.TextureLoader();
 const geometry = new THREE.SphereGeometry(RADIUS, 64, 48);
+const compactGeometry = new THREE.SphereGeometry(RADIUS, 32, 24);
+// Preserve the original silhouette for close views; normal play needs far fewer vertices.
+export function setBallDetail(mesh, screenRadius) {
+  mesh.geometry = screenRadius > 24 ? geometry : compactGeometry;
+}
 export const heads = []; // { id, body, mesh }
 let headRadius = RADIUS;
 

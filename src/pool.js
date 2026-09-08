@@ -8,11 +8,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
-import { RAPIER, DEPTH, renderer, scene, camera, world, eventQueue, heads, lights, DEFAULT_LIGHTS, resetHeads, placeHead, hideHead,
+import { RAPIER, DEPTH, renderer, scene, camera, world, eventQueue, heads, lights, DEFAULT_LIGHTS, setBallDetail, resetHeads, placeHead, hideHead,
   setHeadRadius, addMesh, addBody, addStaticCollider, registerProp, clearProps, pointerToPlane, meshUnderPointer, ui } from './core.js';
 import { noiseBump, feltMap, woodMap, clothNormal, radialShadow, gradientStrip } from './textures.js';
 import { bakeCap, authenticBall, BALL_COLORS } from './ballcaps.js';
 import { PoolAudio } from './sounds.js';
+import { trackShadowChanges } from './shadow-updates.js';
 import { buildEnvironment, environmentById, readEnvironment } from './environments.js';
 import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
@@ -51,6 +52,7 @@ const numberOf = ball => ball.number ?? ballNumber(rackIndexOfHead(heads.indexOf
 // The cue ball is always a plain white ball, and the plain black 8 sits at the centre of the rack. The 14 heads
 // take the other numbers (1-7 and 9-15). `extras` holds the two plain balls; `objects()` is the rack order.
 let extras = [];
+const shadowsChanged = trackShadowChanges();
 const rackIndexOfHead = (i) => (i < 4 ? i : i + 1);                 // the 8 occupies rack index 4 (centre of row 3)
 const objects = () => { const eight = extras.find((e) => e.number === 8); return [...heads.slice(0, 4), eight, ...heads.slice(4)].filter(Boolean); };
 const allBalls = () => [cue, ...objects()].filter(Boolean);
@@ -123,6 +125,7 @@ async function setEnvironment(id) {
   scene.environmentRotation.set(minimal ? 0 : Math.PI / 2, 0, 0);
   scene.environmentIntensity = minimal ? 0.5 : 0.8;
   room?.dispose(); room = next; scene.add(room.group);
+  renderer.shadowMap.needsUpdate = true;
   document.documentElement.dataset.environment = theme.id;
   const label = document.getElementById('environment-name'); if (label) label.textContent = theme.name;
   if (!minimal && atDefaultView) resetView();
@@ -949,6 +952,7 @@ export default {
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     hudObserver?.disconnect(); hudObserver = null;
     controls?.dispose(); controls = null; setLook(false);
+    renderer.shadowMap.autoUpdate = true;
   },
   key(k) { if (k === 'escape') endGesture(); if (k === 'r') restart(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue'); },
   resize() {
@@ -1003,7 +1007,6 @@ export default {
   pointercancel: endGesture,   // explicit cancellation never fires a shot or fling
   step() {
     drainSounds();
-    if (aiming) updateGuide();
     rollingResistance(world.timestep);
     updateDrag();
     physicsTime += world.timestep;
@@ -1019,15 +1022,22 @@ export default {
   audio,
   frame() {
     controls?.update();
+    if (aiming) updateGuide();
     audio.setMuted(!!window.playful?.mute || document.hidden);
     const fade = THREE.MathUtils.clamp((fixtureFade[1] - camera.position.z) / (fixtureFade[1] - fixtureFade[0]), 0, 1);   // lamp fixture fades as the camera climbs to it
     for (const m of fixture) { m.visible = fade > 0; m.material.opacity = fade; }
     if (capsOn && capped.size < heads.length) applyCaps();
-    allBalls().forEach((h, i) => {
+    const balls = allBalls();
+    const pixelScale = innerHeight * renderer.getPixelRatio() * camera.projectionMatrix.elements[5] / 2;
+    balls.forEach((h, i) => {
+      setBallDetail(h.mesh, R * pixelScale / h.mesh.position.distanceTo(camera.position));
       const cs = contactShadows[i]; if (!cs) return;
       const t = h.body.translation(), on = h.mesh.visible && h.body.isEnabled() && t.z > BALL_Z - 0.3;
       cs.visible = on; if (on) cs.position.set(h.mesh.position.x, h.mesh.position.y, FELT_Z + 0.015);
     });
+    // Update shadows only when a ball or the cue changes, including hiding a pocketed ball.
+    renderer.shadowMap.autoUpdate = false;
+    if (shadowsChanged([...balls.map(ball => ball.mesh), cueStick, cueStick.holder])) renderer.shadowMap.needsUpdate = true;
     if (pocketMarker) {
       pocketMarker.visible = gameMode !== 'free' && calledPocket !== null && match.winner === null;
       if (pocketMarker.visible) { const p = pockets[calledPocket]; pocketMarker.position.set(p.x, p.y, FELT_Z + RAIL_H); }

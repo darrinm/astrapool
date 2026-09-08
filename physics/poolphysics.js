@@ -128,25 +128,26 @@ export function strike(body, dir, speed, spin = { x: 0, y: 0 }) {
 
 // Per-step extras Rapier does not model: rolling resistance once rolling, friction against spin about the
 // table normal, and a clean stop when nearly still. `ballZ` is the resting centre height; balls below it
-// (falling into a pocket) are left alone.
+// (falling into a pocket) are left alone. Friction must not wake resting bodies;
+// shots and collisions wake them when movement resumes.
 export function feltExtras(bodies, dt, ballZ) {
   const { R, G, MU_ROLL, SPIN_DECEL, REST_V, REST_W } = P;
   for (const body of bodies) {
-    if (!body.isEnabled()) continue;
+    if (!body.isEnabled() || body.isSleeping()) continue;
     const t = body.translation(); if (t.z < ballZ - 0.3) continue;
     const v = body.linvel(), w = body.angvel(), speed = Math.hypot(v.x, v.y);
     if (Math.abs(w.z) > 0) {
       const dz = Math.min(Math.abs(w.z), SPIN_DECEL * dt) * Math.sign(w.z);
-      body.setAngvel({ x: w.x, y: w.y, z: w.z - dz }, true); w.z -= dz;
+      body.setAngvel({ x: w.x, y: w.y, z: w.z - dz }, false); w.z -= dz;
     }
     const slip = Math.hypot(v.x - R * w.y, v.y + R * w.x);
-    if (speed < REST_V && Math.hypot(w.x, w.y) < REST_W && Math.abs(w.z) < 0.5) { body.setLinvel({ x: 0, y: 0, z: v.z }, true); body.setAngvel({ x: 0, y: 0, z: 0 }, true); continue; }
+    if (speed < REST_V && Math.hypot(w.x, w.y) < REST_W && Math.abs(w.z) < 0.5) { body.setLinvel({ x: 0, y: 0, z: v.z }, false); body.setAngvel({ x: 0, y: 0, z: 0 }, false); continue; }
     if (speed > 0 && slip < 0.8) {
       // Rolling resistance acts on the whole rolling state: slow the velocity and the rolling spin together,
       // otherwise the felt converts the untouched spin back into speed and only 5/7 of the deceleration lands.
       const a = Math.min(MU_ROLL * G, speed / dt), k = (speed - a * dt) / speed;
-      body.setLinvel({ x: v.x * k, y: v.y * k, z: v.z }, true);
-      body.setAngvel({ x: w.x * k, y: w.y * k, z: w.z }, true);
+      body.setLinvel({ x: v.x * k, y: v.y * k, z: v.z }, false);
+      body.setAngvel({ x: w.x * k, y: w.y * k, z: w.z }, false);
     }
   }
 }

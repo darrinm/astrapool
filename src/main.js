@@ -47,7 +47,7 @@ addEventListener('resize', () => {
 let last = performance.now();
 const perf = { frames: 0, worst: 0, step: 0, render: 0, steps: 0, slow: 0, gaps: 0, reset() { this.frames = this.worst = this.step = this.render = this.steps = this.slow = this.gaps = 0; } };
 function tick() { snapshotPoses(); current.step(); world.step(eventQueue); }
-window.playful = { heads, world, camera, scene3: scene, THREE, tick, scene: () => current, perf, mute: false }; // debug handle
+window.playful = { heads, world, renderer, camera, scene3: scene, THREE, tick, scene: () => current, perf, mute: false }; // debug handle
 function animate(now) {
   requestAnimationFrame(animate);
   const t0 = performance.now();
