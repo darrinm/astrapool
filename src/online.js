@@ -1,4 +1,5 @@
 const VERSION = 1;
+const AIM_SEND_INTERVAL = 25, AIM_BLEND_TIME = 40;
 export function roomToken() {
   if (crypto.randomUUID) return crypto.randomUUID();
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -12,7 +13,7 @@ export class OnlineRoom {
     this.id = null; this.socket = null; this.seq = 0; this.seat = null;
     this.connected = [false, false]; this.pending = false; this.waiting = false;
     this.generation = 0; this.retry = 0; this.synced = false; this.result = null; this.error = null; this.errorResync = false;
-    this.aim = null; this.aimReceivedAt = 0; this.lastAim = null;
+    this.aim = null; this.aimFrom = null; this.aimReceivedAt = 0; this.lastAim = null;
   }
   get canAct() { return this.socket?.readyState === WebSocket.OPEN && this.seat !== null && this.connected.every(Boolean) && !this.pending && !this.waiting; }
   async create() {
@@ -48,6 +49,8 @@ export class OnlineRoom {
       const data = JSON.parse(e.data);
       if (data.type === 'aim') {
         if (!this.synced || this.pending || !this.connected.every(Boolean) || data.seq !== this.seq || data.seat !== 1 - this.seat) return;
+        // Start at the currently displayed pose, even if a new packet interrupts a blend.
+        this.aimFrom = data.aim ? this.remoteAim || data.aim : null;
         this.aim = data.aim; this.aimReceivedAt = performance.now();
         return;
       }
@@ -101,7 +104,7 @@ export class OnlineRoom {
     if (aim !== null && !this.canAct) return false;
     if (aim === null && !this.lastAim) return false;
     const encoded = JSON.stringify(aim);
-    if (aim !== null && this.lastAim && (now - this.lastAim.at < 50 ||
+    if (aim !== null && this.lastAim && (now - this.lastAim.at < AIM_SEND_INTERVAL ||
         (encoded === this.lastAim.encoded && now - this.lastAim.at < 1000))) return false;
     // Do not set waiting: previews are unacknowledged and must never block the shot.
     this.socket.send(JSON.stringify({ type: 'aim', seq: this.seq, aim }));
@@ -109,12 +112,22 @@ export class OnlineRoom {
     return true;
   }
   get remoteAim() {
-    return this.aim && performance.now() - this.aimReceivedAt < 2500 ? this.aim : null;
+    const elapsed = performance.now() - this.aimReceivedAt;
+    if (!this.aim || elapsed >= 2500) return null;
+    const t = Math.min(elapsed / AIM_BLEND_TIME, 1), from = this.aimFrom, to = this.aim;
+    if (t >= 1 || from === to) return to;
+    if (t <= 0) return from;
+    const mix = (a, b) => a + (b - a) * t;
+    const start = Math.atan2(from.dir.y, from.dir.x), end = Math.atan2(to.dir.y, to.dir.x);
+    // Follow the shortest arc across ±π and keep direction normalized, including opposite aims.
+    const angle = start + Math.atan2(Math.sin(end - start), Math.cos(end - start)) * t;
+    return { dir: { x: Math.cos(angle), y: Math.sin(angle) }, pull: mix(from.pull, to.pull),
+      spin: { x: mix(from.spin.x, to.spin.x), y: mix(from.spin.y, to.spin.y) } };
   }
   leave() {
     this.generation++; clearTimeout(this.reconnect); clearInterval(this.heartbeat);
     this.socket?.close(); this.synced = false; this.socket = null; this.id = null; this.seat = null;
     this.connected = [false, false]; this.pending = false; this.waiting = false; this.result = null; this.error = null; this.errorResync = false;
-    this.aim = null; this.lastAim = null;
+    this.aim = null; this.aimFrom = null; this.lastAim = null;
   }
 }

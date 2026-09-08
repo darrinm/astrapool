@@ -89,7 +89,8 @@ test('live cues relay only the active player, preserve the table, and do not con
   one.send('aim', { aim: { ...aim, pull: 25 } });
   one.send('aim', { aim, seat: 1 });
   assert.deepEqual(await two.wait(m => m.type === 'aim'), { type: 'aim', seq: 0, seat: 0, aim });
-  for (let i = 0; i < 45; i++) one.send('aim', { aim: { ...aim, pull: i / 2 } });
+  // More than a full 10-second window at 40 Hz, sent as a burst to exercise budget headroom.
+  for (let i = 0; i < 420; i++) one.send('aim', { aim: { ...aim, pull: (i % 48) / 2 } });
   one.send('aim', { aim: null });
   await two.wait(m => m.type === 'aim' && m.aim === null);
   const action = { dir: { x: 1, y: 0 }, speed: 100, spin: { x: 0, y: 0 }, calledPocket: null };
@@ -97,7 +98,7 @@ test('live cues relay only the active player, preserve the table, and do not con
   const shot = await one.wait(m => m.type === 'shot'); await two.wait(m => m.type === 'shot');
   assert.equal(shot.seq, 1); assert.deepEqual(shot.snapshot, initial.snapshot);
   assert.equal(one.messages.some(m => m.type === 'aim' || m.type === 'error'), false);
-  assert.equal(two.messages.filter(m => m.type === 'aim').length, 45);
+  assert.equal(two.messages.filter(m => m.type === 'aim').length, 420);
   two.messages.length = 0;
   one.send('aim', { aim }); // Cannot show a cue while balls are moving.
   one.send('result', { report: { first: null, rails: [], pocketed: [], offTable: [] }, balls: initial.snapshot.balls });

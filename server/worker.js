@@ -54,7 +54,7 @@ export class PoolRoom extends DurableObject {
     const preview = message?.type === 'aim' && Number.isInteger(connection.seat);
     const counter = preview ? 'aimCount' : 'count';
     connection[counter] = (connection[counter] || 0) + 1; ws.serializeAttachment(connection);
-    if (connection[counter] > (preview ? 300 : 40)) { ws.close(1008, 'Too many requests'); return; }
+    if (connection[counter] > (preview ? 600 : 40)) { ws.close(1008, 'Too many requests'); return; }
     if (preview) {
       const { snapshot, seq, pending } = this.room;
       if (message.seq !== seq || connection.seat !== snapshot.match.turn || pending ||

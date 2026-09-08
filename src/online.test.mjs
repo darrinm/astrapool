@@ -8,16 +8,71 @@ test('aim previews are throttled, refreshed while held, and never block a shot o
   const { room } = setup(t);
   assert.equal(room.sendAim(aim, 0), true);
   assert.equal(room.canAct, true);
-  assert.equal(room.sendAim({ ...aim, pull: 10 }, 25), false);
-  assert.equal(room.sendAim({ ...aim, pull: 10 }, 50), true);
+  assert.equal(room.sendAim({ ...aim, pull: 10 }, 24), false);
+  assert.equal(room.sendAim({ ...aim, pull: 10 }, 25), true);
   assert.equal(room.sendAim({ ...aim, pull: 10 }, 1000), false);
-  assert.equal(room.sendAim({ ...aim, pull: 10 }, 1050), true);
+  assert.equal(room.sendAim({ ...aim, pull: 10 }, 1025), true);
   assert.equal(room.send('shoot', { action: {} }), true);
   assert.equal(room.sendAim(aim, 1100), false);
   assert.equal(room.sendAim(null, 1101), true, 'clear immediately even while awaiting the shot');
   assert.equal(room.sendAim(null, 1102), false);
   assert.deepEqual(room.socket.sent.map(m => m.type), ['aim', 'aim', 'aim', 'shoot', 'aim']);
   assert.equal(room.socket.sent.at(-1).aim, null);
+});
+
+test('remote cue blends direction, pull and spin on every frame and reaches the final pose', t => {
+  const { room } = setup(t);
+  let now = 0; t.mock.method(performance, 'now', () => now);
+  const next = { dir: { x: 0, y: 1 }, pull: 16, spin: { x: -0.2, y: 0.3 } };
+  const send = value => room.socket.message({ type: 'aim', seq: 0, seat: 1, aim: value });
+  send(aim); assert.deepEqual(room.remoteAim, aim, 'first pose appears immediately');
+  now = 25; send(next);
+  assert.deepEqual(room.remoteAim, aim, 'new packets do not snap the displayed cue');
+  now = 45;
+  const midway = room.remoteAim;
+  assert.ok(Math.abs(Math.atan2(midway.dir.y, midway.dir.x) - Math.PI / 4) < 1e-12);
+  assert.equal(midway.pull, 12); assert.deepEqual(midway.spin, { x: 0, y: 0 });
+  now = 65; assert.deepEqual(room.remoteAim, next);
+  now = 1000; send(next); assert.deepEqual(room.remoteAim, next, 'held poses stay still on refresh');
+});
+
+test('new aim packets continue from the displayed pose and cancellation stops a blend immediately', t => {
+  const { room } = setup(t);
+  let now = 0; t.mock.method(performance, 'now', () => now);
+  const send = value => room.socket.message({ type: 'aim', seq: 0, seat: 1, aim: value });
+  send(aim); now = 25; send({ ...aim, pull: 16 }); now = 45;
+  const midway = room.remoteAim;
+  send({ ...aim, pull: 24 }); assert.deepEqual(room.remoteAim, midway);
+  now = 65; assert.equal(room.remoteAim.pull, 18);
+  send(null); assert.equal(room.remoteAim, null);
+  send(aim); assert.deepEqual(room.remoteAim, aim, 'a new gesture does not blend from a canceled one');
+  now = 3000; send({ ...aim, pull: 20 });
+  assert.equal(room.remoteAim.pull, 20, 'expired poses are not reused after a network gap');
+});
+
+test('cue rotation crosses the angle seam by the shortest arc and stays normalized', t => {
+  const { room } = setup(t);
+  let now = 0; t.mock.method(performance, 'now', () => now);
+  const send = angle => room.socket.message({ type: 'aim', seq: 0, seat: 1,
+    aim: { ...aim, dir: { x: Math.cos(angle), y: Math.sin(angle) } } });
+  send(Math.PI - 0.1); now = 25; send(-Math.PI + 0.1); now = 45;
+  assert.ok(room.remoteAim.dir.x < -0.999);
+  assert.ok(Math.abs(room.remoteAim.dir.y) < 1e-12);
+  now = 100; send(0);
+  for (now = 105; now <= 140; now += 5) assert.ok(Math.abs(Math.hypot(room.remoteAim.dir.x, room.remoteAim.dir.y) - 1) < 1e-12);
+});
+
+test('cue interpolation depends on elapsed time rather than display frame rate', t => {
+  const { room } = setup(t);
+  let now = 0; t.mock.method(performance, 'now', () => now);
+  const sample = frameInterval => {
+    room.aim = null; now = 0;
+    room.socket.message({ type: 'aim', seq: 0, seat: 1, aim });
+    now = 25; room.socket.message({ type: 'aim', seq: 0, seat: 1, aim: { ...aim, pull: 24 } });
+    for (now = 25; now < 55; now += frameInterval) void room.remoteAim;
+    now = 55; return room.remoteAim;
+  };
+  assert.deepEqual(sample(1000 / 60), sample(1000 / 144));
 });
 
 test('remote previews ignore old tables and own seat without changing action availability or status', t => {
