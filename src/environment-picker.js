@@ -17,7 +17,7 @@ export function connectEnvironmentPicker(game) {
     const button = document.createElement('button'); button.className = `environment-card room-${theme.id}`; button.dataset.room = theme.id;
     button.setAttribute('aria-label', `Preview ${theme.name}`);
     // All copy and IDs come from the fixed, local room catalog.
-    button.innerHTML = `<span class="room-art" aria-hidden="true">${theme.id === 'minimal' ? '<span class="room-table"><i></i></span>' : `<img class="room-photo" src="/environments/${theme.id}-preview.webp" alt="" loading="lazy" width="640" height="320">`}<span class="room-number">${theme.id === 'minimal' ? '•' : `0${ENVIRONMENTS.indexOf(theme)}`}</span><span class="room-check">✓</span></span><span class="room-copy"><span class="eyebrow">${theme.time}</span><strong>${theme.name}</strong><span>${theme.description}</span></span>`;
+    button.innerHTML = `<span class="room-art" aria-hidden="true">${theme.id === 'minimal' ? '<span class="room-table"><i></i></span>' : `<img class="room-photo" src="/environments/${theme.id}-preview.webp" alt="" loading="lazy" width="640" height="320">`}<span class="room-check">✓</span></span><span class="room-copy"><strong>${theme.name}</strong></span>`;
     button.addEventListener('click', async () => {
       const current = ++request;
       preview = theme.id; loading = true; error = ''; update();
