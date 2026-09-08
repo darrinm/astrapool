@@ -9,7 +9,8 @@ export function connectEnvironmentPicker(game) {
   function update() {
     options.querySelectorAll('button').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.room === preview)));
     const theme = environmentById(preview);
-    document.getElementById('environment-preview-status').textContent = error || (loading ? `Opening ${theme.name}…` : theme.name);
+    // Silent at rest: the checked card already names the room.
+    document.getElementById('environment-preview-status').textContent = error || (loading ? `Opening ${theme.name}…` : '');
     options.setAttribute('aria-busy', String(loading));
     apply.disabled = loading;
   }

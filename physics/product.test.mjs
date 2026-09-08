@@ -38,8 +38,9 @@ test('rack-ending feedback explains the loss and is unchanged by later reports',
 
 test('remaining-ball labels and personal names agree with the active game', () => {
   assert.equal(playerText('Player 1 to break. Player 1 shooting…', 'computer'), 'Your break. You are shooting…');
-  assert.equal(groupLabel('stripes', [1, 9, 10]), 'stripes · 5 remaining');
-  assert.equal(groupLabel('solids', [1, 2, 3, 4, 5, 6, 7]), 'solids cleared · 8-ball next');
+  // Capitalised by the copy, not by a CSS text-transform that also title-cased the rest.
+  assert.equal(groupLabel('stripes', [1, 9, 10]), 'Stripes · 5 remaining');
+  assert.equal(groupLabel('solids', [1, 2, 3, 4, 5, 6, 7]), 'Solids cleared · 8-ball next');
   assert.equal(groupLabel(null, [6]), 'Groups not assigned');
   assert.equal(playerText('Player 1’s turn. Player 2 wins!', 'computer'), 'Your turn. Computer wins!');
   assert.equal(playerText('Player 2 continues. Player 1 breaks.', 'online', 1), 'You continue. Friend breaks.');

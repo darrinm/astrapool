@@ -37,5 +37,8 @@ export function groupLabel(group, down) {
   if (!group) return 'Groups not assigned';
   const start = group === 'solids' ? 1 : 9;
   const remaining = Array.from({ length: 7 }, (_, i) => start + i).filter(n => !down.includes(n)).length;
-  return remaining ? `${group} · ${remaining} remaining` : `${group} cleared · 8-ball next`;
+  // Capitalise here, where we know which word is the group name. A CSS text-transform
+  // would also title-case the rest of the sentence ("Groups Not Assigned").
+  const name = group[0].toUpperCase() + group.slice(1);
+  return remaining ? `${name} · ${remaining} remaining` : `${name} cleared · 8-ball next`;
 }

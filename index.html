@@ -25,27 +25,30 @@
           <details class="help">
             <summary class="quiet-button" title="Controls and shortcuts">Help <span aria-hidden="true">?</span></summary>
             <div class="help-panel">
-              <h2>Pool house rules</h2>
-              <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>
-              <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack. Regular shots need no pocket call.</p>
-              <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed. All three follow the same rules.</p>
-              <p>In Cue mode, pull back from the white ball and release to shoot. In Free Play’s Fling mode, grab any ball and throw it. Hold still to place it.</p>
-              <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag / two fingers</dd></div><div><dt>Zoom</dt><dd>Scroll / pinch</dd></div><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Heads / balls</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
+              <h2>How to play</h2>
+              <p class="help-lede">In Cue mode, pull back from the white ball and release to shoot. In Free Play’s Fling mode, grab any ball and throw it — hold still to place it.</p>
+              <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag / two fingers</dd></div><div><dt>Zoom</dt><dd>Scroll / pinch</dd></div></dl>
+              <dl class="shortcuts"><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Heads / balls</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
+              <details class="rules"><summary>House rules</summary>
+                <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>
+                <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack. Regular shots need no pocket call.</p>
+                <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed. All three follow the same rules.</p>
+              </details>
             </div>
           </details>
         </div>
       </header>
       <section id="online-panel" class="online-panel" aria-label="Private online room" hidden>
         <p id="online-status" role="status">Create a room and invite a friend.</p>
-        <div><input id="invite-link" aria-label="Invite link" readonly><button id="copy-invite" class="quiet-button">Copy invite</button><button id="online-retry" class="quiet-button">Reconnect</button></div>
+        <div><input id="invite-link" aria-label="Invite link" placeholder="Creating room…" readonly><button id="copy-invite" class="quiet-button">Copy invite</button><button id="online-retry" class="quiet-button">Reconnect</button></div>
       </section>
       <div class="bottom-hud">
         <div id="shot-result" class="shot-result" hidden><span class="eyebrow">Last shot</span><p id="shot-result-text" role="status"></p></div>
         <div class="guidance"><div id="status" role="status"></div><p id="hint"></p></div>
         <div class="shot-controls">
           <div id="pocket-call" class="pocket-call" hidden>
-            <span class="eyebrow">Call the 8-ball pocket · break end on the left</span>
-            <div class="pocket-map"><button data-pocket="0" aria-pressed="false">Near left</button><button data-pocket="1" aria-pressed="false">Side left</button><button data-pocket="2" aria-pressed="false">Far left</button><button data-pocket="3" aria-pressed="false">Near right</button><button data-pocket="4" aria-pressed="false">Side right</button><button data-pocket="5" aria-pressed="false">Far right</button></div>
+            <span class="eyebrow">Call the 8-ball pocket</span>
+            <div id="pocket-map" class="pocket-map" role="group" aria-label="Pocket for the 8-ball"><!-- layoutPocketMap() in pool.js rewrites these labels to match the map it turns to face the camera. --><button data-pocket="0" aria-pressed="false" aria-label="Top left pocket"></button><button data-pocket="1" aria-pressed="false" aria-label="Top middle pocket"></button><button data-pocket="2" aria-pressed="false" aria-label="Top right pocket"></button><button data-pocket="3" aria-pressed="false" aria-label="Bottom left pocket"></button><button data-pocket="4" aria-pressed="false" aria-label="Bottom middle pocket"></button><button data-pocket="5" aria-pressed="false" aria-label="Bottom right pocket"></button></div>
           </div>
           <section id="spin-control" class="spin-panel" aria-label="Cue spin" hidden>
             <div class="spin-heading"><span class="eyebrow">Cue spin</span><button id="reset-spin" class="text-button">Reset</button></div>
@@ -75,7 +78,7 @@
       <div id="sheet-content"></div>
     </dialog>
     <dialog id="environment-dialog" aria-labelledby="environment-title">
-      <header class="environment-heading"><h2 id="environment-title">Where shall we play?</h2><div class="environment-utilities"><button id="cancel-environment" class="quiet-button" aria-label="Close room chooser">✕</button></div></header>
+      <header class="environment-heading"><h2 id="environment-title">Where shall we play?</h2><div class="environment-utilities"><button id="cancel-environment" class="quiet-button">Cancel</button></div></header>
       <div id="environment-options" class="environment-options" role="group" aria-label="Room previews"></div>
       <footer class="environment-footer"><p id="environment-preview-status" role="status"></p><button id="apply-environment" class="primary-button">Play here</button></footer>
     </dialog>

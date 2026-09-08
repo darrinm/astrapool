@@ -45,3 +45,42 @@ sampled audio, the 14 head maps, and the sound-effect pipeline. The head-map pip
 - [x] Stage 2 validation: 47 tests; Chrome computer break and four following shots pocketed seven balls, assigned groups, and returned a legal turn to the human.
 
 - [x] Stage 3 validation: 53 unit tests, 26 physics checks, real Worker/WebSocket lifecycle test, production build and Wrangler dry run. Two isolated Chrome sessions synchronized a real break and retained seats after refresh. Mobile HUD verified at 390 × 844; Balls is the default.
+
+## HUD review: desktop, mobile and dialogs (2026-09-07)
+Driven in Chrome at 1440×900, 390×844 and 844×390; offsets and contrast measured from the live DOM
+and the WebGL framebuffer rather than judged from screenshots.
+
+### Critical
+- [x] Pocket call was a 3×2 word grid while the six pockets project 2×3 on a phone — a 90° transpose,
+      and "break end on the left" was false in portrait. Now a schematic table; `layoutPocketMap()`
+      orients it from the projected pocket centres, so no copy explains the orientation.
+- [x] Status line sat on the canvas with only a text-shadow: 1.57:1 over The Glasshouse floor. It now
+      has the same panel every other cluster has — 9.33:1 worst case.
+- [x] `resize()` called `overheadView()` → `endGesture()`, so a URL-bar collapse (a resize with no size
+      change) cancelled the shot being aimed and reset the camera. It now ignores unchanged viewports
+      and never runs during a gesture.
+- [x] Portrait and short landscape were forced overhead, so phones never saw the room. Both now open on
+      an angled view framed for their aspect; Overhead stays one tap away.
+
+### High
+- [x] `text-transform: capitalize` title-cased whole sentences ("Groups Not Assigned"); `groupLabel()`
+      capitalises the group name instead
+- [x] Top bar is a three-column grid, so the match score is centred like the free-play score (was −52px)
+- [x] Guidance ordered last in `.bottom-hud`: hiding the setup dock no longer moves it (was a 158px jump)
+- [x] Compact bar, guidance and spin panel now share one bottom line
+- [x] Borrowed panels hide their own heading inside the sheet (no more doubled titles)
+- [x] `.quiet-button` has a resting surface — :hover never fires on touch
+- [x] Sheet actions are a grid; the destructive "New rack" gets its own row
+- [x] Help leads with the controls; rules collapsed; keyboard rows hidden under `(hover: none)`
+- [x] Sheet is bottom-anchored on compact viewports
+- [x] Spin names the contact point ("Top right") and the ball shows the clamp ring
+
+### Medium
+- [x] Minimal is a card like the other rooms; scroll fade above the sticky footer; "Cancel" replaces ✕;
+      footer status silent at rest; invite field has a placeholder; dock group tops align; landscape rail
+      hugs the bottom instead of claiming the column; duplicate Overhead removed from the sheet;
+      dead CSS deleted; empty ball-chip row no longer reserves space
+
+### Not done
+- [ ] Room previews are still raw equirectangular panoramas (bowed horizons). They want rendered
+      perspective stills from the game camera — an asset-pipeline job, not a CSS one.

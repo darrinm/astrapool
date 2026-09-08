@@ -35,3 +35,28 @@ Carried over from playful-photos when the pool game was extracted (2026-09-05).
 - Rule: browsers disagree on pointer-capture event order (w3c/pointerevents#357). Never treat lostpointercapture as
   a cancel when no button is held: it is the release.
 - Rule: a hidden tab has no rAF; the extension tab is hidden while tools run. Use headed Playwright for loop-dependent checks.
+
+## 2026-09-07 — Measuring a paused render loop
+- Verifying the pocket map, I read `camera.project()` from a tool call and got positions far off screen.
+  The tab is backgrounded while tools run, so there is no rAF: `camera.matrixWorldInverse` was whatever the
+  last visible frame left. The map itself was fine.
+- Rule: before projecting anything from a tool call, `camera.updateMatrixWorld(true)` and
+  `updateProjectionMatrix()` first. A stale matrix reads as a wrong answer, not as an error.
+- Rule: `element.hidden = false` does nothing if the element's `hidden` *attribute* is still set and you
+  have shadowed the property with `Object.defineProperty`. Remove the attribute too, or CSS keeps hiding it.
+
+## 2026-09-07 — An iframe resize that fires no resize event
+- Verifying the deferred-refit fix, the camera never re-framed and the fix looked broken. It wasn't:
+  setting an iframe's `width`/`height` attributes changes `innerWidth`/`innerHeight` but fires **no**
+  `resize` event, so the handler under test never ran. A listener counting events proved it: 0 fired.
+- Rule: before concluding a resize-driven fix is broken, assert the event actually fired. Change the
+  size *and* dispatch `new Event('resize')` — that pair is what a real rotation does.
+- Rule (again, the 2026-09-05 one): prove the measurement before touching the code. Two of the three
+  "failures" this session were the harness, not the product.
+
+## 2026-09-07 — Check a review's fix, not just its finding
+- A review reported the Minimal room preview overflowing the top of its clipped art panel and lowered
+  the table to compensate. Measured: at 18px it had 8px of headroom (no clip), and the "fix" pushed it
+  5px past the *bottom* edge at every breakpoint — a regression fixing a defect that did not exist.
+- Rule: for a visual finding, measure both edges before and after. A fix that only moves a box can
+  trade one overflow for another, and the claim reads just as plausibly either way.

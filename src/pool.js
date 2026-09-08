@@ -31,6 +31,10 @@ const SPEED_PER_PULL = MAX_SPEED / MAX_PULL;
 const FELT_Z = -DEPTH, BALL_Z = FELT_Z + R;
 const RAIL_W = 3.2, WELL_DEPTH = P.WELL_DEPTH;
 let cue, aiming = null, pockets = [], guide, cueStick, marker, pocketed = 0, shots = 0, spin = { x: 0, y: 0 }, spinEl, controls;
+let lastViewport = { w: innerWidth, h: innerHeight }, refitPending = false;
+// The three framings resetView() knows about. A change of shape needs a fresh camera, not just a
+// cleared view offset: a landscape position leaves half the table off a portrait screen.
+const viewShape = (w, h) => (h > w ? 'portrait' : h <= 600 ? 'short' : 'wide');
 let pocketedSet = new Set(), respotAt = 0, pmrem, envTex, feltCol, lastStatus = '', contactShadows = [], fixture = [], fixtureFade = [0, 1];
 const capped = new Map();   // head -> { plain, capped, ball } textures; caps are baked lazily once the plain map has loaded
 let capsOn = false;
@@ -346,13 +350,20 @@ function setupCamera() {
   });
   for (const selector of ['.topbar', '.bottom-hud']) hudObserver.observe(document.querySelector(selector));
 }
+// The default view shows the room the player picked. Portrait sights down the long rail so a tall
+// window still frames the whole table; Overhead stays one tap away in the compact bar.
 function resetView() {
-  if (innerHeight > innerWidth || innerHeight <= 600) { overheadView(); return; }
   overhead = false;
   camera.clearViewOffset();
   controls.minPolarAngle = 0.05;
   controls.target.set(0, 0, FELT_Z);
-  if (environmentId === 'minimal') camera.position.set(-HW * 1.6, 0, FELT_Z + 21);
+  // Portrait: back along the long rail and up ~30 degrees. Verified at 390x844 to hold every
+  // pocket and both side rails in frame while the room still reads behind the far end.
+  if (innerHeight > innerWidth) camera.position.set(-HW * 2.35, 0, FELT_Z + 54);
+  // Short landscape: the HUD lives in a rail on the right, so sit off the near-left corner and
+  // aim a little that way, keeping the whole table clear of it. Verified at 844x390.
+  else if (innerHeight <= 600) { camera.position.set(-100, -56, FELT_Z + 38); controls.target.set(-4, 0, FELT_Z); }
+  else if (environmentId === 'minimal') camera.position.set(-HW * 1.6, 0, FELT_Z + 21);
   else { camera.position.set(-115, -65, FELT_Z + 40); controls.target.z = FELT_Z - 7; }
   controls.update();
 }
@@ -501,7 +512,18 @@ function endDrag(fling = false) {
 function updateGestureControls() {
   document.getElementById('cancel-gesture').hidden = !(placing || dragging || (aiming && !computerTurn()));
 }
-function endGesture() { cancelPlacement(); endDrag(); endAim(); }   // the two are exclusive; whichever is in progress stops without a shot or fling
+function endGesture() { cancelPlacement(); endDrag(); endAim(); if (refitPending) refitView(); }   // the two are exclusive; whichever is in progress stops without a shot or fling
+// Re-frame for a viewport that really changed. Deferred out of gestures by resize(), so it also
+// runs from endGesture(); either way it advances the baseline only once the change is handled.
+function refitView() {
+  refitPending = false;
+  if (!controls) return;   // reachable from endGesture() during teardown, when resetView() would throw
+  const shape = viewShape(innerWidth, innerHeight), before = viewShape(lastViewport.w, lastViewport.h);
+  lastViewport = { w: innerWidth, h: innerHeight };
+  if (overhead) fitOverhead();
+  else if (shape !== before) resetView();
+  else camera.clearViewOffset();
+}
 function updateDrag() {
   if (!dragging) return;
   const { ball, to } = dragging;
@@ -564,6 +586,18 @@ function setSpin(x, y) {
   document.getElementById('open-spin').dataset.active = String(Math.hypot(spin.x, spin.y) > 0.01);
   const dot = spinEl.querySelector('.dot');
   dot.style.left = `${50 + spin.x * 50}%`; dot.style.top = `${50 - spin.y * 50}%`;
+  const caption = document.querySelector('.spin-caption');
+  if (caption) caption.textContent = spinName(spin);
+}
+
+// Name the contact point, so the choice reads back in words as well as a dot.
+function spinName({ x, y }) {
+  const vertical = y > 0.15 ? 'Top' : y < -0.15 ? 'Bottom' : '';
+  const side = x > 0.15 ? 'right' : x < -0.15 ? 'left' : '';
+  if (vertical && side) return `${vertical} ${side}`;
+  if (vertical) return vertical;
+  if (side) return `${side[0].toUpperCase()}${side.slice(1)}`;
+  return 'Center ball';   // American, like the rest of the copy ("Home centers")
 }
 function wireOnce(group, onClick) {
   if (group.dataset.wired) return;
@@ -617,6 +651,45 @@ function tableStill() {
     const v = h.body.linvel(); return Math.hypot(v.x, v.y, v.z) < 0.3;
   });
 }
+// Orient the pocket map to the camera: project the real pocket centres, see which way the long rail
+// runs on screen and which end is nearer the top, then place the six targets on a schematic table
+// that matches. No copy has to explain which end is which.
+const THIRDS = { x: ['left', 'middle', 'right'], y: ['Top', 'Middle', 'Bottom'] };
+let pocketMapKey = '', pocketMapEl = null, pocketCallEl = null;
+const projected = new THREE.Vector3();   // scratch: this runs every frame, so it must not allocate
+function layoutPocketMap() {
+  const map = pocketMapEl ||= document.getElementById('pocket-map');
+  const panel = pocketCallEl ||= document.getElementById('pocket-call');
+  // Checked by attribute, never by offsetParent: this runs each frame and must not force a reflow.
+  if (!map || !panel || panel.hidden || !pockets.length) return;
+  const at = (i) => { const v = projected.set(pockets[i].x, pockets[i].y, FELT_Z).project(camera); return { x: v.x, y: -v.y }; };
+  const head = at(0), foot = at(2), across = at(3);
+  const long = { x: foot.x - head.x, y: foot.y - head.y };          // table +x, the long rail
+  const short = { x: across.x - head.x, y: across.y - head.y };     // table -y, across the table
+  const vertical = Math.abs(long.y) > Math.abs(long.x);
+  // Along the long rail: 0 = head end, 2 = foot end. Flip when the foot end projects nearer the origin.
+  const longFlip = (vertical ? long.y : long.x) < 0;
+  const shortFlip = (vertical ? short.x : short.y) < 0;
+  const key = `${vertical}|${longFlip}|${shortFlip}`;
+  if (key === pocketMapKey) return;
+  pocketMapKey = key;
+  map.classList.toggle('vertical', vertical);
+  for (const button of map.querySelectorAll('button')) {
+    const i = Number(button.dataset.pocket);
+    const alongIndex = i % 3;                    // 0 head, 1 side, 2 foot
+    const sideIndex = i < 3 ? 0 : 1;             // table +y then -y
+    const a = (longFlip ? 2 - alongIndex : alongIndex) * 50;
+    const b = (shortFlip ? 1 - sideIndex : sideIndex) * 100;
+    // The targets straddle the edge of the felt, where the real pockets are.
+    const left = vertical ? b : a, top = vertical ? a : b;
+    button.style.left = `${left}%`;
+    button.style.top = `${top}%`;
+    // Name it by where it now sits, so the label a screen reader (and the compact button's title)
+    // reads out cannot contradict the map the camera just turned.
+    button.setAttribute('aria-label', `${THIRDS.y[top / 50]} ${THIRDS.x[left / 50]} pocket`);
+  }
+}
+
 function updateScore() {
   if (shots > 0) markPlaying();
   updateGestureControls();
@@ -635,7 +708,8 @@ function updateScore() {
   const pocketButton = document.getElementById('open-pockets');
   pocketButton.hidden = document.getElementById('pocket-call').hidden;
   pocketButton.textContent = calledPocket === null ? 'Call pocket' : 'Pocket ✓';
-  pocketButton.title = calledPocket === null ? 'Choose the 8-ball pocket' : document.querySelector(`[data-pocket="${calledPocket}"]`).textContent;
+  layoutPocketMap();   // before the title below, which quotes the label this rewrites
+  pocketButton.title = calledPocket === null ? 'Choose the 8-ball pocket' : document.querySelector(`#pocket-call [data-pocket="${calledPocket}"]`).getAttribute('aria-label');
   document.getElementById('open-spin').hidden = interactionMode !== 'cue' || !!activeShot || computerTurn() || remoteTurn() || (!free && match.winner !== null);
   document.getElementById('open-settings').firstChild.textContent = gameMode === 'online' ? 'Room ' : 'Game ';
   document.querySelectorAll('#pocket-call button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.pocket) === calledPocket)));
@@ -956,8 +1030,14 @@ export default {
   },
   key(k) { if (k === 'escape') endGesture(); if (k === 'r') restart(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue'); },
   resize() {
-    if (overhead || innerHeight > innerWidth || innerHeight <= 600) overheadView();
-    else camera.clearViewOffset();
+    // Mobile browsers fire resize when the URL bar hides, with no change in size at all. Re-fitting
+    // then would move the camera out from under the shot being aimed, so do nothing unless the
+    // viewport really changed, and never interrupt a gesture in progress.
+    if (innerWidth === lastViewport.w && innerHeight === lastViewport.h) return;
+    // A rotation mid-aim is deferred, not dropped: lastViewport still holds the pre-change size, so
+    // endGesture() re-frames as soon as the shot is taken or cancelled.
+    if (aiming || placing || dragging) { refitPending = true; return; }
+    refitView();
   },
   pointerdown(e) {
     audio.ensure();
@@ -1038,6 +1118,7 @@ export default {
     // Update shadows only when a ball or the cue changes, including hiding a pocketed ball.
     renderer.shadowMap.autoUpdate = false;
     if (shadowsChanged([...balls.map(ball => ball.mesh), cueStick, cueStick.holder])) renderer.shadowMap.needsUpdate = true;
+    layoutPocketMap();
     if (pocketMarker) {
       pocketMarker.visible = gameMode !== 'free' && calledPocket !== null && match.winner === null;
       if (pocketMarker.visible) { const p = pockets[calledPocket]; pocketMarker.position.set(p.x, p.y, FELT_Z + RAIL_H); }
