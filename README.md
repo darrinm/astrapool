@@ -68,6 +68,20 @@ the old room's graphics resources. Minimal requires no room downloads.
 Art prompts, editable Blender files, and the reproducible asset builder live in
 [`pipeline/environments`](pipeline/environments/README.md). Runtime WebP and GLB files are in `public/environments`.
 
+## Shot replay
+
+**Replay** in the table controls, or **V**, plays the last completed shot in Local 8-ball, Vs Computer,
+Play a Friend, and Free Play Cue / Fling. Pause, scrub the timeline, restart, or choose ¼×, ½×, 1×, or 2×
+speed. Camera orbit and zoom remain available. **Back to game** or **Escape** restores the live view.
+Replay is available with Arcade on or off and does not change scores, turns, or ball positions.
+
+The replay records actual ball poses and pocket disappearances instead of resimulating the shot. Local
+physics and the computer's turn pause during playback and resume on return. Online replay is private to
+your device, becomes available only after the server accepts the shot, and automatically exits when the
+table updates. Rejected or rolled-back shots do not replace the last accepted replay. Replays are kept in
+memory until the next completed shot or a game-mode change; long Free Play recordings lower their sample
+rate to keep memory bounded. Additional flings before the table settles belong to the same replay.
+
 ## Arcade
 
 **Game → Arcade** adds Playful effects and a separate arcade score to local matches, every computer difficulty,

@@ -25,6 +25,8 @@ import { newMatch, targets, groupBalls, shotRecord, resolveShot } from './eight-
 import { PoolArcade } from './arcade.js';
 import { planRack, rackPose, RACK_DURATION } from './rack-animation.js';
 import { ComputerThoughts } from './computer-thoughts.js';
+import { ShotReplay } from './replay.js';
+import { ReplayView } from './replay-view.js';
 import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
 
 const { R, G, MU_SLIDE, MU_BALL, E_BALL, HW, HH, RAIL_H, CUSH, POCKET_R } = P;   // table physics constants live in physics/poolphysics.js
@@ -331,6 +333,7 @@ function setBallStyle(style) {
 }
 
 function layout(animate = true) {
+  stopReplay(); replay.discard();
   cancelComputerSearch(); endGesture();
   const origins = rackOrigins();
   rackMotion = null;
@@ -484,6 +487,46 @@ const audio = new PoolAudio();
 const arcade = new PoolArcade({ scene, camera, feltZ: FELT_Z, audio, spatial, refresh: updateScore,
   context: () => ({ mode: gameMode, match, input: interactionMode, difficulty, calledPocket, pockets, seat: online.seat }) });
 const computerThoughts = new ComputerThoughts({ scene, camera, feltZ: FELT_Z, settings: () => arcade.hud });
+const replay = new ShotReplay();
+const replayView = new ReplayView({ scene, exit: () => stopReplay(true) });
+
+function readReplayPoses() {
+  return allBalls().flatMap(ball => {
+    const p = ball.body.translation(), q = ball.body.rotation();
+    return [Number(ball.mesh.visible), p.x, p.y, p.z, q.x, q.y, q.z, q.w];
+  });
+}
+function beginReplayRecording(input) {
+  const label = gameMode === 'free' ? `Free Play · ${input === 'fling' ? 'Fling' : 'Cue'}` :
+    `${playerName(match.turn, gameMode, online.seat)} · ${match.breaking ? 'Break' : 'Shot'}`;
+  replay.begin(physicsTime, allBalls().map(numberOf), readReplayPoses, { label,
+    online: gameMode === 'online' ? { seq: onlineShotSeq, rack: arcade.state?.rack ?? null,
+      play: arcade.state?.lastPlay, shots: match.shots, breaker: match.breaker } : null });
+}
+function canReplay() {
+  return !!replay.last && !rackMotion && !dragging && !placing &&
+    (gameMode !== 'online' || !activeShot && !online.pending && !online.waiting);
+}
+function syncReplayButton() {
+  const button = document.getElementById('open-replay');
+  button.hidden = !replay.last;
+  button.disabled = !canReplay();
+}
+function startReplay() {
+  if (!canReplay() || replayView.active) return;
+  if (!computerTurn()) endGesture();
+  arcade.effects.clear(); audio.stopArcade(); computerThoughts.clear();
+  replayView.start(replay.last, allBalls().map(ball => ({ number: numberOf(ball), mesh: ball.mesh })));
+  guide.visible = false; cueStick.visible = false;
+  renderer.shadowMap.needsUpdate = true; updateScore();
+}
+function stopReplay(focus = false) {
+  if (!replayView.active) return;
+  replayView.stop(); renderer.shadowMap.needsUpdate = true;
+  audio.setMuted(!!window.playful?.mute || document.hidden);
+  updateScore();
+  if (focus) document.getElementById('open-replay').focus();
+}
 // pan and distance of a table position relative to the camera
 function spatial(p) {
   const v = new THREE.Vector3(p.x, p.y, p.z), dist = v.distanceTo(camera.position);
@@ -619,12 +662,14 @@ function endDrag(fling = false) {
   const velocity = fling ? flingOnTable(ball, flingVelocity(samples)) : { x: 0, y: 0 };
   moveBall(ball.body, velocity);
   if (fling && onTable(ball) && Math.hypot(velocity.x, velocity.y) > 0.3) {
+    beginReplayRecording('fling');
     arcade.time = physicsTime; arcade.begin('fling', numberOf(ball), ball.body.translation()); shots++;
   } else if (fling) arcade.effects.ring(ball.body.translation(), undefined, 1.6, 0.25);
   dragging = null; controls.enabled = true; updateGestureControls();
 }
 function updateGestureControls() {
   document.getElementById('cancel-gesture').hidden = !(placing || dragging || (aiming && !computerTurn()));
+  syncReplayButton();
 }
 function endGesture() { cancelPlacement(); endDrag(); endAim(); if (refitPending) refitView(); }   // the two are exclusive; whichever is in progress stops without a shot or fling
 // Re-frame for a viewport that really changed. Deferred out of gestures by resize(), so it also
@@ -685,6 +730,7 @@ function showGameControls(show) {
       if (computerTurn() && !activeShot) { cancelComputerSearch(); computerPlan = null; computerWait = 0; endAim(); }
     }));
     document.getElementById('overhead-view').addEventListener('click', overheadView);
+    document.getElementById('open-replay').addEventListener('click', startReplay);
     document.getElementById('rematch').addEventListener('click', restart);
     document.querySelectorAll('#pocket-map button').forEach(b => b.addEventListener('click', () => {
       if (!canCallPocket()) return;
@@ -911,6 +957,7 @@ function fitOverhead() {
 }
 function startGame(mode, roomId = null) {
   if (!roomId && shots && (gameMode === 'free' || match.winner === null) && !window.confirm('Start a new game and clear this rack?')) return false;
+  stopReplay(); replay.reset();
   online.leave(); history.replaceState(null, '', location.pathname);
   gameMode = mode;
   arcade.onlineCreating = mode === 'online' && !roomId;
@@ -981,6 +1028,7 @@ function settleShot(dt) {
     ball.body.setLinvel({ x: 0, y: 0, z: 0 }, true); ball.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
   }
   const completed = activeShot;
+  replay.finish(physicsTime, readReplayPoses, gameMode === 'online');
   activeShot = null; calledPocket = null; settledFor = 0;
   const result = resolveShot(match, completed);
   completed.arcade = arcade.finish(completed, result);
@@ -1020,6 +1068,7 @@ function takeShot(dir, speed, shotSpin = { x: 0, y: 0 }, fromRoom = false) {
     return online.send('shoot', { action: { dir: { x: dir.x, y: dir.y }, speed, spin: shotSpin, calledPocket } });
   }
   const c = cue.body.translation();
+  beginReplayRecording('cue');
   if (gameMode !== 'free') { activeShot = shotRecord(calledPocket); settledFor = 0; }
   arcade.time = physicsTime; arcade.begin('cue', 0, c);
   strike(cue.body, dir, speed, shotSpin);
@@ -1117,9 +1166,17 @@ function receiveOnline(data) {
   if (data.type !== 'state' && data.type !== 'shot') return;
   // A resync during the same shot preserves the running simulation.
   if (data.pending && onlineShotSeq === data.seq) return;
+  stopReplay();
+  // Only accepted room results become replayable. Rollbacks and rejected shots
+  // keep the previous replay, and an incoming shot always returns us to live play.
   const origins = rackOrigins();
   const newRack = arcade.syncOnline(data.snapshot);
+  if (newRack && replay.recording) replay.finish(physicsTime, readReplayPoses, true);
   applyOnlineSnapshot(data.snapshot);
+  // A slower spectator may receive acceptance before its simulation settles.
+  // Include the accepted end pose, just as the live table displays it.
+  if (replay.recording) replay.finish(physicsTime, readReplayPoses, true);
+  replay.resolveOnline(data); syncReplayButton();
   if (newRack && !data.pending) { beginRack(origins, data.snapshot.balls); updateScore(); }
   document.getElementById('rematch').disabled = data.votes?.includes(online.seat) ?? false;
   document.getElementById('rematch').textContent = data.votes?.includes(online.seat) ? 'Waiting for your friend…' : data.votes?.length ? 'Accept rematch' : 'Rematch';
@@ -1183,6 +1240,7 @@ export default {
     joinInvite();
   },
   exit() {
+    stopReplay(); replay.reset();
     finishRack(false);
     arcade.effects.dispose(); audio.stopArcade();
     cancelComputerSearch();
@@ -1196,7 +1254,16 @@ export default {
     controls?.dispose(); controls = null; setLook(false);
     renderer.shadowMap.autoUpdate = true;
   },
-  key(k) { if (k === 'escape') endGesture(); if (k === 'r') restart(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue'); },
+  key(k) {
+    if (k === 'v') { if (replayView.active) stopReplay(true); else startReplay(); return; }
+    if (replayView.active) {
+      if (k === 'escape') { stopReplay(true); return; }
+      if (k === 'c') { resetView(); return; }
+      if (['r', 'b', 'f'].includes(k)) stopReplay();
+      else return;
+    }
+    if (k === 'escape') endGesture(); if (k === 'r') restart(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue');
+  },
   resize() {
     // Mobile browsers fire resize when the URL bar hides, with no change in size at all. Re-fitting
     // then would move the camera out from under the shot being aimed, so do nothing unless the
@@ -1209,7 +1276,7 @@ export default {
   },
   pointerdown(e) {
     audio.ensure();
-    if (rackMotion) return false;
+    if (rackMotion || replayView.active) return false;
     if (computerTurn() || remoteTurn() || e.button !== 0 || dragging || aiming || placing) return false;
     if (gameMode !== 'free' && match.winner === null && match.ballInHand && !activeShot && tableStill()) {
       if (meshUnderPointer(e, [cue.mesh]) !== cue.mesh && !validPlacement(pointerToPlane(e, BALL_Z))) return false;
@@ -1235,7 +1302,7 @@ export default {
   },
   // Only the captured pointer's moves arrive during a gesture; otherwise the return value is the hover state.
   pointermove(e) {
-    if (rackMotion) return false;
+    if (rackMotion || replayView.active) return false;
     if (computerTurn() || remoteTurn()) return false;
     if (placing) { movePlacement(e); return; }
     if (dragging) {
@@ -1249,6 +1316,7 @@ export default {
     return cueReady() && cueUnderPointer(e);
   },
   pointerup(e) {
+    if (replayView.active) return;
     if (remoteTurn()) { endGesture(); return; }
     if (computerTurn()) return;
     if (placing) { movePlacement(e); finishPlacement(); }
@@ -1257,6 +1325,7 @@ export default {
   },
   pointercancel: endGesture,   // explicit cancellation never fires a shot or fling
   step() {
+    if (replayView.active) return false;
     if (rackMotion) {
       eventQueue.drainCollisionEvents(() => {}); physicsTime += world.timestep; return;
     }
@@ -1272,8 +1341,12 @@ export default {
     updateDrag();
     physicsTime += world.timestep;
     collectPocketed();
+    replay.capture(physicsTime, readReplayPoses);
     settleShot(world.timestep);
-    if (arcade.active?.free) arcade.settleFree(tableStill(), belowSince.size, dragging, world.timestep);
+    if (arcade.active?.free) {
+      arcade.settleFree(tableStill(), belowSince.size, dragging, world.timestep);
+      if (!arcade.active) { replay.finish(physicsTime, readReplayPoses); syncReplayButton(); }
+    }
     // The next solver step's incoming velocities are needed to distinguish a
     // struck ball from one that merely deflected a ball already in motion.
     if (arcade.active || arcade.effects.enabled) for (const ball of allBalls()) {
@@ -1291,6 +1364,8 @@ export default {
   audio,
   arcadeState: () => arcade.debug(),
   setArcade: enabled => arcade.hud.setEnabled(enabled),
+  replayState: () => ({ available: !!replay.last, active: replayView.active, recording: !!replay.recording,
+    duration: replay.last?.duration, frames: replay.last?.frames.length, time: replayView.time }),
   ...(import.meta.env.DEV ? { debugShot: (dir, speed, shotSpin) => { takeShot(dir, speed, shotSpin); endAim(); },
     previewArcade: kind => {
       if (kind === 'rack') arcade.effects.rack(rackPositions(), gameMode === 'free');
@@ -1305,23 +1380,24 @@ export default {
       const retreat = Math.max(0, camera.position.distanceTo(controls.target) - 120);
       scene.fog.near = 140 + retreat; scene.fog.far = 330 + retreat;
     }
-    if (aiming) updateGuide();
+    if (replayView.active) { replayView.frame(); guide.visible = false; cueStick.visible = false; }
+    else if (aiming) updateGuide();
     else {
       const aim = gameMode === 'online' && match.turn !== online.seat && !activeShot &&
         !match.ballInHand && match.winner === null && onTable(cue) && online.remoteAim;
       cueStick.visible = !!aim;
       if (aim) updateCueStick(cue.body.translation(), aim.dir, aim.pull, aim.spin);
     }
-    audio.setMuted(!!window.playful?.mute || document.hidden);
+    audio.setMuted(!!window.playful?.mute || document.hidden || replayView.active);
     const fade = THREE.MathUtils.clamp((fixtureFade[1] - camera.position.z) / (fixtureFade[1] - fixtureFade[0]), 0, 1);   // lamp fixture fades as the camera climbs to it
     for (const m of fixture) { m.visible = fade > 0; m.material.opacity = fade; }
     if (capsOn && capped.size < heads.length) applyCaps();
-    const balls = allBalls();
+    const balls = replayView.active ? replayView.balls : allBalls();
     const pixelScale = innerHeight * renderer.getPixelRatio() * camera.projectionMatrix.elements[5] / 2;
     balls.forEach((h, i) => {
       setBallDetail(h.mesh, R * pixelScale / h.mesh.position.distanceTo(camera.position));
       const cs = contactShadows[i]; if (!cs) return;
-      const t = h.mesh.position, on = h.mesh.visible && (h.body.isEnabled() || !!rackMotion) && t.z > BALL_Z - 0.3;
+      const t = h.mesh.position, on = h.mesh.visible && (replayView.active || h.body.isEnabled() || !!rackMotion) && t.z > BALL_Z - 0.3;
       cs.visible = on; if (on) cs.position.set(h.mesh.position.x, h.mesh.position.y, FELT_Z + 0.015);
     });
     // Update shadows only when a ball or the cue changes, including hiding a pocketed ball.
@@ -1329,15 +1405,14 @@ export default {
     if (shadowsChanged([...balls.map(ball => ball.mesh), cueStick, cueStick.holder])) renderer.shadowMap.needsUpdate = true;
     layoutPocketMap();
     if (pocketMarker) {
-      pocketMarker.visible = gameMode !== 'free' && calledPocket !== null && match.winner === null;
+      pocketMarker.visible = !replayView.active && gameMode !== 'free' && calledPocket !== null && match.winner === null;
       if (pocketMarker.visible) { const p = pockets[calledPocket]; pocketMarker.position.set(p.x, p.y, FELT_Z + RAIL_H); }
     }
     if (marker) {
-      const ready = !!dragging || (interactionMode === 'cue' && !aiming && cueReady());
+      const ready = !replayView.active && (!!dragging || (interactionMode === 'cue' && !aiming && cueReady()));
       marker.visible = ready;
       if (ready) { const c = (dragging?.ball || cue).body.translation(); marker.position.set(c.x, c.y, FELT_Z + 0.03); }
     }
-    arcade.effects.frame(balls);
-    computerThoughts.frame();
+    if (!replayView.active) { arcade.effects.frame(balls); computerThoughts.frame(); }
   },
 };

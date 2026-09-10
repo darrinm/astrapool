@@ -50,9 +50,16 @@
         <nav class="compact-actions" aria-label="Table controls">
           <button id="open-settings" aria-haspopup="dialog" aria-controls="hud-sheet">Game</button>
           <button id="quick-view" title="View the whole table from above">Overhead</button>
+          <button id="open-replay" title="Replay the last completed shot (V)" hidden>Replay</button>
           <button id="open-spin" aria-haspopup="dialog" aria-controls="hud-sheet">Spin <span class="spin-bead" aria-hidden="true"></span></button>
           <button id="cancel-gesture" hidden>Cancel</button>
         </nav>
+        <section id="replay-controls" aria-label="Shot replay" hidden>
+          <div class="replay-heading"><strong id="replay-title">Replay</strong><button id="replay-close" class="text-button">Back to game</button></div>
+          <input id="replay-seek" type="range" min="0" max="1" step="0.01" value="0" aria-label="Replay position">
+          <div class="replay-actions"><button id="replay-play" class="quiet-button">Pause</button><button id="replay-restart" class="text-button">Restart</button><select id="replay-speed" aria-label="Replay speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select><span id="replay-clock">0:00 / 0:00</span></div>
+          <p>Drag to orbit · Scroll to zoom · Esc returns to the game</p>
+        </section>
       </div>
     </div>
 
@@ -130,6 +137,7 @@
             <summary>How to play &amp; house rules</summary>
             <div class="help-panel">
               <p>In Cue mode, pull back from the white ball and release to shoot. In Free Play’s Fling mode, grab any ball and throw it — hold still to place it.</p>
+              <p>Replay (V) shows the last completed shot in every game, including computer shots and Free Play flings. Pause, scrub, or change speed while orbiting the table. Scores and turns stay intact. Online replay returns to live play when the table updates.</p>
               <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag / two fingers</dd></div><div><dt>Zoom</dt><dd>Scroll / pinch</dd></div></dl>
               <dl class="shortcuts"><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Heads / balls</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
               <h3>House rules</h3>

@@ -122,6 +122,17 @@ button:disabled { opacity: .45; cursor: default; }
 .compact-actions button { display: inline-flex; align-items: center; gap: var(--s2); min-height: 40px; padding: 0 var(--s4); border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ink-dim); font-size: var(--t-body); white-space: nowrap; transition: background .15s, color .15s; }
 .compact-actions button:hover { background: var(--raise-hover); color: var(--ink); }
 #cancel-gesture { color: var(--accent); }
+#replay-controls { grid-column: 1 / -1; grid-row: 1 / 5; justify-self: center; width: min(430px, calc(100vw - 32px)); padding: var(--s4); border: 1px solid var(--edge-strong); border-radius: var(--r-md); background: var(--panel-solid); box-shadow: var(--shadow); text-align: left; }
+.replay-heading, .replay-actions { display: flex; align-items: center; gap: var(--s2); }
+.replay-actions { flex-wrap: wrap; }
+.replay-heading { justify-content: space-between; }
+.replay-heading strong { color: var(--accent); font-size: var(--t-body); }
+#replay-seek { display: block; width: 100%; height: 32px; margin: var(--s2) 0; accent-color: var(--accent); }
+#replay-speed { padding: var(--s2); border: 1px solid var(--edge); border-radius: var(--r-sm); background: var(--panel-solid); color: var(--ink); }
+#replay-clock { margin-left: auto; color: var(--ink-dim); font-size: var(--t-micro); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#replay-controls p { margin: var(--s2) 0 0; color: var(--ink-faint); font-size: var(--t-micro); }
+.replaying .bottom-hud > :not(#replay-controls) { display: none !important; }
+.replaying #arcade-effects, .replaying #computer-thought { visibility: hidden; }
 .compact-actions:has(#cancel-gesture:not([hidden])) > button:not(#cancel-gesture) { display: none; }
 
 /* The spin control is the cue ball itself, showing where you are hitting it. */
@@ -297,6 +308,8 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: cent
   .pocket-map button { width: 40px; height: 40px; }
 }
 @media (max-width: 360px) {
+  .bottom-hud { column-gap: 0; }
+  .compact-actions button, #open-spin { padding-inline: var(--s2); }
   .remaining-balls { gap: 2px; }
   .ball-chip { width: 12px; height: 12px; flex-shrink: 0; }
   .ball-chip > span { width: 9px; height: 9px; }
@@ -309,6 +322,7 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: cent
 }
 /* Short landscape: the bar and the guidance keep to the right of the table. */
 @media (orientation: landscape) and (max-height: 600px) {
+  #replay-controls { width: 100%; padding: var(--s3); }
   .bottom-hud { grid-template-columns: 1fr; justify-items: end; justify-self: end; width: min(310px, 42vw); }
   .compact-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
   .guidance, .shot-result, .compact-actions, .primary-button { grid-column: 1; justify-self: end; text-align: right; }
