@@ -13,6 +13,22 @@ for (const [i, { balls, state }] of layouts.entries()) test(`Hard avoids the old
   const old = simulateShot(table, state, computerShot(balls, state, 'hard', () => 0.5));
   assert.ok(old.state.ballInHand);
   const shot = hardComputerShot(balls, state, table), result = simulateShot(table, state, shot);
+  if (i === 0) {
+    const previews = [];
+    const observed = hardComputerShot(balls, state, table, preview => previews.push(preview));
+    assert.deepEqual(observed, shot, 'showing search candidates must not change the chosen shot or add evaluations');
+    assert.ok(previews.length > 0);
+    for (const preview of previews) {
+      assert.ok(preview.paths.length <= 2);
+      for (const path of preview.paths) {
+        assert.ok(path.number === 0 || path.number === preview.target);
+        assert.ok(path.points.length > 0 && path.points.length <= 96);
+        const original = balls.find(b => b.number === path.number);
+        assert.ok(Math.hypot(path.points[0].x - original.x, path.points[0].y - original.y) < 0.001);
+        assert.ok(path.points.every(p => Number.isFinite(p.x) && Number.isFinite(p.y)));
+      }
+    }
+  }
   assert.equal(result.settled, true); assert.equal(result.state.ballInHand, false); assert.equal(result.rerack, false);
   assert.equal(result.state.winner, null);
   assert.ok(shot.speed > 0 && shot.speed <= 24 * 0.44704 / 0.026);

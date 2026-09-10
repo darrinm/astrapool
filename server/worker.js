@@ -47,6 +47,9 @@ export class PoolRoom extends DurableObject {
   async webSocketMessage(ws, raw) {
     if (typeof raw !== 'string' || raw.length > 12000) { ws.close(1009, 'Message too large'); return; }
     const connection = ws.deserializeAttachment();
+    if (connection.seat !== null && connection.version !== PROTOCOL_VERSION) {
+      ws.close(4002, 'Refresh Pool to continue this room.'); return;
+    }
     let message;
     try { message = JSON.parse(raw); } catch { ws.close(1008, 'Invalid message'); return; }
     if (Date.now() - connection.since > 10000) { connection.count = 0; connection.aimCount = 0; connection.since = Date.now(); }
@@ -75,7 +78,7 @@ export class PoolRoom extends DurableObject {
         if (seat === -1) { seat = seats.indexOf(null); if (seat === -1) throw new Error('This room already has two players.'); seats[seat] = hash; }
         for (const old of this.ctx.getWebSockets()) if (old !== ws && old.deserializeAttachment()?.seat === seat) old.close(4001, 'Opened in another tab');
         this.#save({ ...this.room, seats });
-        connection.seat = seat; ws.serializeAttachment(connection);
+        connection.seat = seat; connection.version = PROTOCOL_VERSION; ws.serializeAttachment(connection);
         this.#state(ws); this.#broadcast({ type: 'presence', connected: this.#connected() });
         return;
       }
@@ -86,7 +89,7 @@ export class PoolRoom extends DurableObject {
       if (message.type === 'rematch') {
         if (room.snapshot.match.winner === null || room.pending) throw new Error('Finish this rack before requesting a rematch.');
         room.votes = [...new Set([...room.votes, seat])];
-        if (room.votes.length === 2) { room.snapshot = initialSnapshot(1 - room.snapshot.match.breaker, room.snapshot.match.wins); room.votes = []; }
+        if (room.votes.length === 2) { room.snapshot = initialSnapshot(1 - room.snapshot.match.breaker, room.snapshot.match.wins, (room.snapshot.arcade?.rack || 0) + 1); room.votes = []; }
       } else {
         if (seat !== room.snapshot.match.turn) throw new Error('It is your friend’s turn.');
         if (message.type === 'result') {

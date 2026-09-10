@@ -5,6 +5,14 @@ Hatch 2025 team as 3D head textures on the balls. Extracted from `playful-photos
 
 `npm install && npm run dev`, then open the printed URL. `npm run physics-test` runs the physics harness.
 
+When it is your turn on the 8-ball, **Call the 8-ball pocket** appears above the table controls.
+Your chosen pocket stays marked on the table and named in the guidance. **Change pocket** lets you
+revise the call until you take the shot; the shot uses that final choice.
+
+Re-racking gathers the balls from their current table positions. Missing balls return at random clear
+spots first, then all sixteen balls glide into the rack and cue-ball position. Shooting resumes after
+the brief setup animation; it creates no shots or arcade points. Reduced motion places the rack immediately.
+
 ## Deployment
 Live at [pool.darrinm.com](https://pool.darrinm.com). The repository lives at `~/src/pool`.
 
@@ -59,6 +67,39 @@ the old room's graphics resources. Minimal requires no room downloads.
 
 Art prompts, editable Blender files, and the reproducible asset builder live in
 [`pipeline/environments`](pipeline/environments/README.md). Runtime WebP and GLB files are in `public/environments`.
+
+## Arcade
+
+**Game → Arcade** adds Playful effects and a separate arcade score to local matches, every computer difficulty,
+online rooms, and Free Play Cue / Fling. Warm bursts and points rise from the pocket that received the ball;
+contacts pop, rails ripple, scratches gulp, early 8s get “TOO SOON!”, and fresh racks get a brief flourish.
+Arcade is on by default; the switch remembers your preference, including turning it off. **Reduced effects** keeps local scores readable with calmer motion;
+the system's reduced-motion preference supplies its initial setting. Sound / M also mutes arcade accents.
+
+While Hard studies the table, faint chalk paths and a ghost cue ball show samples from its ongoing practice shots.
+At most two candidates appear, with a local target/pocket highlight and a small “Hmm…” bubble. New candidates
+replace old ones immediately. The chosen shot gets a quick “Aha!” during the normal 180 ms cue windup;
+all thinking effects clear before the strike. Planning starts as soon as the table settles and never waits for
+an effect to finish. Easy and Medium go straight to their chosen shot. Reduced effects use static highlights.
+The settled physics world is held during planning and cue windup so the shot starts from the exact state the
+computer evaluated. Rendering continues throughout; spin, friction, and collision processing resume with the strike.
+
+Eligible pots earn 100 points, banks add 150 (plus 75 for each of two additional rails), kicks and combinations
+add 200, and additional pots in one play add 200 / 300 / 400… A legal winning 8 adds 500. Consecutive scoring
+plays use ×1, ×1.5, ×2, then ×3. Points stay pending until the shot settles; fouls and losing shots void that
+play's points and reset its streak, while earlier points remain. The break 8 is still respotted, and the 8 is
+an ordinary ball in Free Play. Racks won, turns, physics, and computer strategy retain their normal rules.
+
+The ledger tracks the rack even with Arcade hidden; toggling it never changes scoring. Each online player
+chooses their own effects while the server shares the accepted points. Reconnecting restores totals without
+replaying celebrations. Scores reset with each fresh rack, and personal bests are saved on this device per
+game mode and computer difficulty. Switching input or difficulty during play makes the rack mixed practice.
+Fling awards come from actual releases and their collision chains; holding or manually pushing balls cannot
+earn points. Multiple releases before the balls settle count as one play.
+
+The [Arcade plan](docs/arcade-mode-plan.md) contains the full design. `src/arcade-events.js` records bounded
+contact evidence; `src/arcade-score.js` supplies the pure scorer shared with the server; `src/arcade.js`
+connects the game, HUD, and effects. Long-pot and thin-cut awards remain a planned follow-on.
 
 ## Playing
 Choose **Local 8-ball** to play a match with another person on this device, or **Free Play** for Cue / Fling.

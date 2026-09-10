@@ -5,6 +5,7 @@ import { connectPointerInput } from './pointer-input.js';
 import { connectHud } from './hud.js';
 import { connectEnvironmentPicker } from './environment-picker.js';
 import { connectWelcome } from './welcome.js';
+import { stepPhysics } from './physics-step.js';
 
 const current = pool;
 const STEP = 1 / current.stepRate;   // 480 Hz: see the note on stepRate in pool.js
@@ -45,14 +46,14 @@ addEventListener('resize', () => {
 // ---------- loop ----------
 let last = performance.now();
 const perf = { frames: 0, worst: 0, step: 0, render: 0, steps: 0, slow: 0, gaps: 0, reset() { this.frames = this.worst = this.step = this.render = this.steps = this.slow = this.gaps = 0; } };
-function tick() { snapshotPoses(); current.step(); world.step(eventQueue); }
+function tick() { snapshotPoses(); return stepPhysics(current, world, eventQueue); }
 window.playful = { heads, world, renderer, camera, scene3: scene, THREE, tick, scene: () => current, perf, mute: false }; // debug handle
 function animate(now) {
   requestAnimationFrame(animate);
   const t0 = performance.now();
   if (now - last > 25) perf.gaps++;   // long gap between frames = a visible hitch, whatever caused it
   accumulator += Math.min((now - last) / 1000, 0.05); last = now;
-  while (accumulator >= STEP) { tick(); accumulator -= STEP; perf.steps++; }
+  while (accumulator >= STEP) { if (tick()) perf.steps++; accumulator -= STEP; }
   const t1 = performance.now();
   syncMeshes(accumulator / STEP);
   current.frame();

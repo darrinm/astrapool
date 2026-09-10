@@ -19,9 +19,14 @@ export function connectHud(game) {
 
   function open(which) {
     game.key('escape');
+    if (which === 'pockets' && document.getElementById('open-pockets').hidden) return;
     for (const [name, panel] of Object.entries(PANELS)) document.getElementById(panel.id).hidden = name !== which;
     title.textContent = PANELS[which].title;
     if (!sheet.open) sheet.showModal();
+    if (which === 'pockets') {
+      const map = document.getElementById('pocket-map');
+      (map.querySelector('[aria-pressed="true"]') || map.querySelector('button')).focus();
+    }
   }
   const close = () => sheet.close();
 

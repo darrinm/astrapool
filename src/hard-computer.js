@@ -78,12 +78,19 @@ function value(result, previous, shot) {
   const nearPocket = target && shot.pocket !== null ? distance(target, pockets[shot.pocket]) : 0;
   return -(next[0]?.score ?? -30) * 8 - next.length * 25 + (contact.length ? Math.min(...contact.map(b => distance(cue, b))) : 250) - nearPocket;
 }
-export function hardComputerShot(balls, state, liveTable) {
+export function hardComputerShot(balls, state, liveTable, onPreview) {
   const table = liveTable || practiceTable(balls), legal = targets(state), evaluated = [], seen = new Set();
+  let lastPreview = -Infinity;
   const evaluate = shot => {
     const key = JSON.stringify([shot.dir, shot.speed, shot.spin, shot.position, shot.pocket]);
     if (seen.has(key)) return; seen.add(key);
-    const result = simulateShot(table, state, shot), entry = { shot, result, score: value(result, state, shot) };
+    const now = performance.now(), preview = !!onPreview && now - lastPreview >= 100;
+    if (preview) lastPreview = now;
+    const result = simulateShot(table, state, shot, preview), entry = { shot, result, score: value(result, state, shot) };
+    if (preview) {
+      onPreview({ target: shot.target, pocket: shot.pocket, paths: result.paths });
+      delete result.paths;
+    }
     evaluated.push(entry); return entry;
   };
   let fallbackBalls = balls, position;

@@ -14,7 +14,7 @@ export function practiceTable(balls) {
     return { snapshot: world.takeSnapshot(), handles, cushions, feltZ: 0 };
   } finally { world.free(); }
 }
-export function simulateShot(table, state, shot) {
+export function simulateShot(table, state, shot, trace = false) {
   const world = RAPIER.World.restoreSnapshot(table.snapshot), queue = new RAPIER.EventQueue(true);
   try {
     const balls = table.handles.map(b => ({ number: b.number, body: world.getRigidBody(b.handle) }));
@@ -22,13 +22,32 @@ export function simulateShot(table, state, shot) {
     const numbers = new Map(balls.map(b => [b.body.collider(0).handle, b.number])), cushions = new Set(table.cushions);
     const report = shotRecord(shot.pocket), below = new Map();
     const ballZ = table.feltZ + P.R;
-    if (shot.position) { cue.setTranslation({ ...shot.position, z: ballZ }, true); cue.setLinvel(zero, true); cue.setAngvel(zero, true); }
+    if (shot.position) {
+      cue.setTranslation({ ...shot.position, z: ballZ }, true);
+      cue.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+      cue.setLinvel(zero, true); cue.setAngvel(zero, true);
+    }
+    // Read a bounded sample from this simulation, without running a second shot
+    // or changing its physics. Only occasional search candidates request a trace.
+    const paths = trace ? balls.filter(b => b.number === 0 || b.number === shot.target).map(b => ({ number: b.number, points: [], body: b.body, ended: false })) : null;
+    const sample = () => {
+      for (const path of paths) {
+        if (path.ended) continue;
+        const p = path.body.translation(), previous = path.points.at(-1);
+        if (!path.body.isEnabled() || p.z < table.feltZ || Math.abs(p.x) > P.HW + P.CUSH || Math.abs(p.y) > P.HH + P.CUSH) { path.ended = true; continue; }
+        if (path.points.length >= 96) { path.ended = true; continue; }
+        if (!previous || Math.hypot(p.x - previous.x, p.y - previous.y) > 0.2) path.points.push({ x: p.x, y: p.y });
+      }
+    };
+    if (paths) sample();
     strike(cue, shot.dir, shot.speed, shot.spin);
     let still = 0, settled = false;
     for (let step = 0; step < 480 * 24; step++) {
+      let traceContact = false;
       queue.drainCollisionEvents((a, b, started) => {
         if (!started) return;
         const na = numbers.get(a), nb = numbers.get(b);
+        if (paths && (na === 0 || nb === 0 || na === shot.target || nb === shot.target)) traceContact = true;
         if (report.first === null) {
           if (na === 0 && nb > 0) report.first = nb;
           if (nb === 0 && na > 0) report.first = na;
@@ -38,6 +57,7 @@ export function simulateShot(table, state, shot) {
           if (n !== undefined && !report.rails.includes(n)) report.rails.push(n);
         }
       });
+      if (paths && (step % 16 === 0 || traceContact)) sample();
       feltExtras(bodies, world.timestep, ballZ);
       for (const { number, body } of balls) {
         if (!body.isEnabled()) continue;
@@ -62,6 +82,7 @@ export function simulateShot(table, state, shot) {
       world.step(queue);
     }
     const ballsAfter = balls.filter(b => b.body.isEnabled()).map(b => ({ number: b.number, x: b.body.translation().x, y: b.body.translation().y }));
-    return { ...resolveShot(state, report), report, balls: ballsAfter, settled };
+    return { ...resolveShot(state, report), report, balls: ballsAfter, settled,
+      ...(paths && { paths: paths.map(({ number, points }) => ({ number, points })) }) };
   } finally { queue.free(); world.free(); }
 }

@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap">
     <link rel="stylesheet" href="/src/hud.css" />
+    <link rel="stylesheet" href="/src/arcade.css" />
   </head>
   <body>
     <div id="vignette" hidden></div>
@@ -29,6 +30,7 @@
         <div id="free-score" class="scoreboard" aria-label="Game score">
           <div><span class="eyebrow">Pocketed</span><span class="score"><b id="pocketed-count">0</b><span> / 15</span></span></div>
           <div><span class="eyebrow">Shots</span><b id="shot-count" class="score">0</b></div>
+          <div id="arcade-free" hidden><span class="eyebrow">Arcade</span><strong>0</strong><span class="arcade-multiplier">×1</span></div>
         </div>
         <div id="match-score" class="match-score" aria-label="Match score">
           <div id="player-0" class="player-card"><div class="player-heading"><strong class="player-name">Player 1</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
@@ -41,14 +43,14 @@
       </header>
 
       <div class="bottom-hud">
-        <div id="shot-result" class="shot-result" hidden><span class="eyebrow">Last shot</span><p id="shot-result-text" role="status"></p></div>
-        <div class="guidance"><div id="status" role="status"></div><p id="hint"></p></div>
+        <div id="shot-result" class="shot-result" hidden><span class="eyebrow">Last shot</span><p id="shot-result-text" role="status"></p><p id="arcade-receipt" role="status" hidden></p><p id="arcade-pending" hidden></p></div>
+        <div class="guidance"><div id="status" role="status"></div><p id="pocket-call-status" role="status" hidden></p><p id="hint"></p></div>
         <button id="rematch" class="primary-button" hidden>Rematch</button>
+        <button id="open-pockets" class="primary-button" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Call the 8-ball pocket</button>
         <nav class="compact-actions" aria-label="Table controls">
           <button id="open-settings" aria-haspopup="dialog" aria-controls="hud-sheet">Game</button>
           <button id="quick-view" title="View the whole table from above">Overhead</button>
           <button id="open-spin" aria-haspopup="dialog" aria-controls="hud-sheet">Spin <span class="spin-bead" aria-hidden="true"></span></button>
-          <button id="open-pockets" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Call pocket</button>
           <button id="cancel-gesture" hidden>Cancel</button>
         </nav>
       </div>
@@ -67,6 +69,13 @@
               <button data-game="online" aria-pressed="false"><strong>Play a Friend</strong><span>Share a private link</span></button>
               <button data-game="free" aria-pressed="false"><strong>Free Play</strong><span>No rules, just the table</span></button>
             </div>
+          </div>
+
+          <div class="field arcade-setting">
+            <button id="arcade-toggle" class="switch" aria-pressed="true"><span>Arcade</span><span class="switch-track" aria-hidden="true"></span></button>
+            <p class="arcade-description">Big little celebrations. Skill points, lucky shots, and glorious mistakes.</p>
+            <div id="arcade-intensity" class="segmented" role="group" aria-label="Arcade effects"><button data-effects="full" aria-pressed="true">Full effects</button><button data-effects="reduced" aria-pressed="false">Reduced effects</button></div>
+            <p id="arcade-best" hidden></p>
           </div>
 
           <div class="field" id="difficulty-group" hidden>
@@ -124,6 +133,7 @@
               <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag / two fingers</dd></div><div><dt>Zoom</dt><dd>Scroll / pinch</dd></div></dl>
               <dl class="shortcuts"><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Heads / balls</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
               <h3>House rules</h3>
+              <p>Arcade adds playful effects and a separate points score in every game. Pots earn 100; banks, kicks, combinations and multi-pots add bonuses. Consecutive scoring shots build a multiplier up to ×3. Floating points are pending until the shot settles; scratches and fouls void that shot's points. Racks won still decide the match. Choose Reduced effects for calmer motion. Free Play Cue and Fling have separate personal bests; changing modes during a rack makes it mixed practice.</p>
               <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>
               <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack.</p>
               <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed.</p>
@@ -139,7 +149,8 @@
 
         <section id="panel-pockets" class="pocket-call" hidden>
           <span class="eyebrow">Which pocket for the 8-ball?</span>
-          <div id="pocket-map" class="pocket-map" role="group" aria-label="Pocket for the 8-ball"><button data-pocket="0" aria-pressed="false" aria-label="Top left pocket"></button><button data-pocket="1" aria-pressed="false" aria-label="Top middle pocket"></button><button data-pocket="2" aria-pressed="false" aria-label="Top right pocket"></button><button data-pocket="3" aria-pressed="false" aria-label="Bottom left pocket"></button><button data-pocket="4" aria-pressed="false" aria-label="Bottom middle pocket"></button><button data-pocket="5" aria-pressed="false" aria-label="Bottom right pocket"></button></div>
+          <div id="pocket-map" class="pocket-map" role="group" aria-label="Pocket for the 8-ball" aria-describedby="pocket-call-help"><button data-pocket="0" aria-pressed="false" aria-label="Top left pocket"></button><button data-pocket="1" aria-pressed="false" aria-label="Top middle pocket"></button><button data-pocket="2" aria-pressed="false" aria-label="Top right pocket"></button><button data-pocket="3" aria-pressed="false" aria-label="Bottom left pocket"></button><button data-pocket="4" aria-pressed="false" aria-label="Bottom middle pocket"></button><button data-pocket="5" aria-pressed="false" aria-label="Bottom right pocket"></button></div>
+          <p id="pocket-call-help">You can change your call until you take the shot.</p>
         </section>
 
       </div>

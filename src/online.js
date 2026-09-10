@@ -1,4 +1,4 @@
-const VERSION = 1;
+const VERSION = 2;
 const AIM_SEND_INTERVAL = 25, AIM_BLEND_TIME = 40;
 export function roomToken() {
   if (crypto.randomUUID) return crypto.randomUUID();

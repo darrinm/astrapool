@@ -113,4 +113,21 @@ export class PoolAudio {
     this.enabled = !m;
     if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.02);
   }
+  arcade(kind, pan = 0, dist = 0) {
+    if (!this.enabled) return;
+    this.arcadeVoices ||= new Set();
+    if (this.arcadeVoices.size > 8) return;
+    const e = this.begin(0.5, 0.05, 0.06, pan, dist); if (!e) return;
+    const notes = kind === 'fault' ? [260, 165] : kind === 'rack' ? [330, 440, 660] : kind === 'win' ? [523, 659, 784, 1047] : [660, 880];
+    for (const [i, frequency] of notes.entries()) {
+      const oscillator = e.ctx.createOscillator(), gain = e.ctx.createGain(), start = e.t + i * 0.06;
+      oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(frequency, start);
+      if (kind === 'fault') oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.6, start + 0.15);
+      gain.gain.setValueAtTime(0, start); gain.gain.linearRampToValueAtTime(0.6, start + 0.008); gain.gain.exponentialRampToValueAtTime(0.001, start + 0.18);
+      oscillator.connect(gain).connect(e.dest); this.arcadeVoices.add(oscillator);
+      oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); this.arcadeVoices.delete(oscillator); };
+      oscillator.start(start); oscillator.stop(start + 0.2);
+    }
+  }
+  stopArcade() { for (const voice of this.arcadeVoices || []) { try { voice.stop(); } catch { /* Already ended. */ } } }
 }

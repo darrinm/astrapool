@@ -22,6 +22,9 @@ import { setOverheadCamera, withinCueTarget } from './table-view.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
 import { newMatch, targets, groupBalls, shotRecord, resolveShot } from './eight-ball.js';
+import { PoolArcade } from './arcade.js';
+import { planRack, rackPose, RACK_DURATION } from './rack-animation.js';
+import { ComputerThoughts } from './computer-thoughts.js';
 import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
 
 const { R, G, MU_SLIDE, MU_BALL, E_BALL, HW, HH, RAIL_H, CUSH, POCKET_R } = P;   // table physics constants live in physics/poolphysics.js
@@ -39,9 +42,14 @@ const capped = new Map();   // head -> { plain, capped, ball } textures; caps ar
 let capsOn = false;
 let ballStyle = localStorage.getItem('playful.ballStyle') === 'heads' ? 'heads' : 'balls';   // 'heads' | 'balls'
 let interactionMode = 'cue', dragging = null;
+const CUE_LEARNED = 'pool.cueLearned';
+let cueLearned = false;
+try { cueLearned = localStorage.getItem(CUE_LEARNED) === '1'; } catch {}
 let gameMode = 'local', match = newMatch(), activeShot = null, calledPocket = null;
 let settledFor = 0, physicsTime = 0, placing = null, pocketMarker;
+let rackMotion = null;
 let computerWait = 0, computerPlan = null, computerWorker = null;
+const COMPUTER_CUE_TIME = 0.18;
 let difficulty = 'medium', onlineShotSeq = null, onlineShooter = null;
 let overhead = false, hudObserver;
 const online = new OnlineRoom(receiveOnline, text => {
@@ -54,6 +62,7 @@ const online = new OnlineRoom(receiveOnline, text => {
 const remoteTurn = () => gameMode === 'online' && (!online.canAct || match.turn !== online.seat);
 const computerTurn = () => gameMode === 'computer' && match.turn === 1 && match.winner === null;
 const cushionHandles = new Set();
+const arcadeRailIds = new Map(), beforeMotion = new Map(), lastArcadeImpact = new Map();
 const numberOf = ball => ball.number ?? ballNumber(rackIndexOfHead(heads.indexOf(ball)));
 // The cue ball is always a plain white ball, and the plain black 8 sits at the centre of the rack. The 14 heads
 // take the other numbers (1-7 and 9-15). `extras` holds the two plain balls; `objects()` is the rack order.
@@ -186,7 +195,8 @@ function build() {
     const m = addMesh(new THREE.Mesh(geo, cushionMat)); m.receiveShadow = true; m.castShadow = true;
   }
   cushionHandles.clear();
-  cushionColliders(world, FELT_Z, true).forEach(c => { registerCollider(c); cushionHandles.add(c.handle); });
+  arcadeRailIds.clear();
+  cushionColliders(world, FELT_Z, true).forEach((c, i) => { registerCollider(c); cushionHandles.add(c.handle); arcadeRailIds.set(c.handle, i); });
   // ---- rails, diamonds, apron, legs: dark walnut with a satin finish ----
   const walnut = ['#1f1007', '#2a170a', '#31200c', '#160b04'];   // dark walnut
   const woodTex = (seed, rx, ry, rot = 0) => { const t = woodMap(1024, 1, seed, walnut); t.repeat.set(rx, ry); t.rotation = rot; t.center.set(0.5, 0.5); return t; };
@@ -314,13 +324,16 @@ function removeCaps() {
 }
 function setBallStyle(style) {
   ballStyle = style; localStorage.setItem('playful.ballStyle', style);
+  if (rackMotion) for (const entry of rackMotion.entries) entry.rotationTo.copy(rackRot(entry.ball));
   if (tableStill()) for (const h of heads) if (h.mesh.visible && !pocketedSet.has(h)) h.body.setRotation(rackRot(h), true);   // re-orient resting heads face/number up
   document.querySelectorAll('#style button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.style === style)));
   applyCaps();
 }
 
-function layout() {
+function layout(animate = true) {
   cancelComputerSearch(); endGesture();
+  const origins = rackOrigins();
+  rackMotion = null;
   eventQueue.drainCollisionEvents(() => {});
   resetHeads({ linearDamping: 0, angularDamping: 0.02, restitution: E_BALL, friction: MU_BALL });
   for (const h of heads) h.body.collider(0).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
@@ -332,9 +345,65 @@ function layout() {
   }
   pocketed = 0; shots = 0; pocketedSet = new Set(); respotAt = 0; belowSince.clear(); inWell.clear();
   activeShot = null; settledFor = 0; calledPocket = null; computerWait = 0; computerPlan = null; onlineShotSeq = null;
+  beforeMotion.clear(); lastArcadeImpact.clear(); arcade.reset();
+  if (animate) beginRack(origins);
   updateScore();
 }
 function spot(h, x, y, rot) { h.body.setTranslation({ x, y, z: BALL_Z }, true); h.body.setRotation(rot, true); h.body.setLinvel({ x: 0, y: 0, z: 0 }, true); h.body.setAngvel({ x: 0, y: 0, z: 0 }, true); }
+
+function rackOrigins() {
+  return allBalls().map(ball => {
+    const p = rackMotion ? ball.mesh.position : ball.body.translation();
+    const q = rackMotion ? ball.mesh.quaternion : ball.body.rotation();
+    return { number: numberOf(ball), x: p.x, y: p.y, rotation: { x: q.x, y: q.y, z: q.z, w: q.w },
+      onTable: ball.mesh.visible && (ball.body.isEnabled() || !!rackMotion) && !pocketedSet.has(ball) && Math.abs(p.z - BALL_Z) < R };
+  });
+}
+function beginRack(origins, positions = rackPositions()) {
+  if (arcade.hud.reduced || document.hidden) {
+    if (!document.hidden) arcade.effects.rack(positions, gameMode === 'free');
+    return;
+  }
+  const balls = allBalls();
+  const plan = planRack(origins, Math.random, positions);
+  if (plan.every(move => Math.hypot(move.from.x - move.to.x, move.from.y - move.to.y) < 0.01)) {
+    arcade.effects.rack(positions, gameMode === 'free'); return;
+  }
+  const entries = plan.map(move => {
+    const ball = balls.find(b => numberOf(b) === move.number);
+    const q = origins.find(p => p.number === move.number)?.rotation || rackRot(ball);
+    ball.body.setEnabled(false); ball.mesh.visible = true;
+    ball.mesh.position.set(move.from.x, move.from.y, BALL_Z);
+    ball.mesh.quaternion.set(q.x, q.y, q.z, q.w);
+    if (move.returned) arcade.effects.ring(move.from, undefined, 1.8, 0.25);
+    return { ...move, ball, rotationFrom: ball.mesh.quaternion.clone(), rotationTo: new THREE.Quaternion().copy(rackRot(ball)) };
+  });
+  rackMotion = { start: performance.now() / 1000, entries, positions };
+}
+function finishRack(celebrate = true) {
+  if (!rackMotion) return;
+  const { entries, positions } = rackMotion;
+  rackMotion = null;
+  for (const { ball, to } of entries) {
+    spot(ball, to.x, to.y, rackRot(ball)); ball.body.setEnabled(true);
+    ball.mesh.position.set(to.x, to.y, BALL_Z); ball.mesh.quaternion.copy(rackRot(ball));
+  }
+  eventQueue.drainCollisionEvents(() => {});
+  if (celebrate && !document.hidden) arcade.effects.rack(positions, gameMode === 'free');
+  updateScore();
+}
+function animateRack() {
+  if (!rackMotion) return;
+  const elapsed = performance.now() / 1000 - rackMotion.start;
+  if (elapsed >= RACK_DURATION || arcade.hud.reduced || document.hidden) {
+    finishRack(elapsed < RACK_DURATION + 0.5); return;
+  }
+  for (const entry of rackMotion.entries) {
+    const p = rackPose(entry, elapsed);
+    entry.ball.mesh.position.set(p.x, p.y, BALL_Z);
+    entry.ball.mesh.quaternion.copy(entry.rotationFrom).slerp(entry.rotationTo, p.progress);
+  }
+}
 
 // ---------- camera ----------
 function setupCamera() {
@@ -412,6 +481,9 @@ function lampRoom() {
 
 // ---------- sound ----------
 const audio = new PoolAudio();
+const arcade = new PoolArcade({ scene, camera, feltZ: FELT_Z, audio, spatial, refresh: updateScore,
+  context: () => ({ mode: gameMode, match, input: interactionMode, difficulty, calledPocket, pockets, seat: online.seat }) });
+const computerThoughts = new ComputerThoughts({ scene, camera, feltZ: FELT_Z, settings: () => arcade.hud });
 // pan and distance of a table position relative to the camera
 function spatial(p) {
   const v = new THREE.Vector3(p.x, p.y, p.z), dist = v.distanceTo(camera.position);
@@ -430,13 +502,37 @@ function drainSounds() {
   eventQueue.drainCollisionEvents((a, b, started) => {
     if (!started) return;
     const ha = byHandle.get(a), hb = byHandle.get(b);
+    const railBall = cushionHandles.has(a) ? hb : cushionHandles.has(b) ? ha : null;
     // Refereeing is independent of mute, sound budgets, and impact strength.
     if (activeShot) {
       if (ha === cue && hb && activeShot.first === null) activeShot.first = numberOf(hb);
       if (hb === cue && ha && activeShot.first === null) activeShot.first = numberOf(ha);
       if (activeShot.first !== null) {
-        const railBall = cushionHandles.has(a) ? hb : cushionHandles.has(b) ? ha : null;
         if (railBall && !activeShot.rails.includes(numberOf(railBall))) activeShot.rails.push(numberOf(railBall));
+      }
+    }
+    const railId = arcadeRailIds.get(cushionHandles.has(a) ? a : b);
+    if (ha && hb) arcade.hit(numberOf(ha), numberOf(hb), beforeMotion.get(numberOf(ha)), beforeMotion.get(numberOf(hb)), dragging?.ball === ha || dragging?.ball === hb);
+    if (railBall) {
+      const p = railBall.body.translation();
+      arcade.rail(numberOf(railBall), railId, !pockets.some(hole => Math.hypot(p.x - hole.x, p.y - hole.y) < POCKET_R * 2.2));
+    }
+    if (arcade.effects.enabled && (ha && hb || railBall)) {
+      const ball = ha || hb, p = ball.body.translation(), q = hb && ha ? hb.body.translation() : p;
+      const va = beforeMotion.get(numberOf(ball)), vb = ha && hb ? beforeMotion.get(numberOf(hb)) : null;
+      const strength = Math.hypot((va?.vx || 0) - (vb?.vx || 0), (va?.vy || 0) - (vb?.vy || 0));
+      const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+      if (strength > 1 && p.z > FELT_Z && now - (lastArcadeImpact.get(key) || 0) > 90) {
+        arcade.effects.impact({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, z: BALL_Z }, railBall ? 'rail' : 'ball', strength / 80);
+        lastArcadeImpact.set(key, now);
+      }
+    }
+    if (arcade.effects.enabled && !!ha !== !!hb) {
+      const ball = ha || hb, p = ball.body.translation(), v = ball.body.linvel();
+      const key = `well-${numberOf(ball)}`;
+      if (p.z < FELT_Z - 1 && inWell.has(ball) && Math.hypot(v.x, v.y, v.z) > 2 && now - (lastArcadeImpact.get(key) || 0) > 150) {
+        const pocket = pockets.reduce((a, b) => Math.hypot(p.x - a.x, p.y - a.y) < Math.hypot(p.x - b.x, p.y - b.y) ? a : b);
+        arcade.effects.ring(pocket, '#fff3dc', 1.9, 0.18); lastArcadeImpact.set(key, now);
       }
     }
     if (soundBudget <= 0) return;
@@ -464,14 +560,17 @@ function setInteractionMode(mode) {
   if (mode === 'fling' && gameMode !== 'free') return;
   endGesture();
   interactionMode = mode;
+  arcade.modeChanged();
   document.querySelectorAll('#mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
   document.getElementById('open-spin').hidden = mode !== 'cue';
   updateScore();
 }
 const onTable = (h) => h.mesh.visible && h.body.isEnabled() && !pocketedSet.has(h) && h.body.translation().z > BALL_Z - 0.5;
-const cueReady = () => onTable(cue) && tableStill() && !activeShot && !remoteTurn() &&
+const cueReady = () => !rackMotion && onTable(cue) && tableStill() && !activeShot && !arcade.active && !remoteTurn() &&
   (gameMode === 'free' || (match.winner === null && !match.ballInHand && (!onEight() || calledPocket !== null)));
 const onEight = () => !match.breaking && targets(match).length === 1 && targets(match)[0] === 8;
+const canCallPocket = () => gameMode !== 'free' && match.winner === null && !match.ballInHand &&
+  !rackMotion && !activeShot && !arcade.active && !computerTurn() && !remoteTurn() && onEight();
 function ballUnderPointer(e) {
   const balls = allBalls().filter((h) => h.mesh.visible), mesh = meshUnderPointer(e, balls.map((h) => h.mesh));
   const ball = balls.find((h) => h.mesh === mesh);
@@ -517,7 +616,11 @@ function moveBall(body, velocity) {
 function endDrag(fling = false) {
   if (!dragging) return;
   const { ball, samples } = dragging;
-  moveBall(ball.body, fling ? flingOnTable(ball, flingVelocity(samples)) : { x: 0, y: 0 });
+  const velocity = fling ? flingOnTable(ball, flingVelocity(samples)) : { x: 0, y: 0 };
+  moveBall(ball.body, velocity);
+  if (fling && onTable(ball) && Math.hypot(velocity.x, velocity.y) > 0.3) {
+    arcade.time = physicsTime; arcade.begin('fling', numberOf(ball), ball.body.translation()); shots++;
+  } else if (fling) arcade.effects.ring(ball.body.translation(), undefined, 1.6, 0.25);
   dragging = null; controls.enabled = true; updateGestureControls();
 }
 function updateGestureControls() {
@@ -577,12 +680,14 @@ function showGameControls(show) {
     });
     document.querySelectorAll('#difficulty button').forEach(b => b.addEventListener('click', () => {
       difficulty = b.dataset.difficulty;
+      arcade.modeChanged();
       document.querySelectorAll('#difficulty button').forEach(o => o.setAttribute('aria-pressed', String(o.dataset.difficulty === difficulty)));
       if (computerTurn() && !activeShot) { cancelComputerSearch(); computerPlan = null; computerWait = 0; endAim(); }
     }));
     document.getElementById('overhead-view').addEventListener('click', overheadView);
     document.getElementById('rematch').addEventListener('click', restart);
     document.querySelectorAll('#pocket-map button').forEach(b => b.addEventListener('click', () => {
+      if (!canCallPocket()) return;
       calledPocket = Number(b.dataset.pocket); updateScore();
     }));
   }
@@ -670,13 +775,12 @@ function tableStill() {
 // runs on screen and which end is nearer the top, then place the six targets on a schematic table
 // that matches. No copy has to explain which end is which.
 const THIRDS = { x: ['left', 'middle', 'right'], y: ['Top', 'Middle', 'Bottom'] };
-let pocketMapKey = '', pocketMapEl = null, pocketCallEl = null;
+let pocketMapKey = '', pocketMapEl = null;
 const projected = new THREE.Vector3();   // scratch: this runs every frame, so it must not allocate
 function layoutPocketMap() {
   const map = pocketMapEl ||= document.getElementById('pocket-map');
-  const panel = pocketCallEl ||= document.getElementById('panel-pockets');
-  // Checked by attribute, never by offsetParent: this runs each frame and must not force a reflow.
-  if (!map || !panel || panel.hidden || !pockets.length) return;
+  // Keep the chosen pocket's name aligned with the camera, even with the sheet closed.
+  if (!map || !pockets.length || (!canCallPocket() && calledPocket === null)) return;
   const at = (i) => { const v = projected.set(pockets[i].x, pockets[i].y, FELT_Z).project(camera); return { x: v.x, y: -v.y }; };
   const head = at(0), foot = at(2), across = at(3);
   const long = { x: foot.x - head.x, y: foot.y - head.y };          // table +x, the long rail
@@ -703,6 +807,28 @@ function layoutPocketMap() {
     // reads out cannot contradict the map the camera just turned.
     button.setAttribute('aria-label', `${THIRDS.y[top / 50]} ${THIRDS.x[left / 50]} pocket`);
   }
+  syncPocketCall();
+}
+
+function syncPocketCall() {
+  const available = canCallPocket(), chosen = calledPocket !== null;
+  const map = document.getElementById('pocket-map'), button = document.getElementById('open-pockets');
+  const name = chosen ? map.querySelector(`[data-pocket="${calledPocket}"]`)?.getAttribute('aria-label') : null;
+  button.hidden = !available;
+  button.textContent = chosen ? 'Change pocket' : 'Call the 8-ball pocket';
+  button.dataset.called = String(chosen);
+  button.title = chosen ? `Called: ${name}. Change before shooting.` : 'Choose the pocket before shooting the 8-ball';
+  const status = document.getElementById('pocket-call-status');
+  status.hidden = gameMode === 'free' || match.winner !== null || !onEight() || !chosen;
+  const text = chosen ? `Called: ${name}` : '';
+  if (status.textContent !== text) status.textContent = text;
+  for (const option of map.querySelectorAll('button')) {
+    option.setAttribute('aria-pressed', String(Number(option.dataset.pocket) === calledPocket));
+    option.disabled = !available;
+  }
+  // Panel visibility belongs to the sheet, independently of whether a call is due.
+  const sheet = document.getElementById('hud-sheet');
+  if (!available && sheet.open && !document.getElementById('panel-pockets').hidden) sheet.close();
 }
 
 function updateScore() {
@@ -718,14 +844,9 @@ function updateScore() {
   document.getElementById('interaction-group').hidden = !free;
   document.getElementById('rerack').textContent = free ? 'Re-rack ↻' : 'New rack ↻';
   document.getElementById('rematch').hidden = free || match.winner === null;
-  document.getElementById('panel-pockets').hidden = free || match.winner !== null || !!activeShot || match.ballInHand || computerTurn() || remoteTurn() || !onEight();
-  const pocketButton = document.getElementById('open-pockets');
-  pocketButton.hidden = document.getElementById('panel-pockets').hidden;
-  pocketButton.textContent = calledPocket === null ? 'Call pocket' : 'Pocket ✓';
-  layoutPocketMap();   // before the title below, which quotes the label this rewrites
-  pocketButton.title = calledPocket === null ? 'Choose the 8-ball pocket' : document.querySelector(`#pocket-call [data-pocket="${calledPocket}"]`).getAttribute('aria-label');
-  document.getElementById('open-spin').hidden = interactionMode !== 'cue' || !!activeShot || computerTurn() || remoteTurn() || (!free && match.winner !== null);
-  document.querySelectorAll('#pocket-map button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.pocket) === calledPocket)));
+  layoutPocketMap();
+  syncPocketCall();
+  document.getElementById('open-spin').hidden = !!rackMotion || interactionMode !== 'cue' || !!activeShot || computerTurn() || remoteTurn() || (!free && match.winner !== null);
   if (!free) for (let i = 0; i < 2; i++) {
     const card = document.getElementById(`player-${i}`);
     card.classList.toggle('active', match.winner === null && match.turn === i);
@@ -746,26 +867,29 @@ function updateScore() {
     }));
   }
   const lastShot = free ? '' : playerText(match.lastShot || '', gameMode, online.seat);
-  document.getElementById('shot-result').hidden = !lastShot;
+  const arcadeVisible = arcade.update();
+  document.getElementById('shot-result').hidden = !lastShot && !arcadeVisible;
   const resultText = document.getElementById('shot-result-text');
   if (resultText.textContent !== lastShot) resultText.textContent = lastShot;
   lastStatus = '';
   const nextAction = match.winner !== null ? `Player ${match.winner + 1} wins the rack!` :
     match.ballInHand ? `Player ${match.turn + 1}: place the cue ball.` :
+    canCallPocket() && calledPocket === null ? `Player ${match.turn + 1}: call a pocket for the 8-ball.` :
     match.breaking ? `Player ${match.turn + 1} to break.` :
     `Player ${match.turn + 1}’s turn${match.groups[match.turn] ? ` · ${match.groups[match.turn]}` : ''}.`;
-  ui.status(free ? (pocketed === 15 ? `Table cleared in ${shots} shots. Ready for another rack?` : '') :
+  ui.status(rackMotion ? 'Racking the balls…' : free ? (pocketed === 15 ? `Table cleared in ${shots} shots. Ready for another rack?` : '') :
     activeShot ? playerText(`Player ${match.turn + 1} shooting…`, gameMode, online.seat) : gameMode === 'online' && online.pending ? 'Waiting for the shot result…' : playerText(nextAction, gameMode, online.seat));
-  ui.hint(free ? (interactionMode === 'fling' ? 'Grab any ball. Release to fling. Hold still to place.' : 'Pull back from the cue ball. Release to shoot.') :
+  ui.hint(rackMotion ? 'Getting the table ready.' : free ? (interactionMode === 'fling' ? 'Grab any ball. Release to fling. Hold still to place.' : cueLearned ? '' : 'Pull back from the cue ball. Release to shoot.') :
     match.winner !== null ? 'A rack well played. Rematch to switch the break.' :
     activeShot ? 'Waiting for the balls to settle.' :
     gameMode === 'online' && online.pending ? 'The next turn begins when the result is confirmed.' :
     computerTurn() ? (computerWorker ? 'The computer is studying the table.' : 'The computer is lining up its shot.') :
     remoteTurn() ? (online.connected.every(Boolean) ? 'Your friend is lining up a shot.' : 'Share the invite link. Play begins when both players are connected.') :
     match.ballInHand ? 'Ball in hand: click an empty spot on the felt, or drag the white ball into place.' :
-    onEight() && calledPocket === null ? 'Choose a pocket for the 8-ball below, then take your shot.' :
+    onEight() && calledPocket === null ? 'Choose where the 8-ball will go before you shoot.' :
+    onEight() ? (cueLearned ? 'You can change your pocket call before shooting.' : 'Pull back from the white ball to shoot, or change your pocket call.') :
     !match.groups[match.turn] && !match.breaking ? 'Pocket a solid or stripe on a legal shot to claim your group.' :
-    'Pull back from the white ball. Release to shoot.');
+    cueLearned ? '' : 'Pull back from the white ball. Release to shoot.');
   if (overhead && !aiming) fitOverhead();
 }
 function overheadView() {
@@ -789,8 +913,9 @@ function startGame(mode, roomId = null) {
   if (!roomId && shots && (gameMode === 'free' || match.winner === null) && !window.confirm('Start a new game and clear this rack?')) return false;
   online.leave(); history.replaceState(null, '', location.pathname);
   gameMode = mode;
+  arcade.onlineCreating = mode === 'online' && !roomId;
   document.querySelectorAll('#game-mode button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.game === mode)));
-  document.getElementById('rematch').disabled = false; document.getElementById('rematch').textContent = 'Rematch'; match = newMatch(); layout();
+  document.getElementById('rematch').disabled = false; document.getElementById('rematch').textContent = 'Rematch'; match = newMatch(); layout(mode !== 'online' || !roomId);
   if (mode === 'online') { if (roomId) online.join(roomId); else void online.create(); }
   setInteractionMode('cue');
   return true;
@@ -820,6 +945,7 @@ function respot(ball, preferredX) {
   const p = findSpot(ball, preferredX);
   pocketedSet.delete(ball); belowSince.delete(ball); inWell.delete(ball);
   ball.body.setEnabled(true); ball.mesh.visible = true; spot(ball, p.x, p.y, rackRot(ball));
+  arcade.effects.ring(p, undefined, 2.2, 0.3);
 }
 function cancelPlacement() {
   if (!placing) return;
@@ -843,6 +969,7 @@ function finishPlacement() {
   if (gameMode === 'online') { cancelPlacement(); online.send('place', { position: { x: p.x, y: p.y } }); return; }
   placing = null;
   cue.body.setEnabled(true); spot(cue, p.x, p.y, IDENTITY); controls.enabled = true;
+  arcade.effects.ring(p, undefined, 2.2, 0.3);
   match = { ...match, ballInHand: false, message: `Player ${match.turn + 1}: cue ball placed. Take your shot.` }; updateScore();
 }
 function settleShot(dt) {
@@ -855,9 +982,10 @@ function settleShot(dt) {
   }
   const completed = activeShot;
   activeShot = null; calledPocket = null; settledFor = 0;
+  const result = resolveShot(match, completed);
+  completed.arcade = arcade.finish(completed, result);
   // Both clients animate the shot; only the shooter prepares a result for the server.
   if (gameMode === 'online' && online.seat !== onlineShooter) { updateScore(); return; }
-  const result = resolveShot(match, completed);
   if (gameMode !== 'online') match = result.state;
   if (result.rerack) {
     if (gameMode === 'online') { sendOnlineResult(completed); updateScore(); return; }
@@ -877,17 +1005,27 @@ function endAim() {
 function shoot() {
   const { dir, pull } = aimVector();
   if (pull < 0.3) return;
-  takeShot(dir, pull * SPEED_PER_PULL, spin);
+  if (!takeShot(dir, pull * SPEED_PER_PULL, spin)) return;
+  // Learn from the player's completed gesture, never from a computer or remote shot.
+  if (!cueLearned) {
+    cueLearned = true;
+    try { localStorage.setItem(CUE_LEARNED, '1'); } catch {}
+  }
 }
 function takeShot(dir, speed, shotSpin = { x: 0, y: 0 }, fromRoom = false) {
+  computerThoughts.clear();
+  // An accepted online shot takes precedence over a device's setup animation.
+  finishRack(false);
   if (gameMode === 'online' && !fromRoom) {
-    online.send('shoot', { action: { dir: { x: dir.x, y: dir.y }, speed, spin: shotSpin, calledPocket } }); return;
+    return online.send('shoot', { action: { dir: { x: dir.x, y: dir.y }, speed, spin: shotSpin, calledPocket } });
   }
   const c = cue.body.translation();
   if (gameMode !== 'free') { activeShot = shotRecord(calledPocket); settledFor = 0; }
+  arcade.time = physicsTime; arcade.begin('cue', 0, c);
   strike(cue.body, dir, speed, shotSpin);
   shots++;
   const at = spatial(c); audio.cueTip(speed / MAX_SPEED, at.pan, at.dist);
+  return true;
 }
 
 function tablePositions() {
@@ -895,22 +1033,24 @@ function tablePositions() {
 }
 function cancelComputerSearch() {
   computerWorker?.terminate(); computerWorker = null;
+  computerThoughts.clear();
 }
 function prepareComputerPlan(plan) {
   if (match.ballInHand) {
     const position = plan.position || computerPlacement(tablePositions(), match, validPlacement) || findSpot(cue, -HW * 0.5);
     spot(cue, position.x, position.y, IDENTITY); match = { ...match, ballInHand: false };
   }
-  computerPlan = plan; computerWait = 0.8; calledPocket = plan.pocket;
+  computerPlan = plan; computerWait = 0; calledPocket = plan.pocket;
+  computerThoughts.choose(plan, tablePositions());
   const c = cue.body.translation(), pull = plan.speed / SPEED_PER_PULL;
   setSpin(plan.spin?.x || 0, plan.spin?.y || 0);
   aiming = { to: new THREE.Vector3(c.x - plan.dir.x * pull, c.y - plan.dir.y * pull, BALL_Z) };
   guide.visible = true; cueStick.visible = true; updateScore();
 }
 function updateComputer(dt) {
+  if (rackMotion) return;
   if (!computerTurn() || activeShot || !tableStill()) { computerWait = 0; return; }
-  computerWait += dt;
-  if (computerWait < 0.8 || computerWorker) return;
+  if (computerWorker) return;
   if (!computerPlan) {
     if (difficulty === 'hard') {
       const worker = new Worker(new URL('./computer-worker.js', import.meta.url), { type: 'module' });
@@ -926,11 +1066,12 @@ function updateComputer(dt) {
       };
       worker.onmessage = ({ data }) => {
         if (computerWorker !== worker) return;
+        if (data.preview) { computerThoughts.show(data.preview); return; }
         if (data.error) { console.error('Computer search:', data.error); fallback(); return; }
         cancelComputerSearch(); prepareComputerPlan(data.shot);
       };
       worker.onerror = fallback;
-      worker.postMessage({ balls: tablePositions(), state: structuredClone(match), table: {
+      worker.postMessage({ balls: tablePositions(), state: structuredClone(match), previews: arcade.hud.enabled, table: {
         snapshot: world.takeSnapshot(), feltZ: FELT_Z, cushions: [...cushionHandles],
         handles: allBalls().filter(b => !pocketedSet.has(b)).map(b => ({ number: numberOf(b), handle: b.body.handle })),
       } });
@@ -941,8 +1082,12 @@ function updateComputer(dt) {
       spot(cue, position.x, position.y, IDENTITY); match = { ...match, ballInHand: false };
     }
     prepareComputerPlan(computerShot(tablePositions(), match, difficulty));
+    return;
   }
-  if (computerWait < 1.6) return;
+  // Planning begins as soon as the table settles. Only the brief cue windup
+  // remains; it has the same duration with Arcade on or off.
+  computerWait += dt;
+  if (computerWait < COMPUTER_CUE_TIME) return;
   const plan = computerPlan; computerPlan = null; computerWait = 0;
   takeShot(plan.dir, plan.speed, plan.spin); endAim();
 }
@@ -951,6 +1096,7 @@ function sendOnlineResult(report) {
   if (online.seat === onlineShooter && onlineShotSeq === online.seq) online.submitResult({ report, balls: tablePositions() });
 }
 function applyOnlineSnapshot(snapshot) {
+  finishRack(false);
   endGesture(); activeShot = null; computerPlan = null; settledFor = 0; calledPocket = null;
   belowSince.clear(); inWell.clear(); respotAt = 0; pocketedSet.clear();
   eventQueue.drainCollisionEvents(() => {});
@@ -971,7 +1117,10 @@ function receiveOnline(data) {
   if (data.type !== 'state' && data.type !== 'shot') return;
   // A resync during the same shot preserves the running simulation.
   if (data.pending && onlineShotSeq === data.seq) return;
+  const origins = rackOrigins();
+  const newRack = arcade.syncOnline(data.snapshot);
   applyOnlineSnapshot(data.snapshot);
+  if (newRack && !data.pending) { beginRack(origins, data.snapshot.balls); updateScore(); }
   document.getElementById('rematch').disabled = data.votes?.includes(online.seat) ?? false;
   document.getElementById('rematch').textContent = data.votes?.includes(online.seat) ? 'Waiting for your friend…' : data.votes?.length ? 'Accept rematch' : 'Rematch';
   if (data.pending) {
@@ -999,13 +1148,14 @@ function collectPocketed() {
       if (!belowSince.has(h)) belowSince.set(h, now);
       if (now - belowSince.get(h) > 0.6) {
         pocketedSet.add(h); belowSince.delete(h);
+        let pocket = 0;
+        pockets.forEach((p, i) => { if (Math.hypot(t.x - p.x, t.y - p.y) < Math.hypot(t.x - pockets[pocket].x, t.y - pockets[pocket].y)) pocket = i; });
         if (activeShot) {
           if (below) {
-            let pocket = 0;
-            pockets.forEach((p, i) => { if (Math.hypot(t.x - p.x, t.y - p.y) < Math.hypot(t.x - pockets[pocket].x, t.y - pockets[pocket].y)) pocket = i; });
             activeShot.pocketed.push({ number: numberOf(h), pocket });
           } else activeShot.offTable.push(numberOf(h));
         }
+        arcade.pocket(numberOf(h), pocket, below ? pockets[pocket] : { x: THREE.MathUtils.clamp(t.x, -HW, HW), y: THREE.MathUtils.clamp(t.y, -HH, HH) }, !below);
         // No delayed hide callback: a re-rack can safely revive every ball immediately.
         hideHead(h);
         if (h === cue && gameMode === 'free') respotAt = now + 0.6;
@@ -1024,7 +1174,7 @@ export default {
   enter() {
     setHeadRadius(R); world.gravity = { x: 0, y: 0, z: -G };
     RectAreaLightUniformsLib.init();
-    build(); layout(); setupCamera(); setLook(true);
+    build(); layout(!/^#room=/.test(location.hash)); setupCamera(); setLook(true);
     const initialEnvironment = environmentId;
     setEnvironment('minimal');
     if (initialEnvironment !== 'minimal') setEnvironment(initialEnvironment);
@@ -1033,7 +1183,10 @@ export default {
     joinInvite();
   },
   exit() {
+    finishRack(false);
+    arcade.effects.dispose(); audio.stopArcade();
     cancelComputerSearch();
+    computerThoughts.dispose();
     window.removeEventListener('hashchange', joinInvite); online.leave();
     endGesture();
     ++environmentRequest; pendingRoom?.dispose(); pendingRoom = null;
@@ -1056,6 +1209,7 @@ export default {
   },
   pointerdown(e) {
     audio.ensure();
+    if (rackMotion) return false;
     if (computerTurn() || remoteTurn() || e.button !== 0 || dragging || aiming || placing) return false;
     if (gameMode !== 'free' && match.winner === null && match.ballInHand && !activeShot && tableStill()) {
       if (meshUnderPointer(e, [cue.mesh]) !== cue.mesh && !validPlacement(pointerToPlane(e, BALL_Z))) return false;
@@ -1069,6 +1223,7 @@ export default {
       controls.enabled = false;
       const p = ball.body.translation(), to = new THREE.Vector3(p.x, p.y, BALL_Z);
       dragging = { ball, to, offset: to.clone().sub(pointerToPlane(e, BALL_Z)), samples: [] };
+      arcade.touch(numberOf(ball));
       sampleDrag(e); updateGestureControls();
       return true;
     }
@@ -1080,6 +1235,7 @@ export default {
   },
   // Only the captured pointer's moves arrive during a gesture; otherwise the return value is the hover state.
   pointermove(e) {
+    if (rackMotion) return false;
     if (computerTurn() || remoteTurn()) return false;
     if (placing) { movePlacement(e); return; }
     if (dragging) {
@@ -1101,23 +1257,54 @@ export default {
   },
   pointercancel: endGesture,   // explicit cancellation never fires a shot or fling
   step() {
+    if (rackMotion) {
+      eventQueue.drainCollisionEvents(() => {}); physicsTime += world.timestep; return;
+    }
+    arcade.time = physicsTime;
     drainSounds();
+    if (computerTurn() && !activeShot) {
+      updateComputer(world.timestep);
+      // Keep the exact snapshot, including contact/sleep state, until the strike.
+      // The eventual impulse also precedes felt friction, as it does in the worker.
+      if (computerWorker || computerPlan) return false;
+    }
     rollingResistance(world.timestep);
     updateDrag();
     physicsTime += world.timestep;
     collectPocketed();
     settleShot(world.timestep);
-    updateComputer(world.timestep);
+    if (arcade.active?.free) arcade.settleFree(tableStill(), belowSince.size, dragging, world.timestep);
+    // The next solver step's incoming velocities are needed to distinguish a
+    // struck ball from one that merely deflected a ball already in motion.
+    if (arcade.active || arcade.effects.enabled) for (const ball of allBalls()) {
+      const p = ball.body.translation(), v = ball.body.linvel(), n = numberOf(ball);
+      let sample = beforeMotion.get(n); if (!sample) { sample = {}; beforeMotion.set(n, sample); }
+      sample.x = p.x; sample.y = p.y; sample.vx = v.x; sample.vy = v.y;
+    }
   },
   setEnvironment,
   environment: () => environmentId,
   setGame: (mode) => startGame(mode),
-  matchState: () => ({ mode: gameMode, match: structuredClone(match), shot: activeShot && structuredClone(activeShot), calledPocket }),
+  matchState: () => ({ mode: gameMode, match: structuredClone(match), shot: activeShot && structuredClone(activeShot), calledPocket, racking: !!rackMotion }),
   balls: allBalls,
   controls: () => controls,   // for scripted testing
   audio,
+  arcadeState: () => arcade.debug(),
+  setArcade: enabled => arcade.hud.setEnabled(enabled),
+  ...(import.meta.env.DEV ? { debugShot: (dir, speed, shotSpin) => { takeShot(dir, speed, shotSpin); endAim(); },
+    previewArcade: kind => {
+      if (kind === 'rack') arcade.effects.rack(rackPositions(), gameMode === 'free');
+      else arcade.effects.pocket(pockets[1], kind === 'scratch' ? 'SCRATCH' : kind === 'early' ? 'TOO SOON!' : '+350',
+        kind === 'scratch' || kind === 'early' ? 'NO POINTS THIS SHOT' : 'BANK SHOT!', { down: kind === 'scratch' || kind === 'early', color: kind === 'early' ? '#bd8bce' : kind === 'scratch' ? '#f28c78' : '#ffe08a', pending: kind === 'bank' });
+    } } : {}),
   frame() {
     controls?.update();
+    animateRack();
+    if (scene.fog && controls) {
+      // A camera pulled back to fit the HUD must not lose the table in the fog.
+      const retreat = Math.max(0, camera.position.distanceTo(controls.target) - 120);
+      scene.fog.near = 140 + retreat; scene.fog.far = 330 + retreat;
+    }
     if (aiming) updateGuide();
     else {
       const aim = gameMode === 'online' && match.turn !== online.seat && !activeShot &&
@@ -1134,7 +1321,7 @@ export default {
     balls.forEach((h, i) => {
       setBallDetail(h.mesh, R * pixelScale / h.mesh.position.distanceTo(camera.position));
       const cs = contactShadows[i]; if (!cs) return;
-      const t = h.body.translation(), on = h.mesh.visible && h.body.isEnabled() && t.z > BALL_Z - 0.3;
+      const t = h.mesh.position, on = h.mesh.visible && (h.body.isEnabled() || !!rackMotion) && t.z > BALL_Z - 0.3;
       cs.visible = on; if (on) cs.position.set(h.mesh.position.x, h.mesh.position.y, FELT_Z + 0.015);
     });
     // Update shadows only when a ball or the cue changes, including hiding a pocketed ball.
@@ -1150,5 +1337,7 @@ export default {
       marker.visible = ready;
       if (ready) { const c = (dragging?.ball || cue).body.translation(); marker.position.set(c.x, c.y, FELT_Z + 0.03); }
     }
+    arcade.effects.frame(balls);
+    computerThoughts.frame();
   },
 };

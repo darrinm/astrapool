@@ -4,6 +4,8 @@ import { once } from 'node:events';
 import { before, after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
+import { PROTOCOL_VERSION } from './protocol.js';
+import { ArcadeEvents, EVENT as E } from '../src/arcade-events.js';
 const base = 'http://127.0.0.1:8789';
 let runtime, output = '';
 const clients = [];
@@ -34,7 +36,7 @@ async function connect(id, token = crypto.randomUUID()) {
     });
   } };
   clients.push(client); await once(ws, 'open');
-  ws.send(JSON.stringify({ type: 'hello', version: 1, token }));
+  ws.send(JSON.stringify({ type: 'hello', version: PROTOCOL_VERSION, token }));
   return client;
 }
 test('private room: seats, turn enforcement, results, placement, reconnect, interrupted shot, win and mutual rematch', async () => {
@@ -76,6 +78,40 @@ test('private room: seats, turn enforcement, results, placement, reconnect, inte
   assert.equal(vote.snapshot.match.winner, 1);
   rejoined.send('rematch'); const rematch = await returned.wait(m => m.type === 'state' && m.seq > vote.seq);
   assert.equal(rematch.snapshot.match.winner, null); assert.equal(rematch.snapshot.match.breaker, 1); assert.deepEqual(rematch.snapshot.match.wins, [0, 1]); assert.equal(rematch.snapshot.balls.length, 16);
+  assert.equal(rematch.snapshot.arcade.rack, won.snapshot.arcade.rack + 1); assert.deepEqual(rematch.snapshot.arcade.totals, [0, 0]);
+});
+
+test('arcade scores agree across peers, reject duplicates, survive reconnect, and roll back interrupted play', async () => {
+  const { id } = await (await fetch(base + '/api/rooms', { method: 'POST', headers: { Origin: base } })).json();
+  const one = await connect(id), initial = await one.wait(m => m.type === 'state');
+  const two = await connect(id); await two.wait(m => m.type === 'state');
+  await one.wait(m => m.type === 'presence' && m.connected.every(Boolean));
+  const action = { dir: { x: 1, y: 0 }, speed: 100, spin: { x: 0, y: 0 }, calledPocket: null };
+  one.send('shoot', { action }); const started = await one.wait(m => m.type === 'shot'); await two.wait(m => m.type === 'shot');
+  const trace = new ArcadeEvents();
+  trace.add(E.launch, 0, 0); trace.add(E.hit, 10, 0, 1); trace.add(E.rail, 20, 1, 0); trace.add(E.pot, 100, 1, 2);
+  const report = { first: 1, rails: [1], pocketed: [{ number: 1, pocket: 2 }], offTable: [], arcade: trace.report() };
+  one.send('result', { report, balls: initial.snapshot.balls.filter(b => b.number !== 1) });
+  const scored = await one.wait(m => m.type === 'state' && m.seq > started.seq);
+  const peer = await two.wait(m => m.type === 'state' && m.seq === scored.seq);
+  assert.deepEqual(scored.snapshot.arcade, peer.snapshot.arcade); assert.equal(peer.snapshot.arcade.totals[0], 250);
+  one.send('result', { seq: started.seq, report, balls: scored.snapshot.balls });
+  assert.match((await one.wait(m => m.type === 'error')).message, /table changed/);
+  const duplicate = await one.wait(m => m.type === 'state'); assert.deepEqual(duplicate.snapshot.arcade, scored.snapshot.arcade);
+  one.send('shoot', { action }); const unfinished = await one.wait(m => m.type === 'shot'); await two.wait(m => m.type === 'shot');
+  one.ws.close(); await once(one.ws, 'close');
+  const rollback = await two.wait(m => m.type === 'state' && m.seq > unfinished.seq);
+  assert.deepEqual(rollback.snapshot.arcade, scored.snapshot.arcade);
+  const returned = await connect(id, one.token); const restored = await returned.wait(m => m.type === 'state');
+  assert.deepEqual(restored.snapshot.arcade, scored.snapshot.arcade);
+  await two.wait(m => m.type === 'presence' && m.connected.every(Boolean));
+  returned.send('shoot', { action }); const scratchStart = await returned.wait(m => m.type === 'shot'); await two.wait(m => m.type === 'shot');
+  const scratch = new ArcadeEvents(); scratch.add(E.launch, 0, 0); scratch.add(E.hit, 10, 0, 2); scratch.add(E.pot, 30, 2, 0); scratch.add(E.pot, 40, 0, 3);
+  returned.send('result', { report: { first: 2, rails: [], pocketed: [{ number: 2, pocket: 0 }, { number: 0, pocket: 3 }], offTable: [], arcade: scratch.report() }, balls: restored.snapshot.balls.filter(b => b.number !== 2) });
+  const failed = await returned.wait(m => m.type === 'state' && m.seq > scratchStart.seq);
+  await two.wait(m => m.type === 'state' && m.seq === failed.seq);
+  assert.equal(failed.snapshot.arcade.last.fault, 'scratch'); assert.deepEqual(failed.snapshot.arcade.totals, [250, 0]); assert.equal(failed.snapshot.arcade.streaks[0], 0);
+  returned.ws.close(); two.ws.close();
 });
 
 test('live cues relay only the active player, preserve the table, and do not consume shot requests', async () => {
