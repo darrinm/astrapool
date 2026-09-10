@@ -50,7 +50,7 @@ let settledFor = 0, physicsTime = 0, placing = null, pocketMarker;
 let rackMotion = null;
 let computerWait = 0, computerPlan = null, computerWorker = null;
 const COMPUTER_CUE_TIME = 0.18;
-let difficulty = 'medium', onlineShotSeq = null, onlineShooter = null;
+let difficulty = 'hard', onlineShotSeq = null, onlineShooter = null;
 let overhead = false, hudObserver;
 const online = new OnlineRoom(receiveOnline, text => {
   document.getElementById('online-status').textContent = text;
