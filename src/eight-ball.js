@@ -25,6 +25,12 @@ export function resolveShot(previous, shot) {
   if (previous.winner === null) result.state.lastShot = shotSummary(previous, shot, result);
   return result;
 }
+// The welcome demo plays one open-table run: either group is a target, then the 8.
+// Keep normal fouls, spotting, and rack endings, but never hand play to a human.
+export function resolveSoloShot(previous, shot) {
+  const result = resolveShot(previous, shot);
+  return { ...result, state: { ...result.state, turn: 0, breaker: 0, groups: [null, null] } };
+}
 function resolveRules(previous, shot) {
   if (previous.winner !== null) return { state: previous, respot: [], rerack: false };
   const state = { ...previous, groups: [...previous.groups], down: [...previous.down], wins: [...previous.wins],

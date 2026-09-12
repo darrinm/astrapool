@@ -1,5 +1,5 @@
 #arcade-effects { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
-body:has(#welcome[open]) #arcade-effects, body:has(#hud-sheet[open]) #arcade-effects { visibility: hidden; }
+body:has(#hud-sheet[open]) #arcade-effects { visibility: hidden; }
 #computer-thought { position: fixed; top: 0; left: 0; z-index: 2; pointer-events: none; padding: 4px 10px; border-radius: 14px 14px 14px 3px; background: #ffe08a; color: #352219; box-shadow: 0 2px 7px #0003; font: 750 14px/1.3 ui-rounded, system-ui, sans-serif; }
 #computer-thought.chosen { background: #a8e8be; }
 .arcade-float { position: absolute; top: 0; left: 0; max-width: 210px; text-align: center; color: var(--arcade-color, #ffe08a); transform-origin: center; will-change: transform, opacity; font-family: ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif; }

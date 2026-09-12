@@ -25,7 +25,7 @@ import { groupLabel, playerName, playerText } from './match-copy.js';
 import { setOverheadCamera, withinCueTarget } from './table-view.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
-import { newMatch, targets, groupBalls, shotRecord, resolveShot } from './eight-ball.js';
+import { newMatch, targets, groupBalls, shotRecord, resolveShot, resolveSoloShot } from './eight-ball.js';
 import { PoolArcade } from './arcade.js';
 import { planRack, rackPose, RACK_DURATION } from './rack-animation.js';
 import { ComputerThoughts } from './computer-thoughts.js';
@@ -60,6 +60,7 @@ let gameMode = 'computer', match = newMatch(), activeShot = null, calledPocket =
 let settledFor = 0, physicsTime = 0, placing = null, pocketMarker;
 let rackMotion = null;
 let computerWait = 0, computerPlan = null, computerWorker = null;
+let attractMode = false, attractWait = 0;
 const COMPUTER_CUE_TIME = 0.18;
 let difficulty = 'hard', onlineShotSeq = null, onlineShooter = null;
 let overhead = false, hudObserver;
@@ -71,7 +72,7 @@ const online = new OnlineRoom(receiveOnline, text => {
   document.getElementById('online-retry').hidden = !!online.id && online.connected.every(Boolean);
 });
 const remoteTurn = () => gameMode === 'online' && (!online.canAct || match.turn !== online.seat);
-const computerTurn = () => gameMode === 'computer' && match.turn === 1 && match.winner === null;
+const computerTurn = () => (attractMode || gameMode === 'computer' && match.turn === 1) && match.winner === null;
 const cushionHandles = new Set();
 const arcadeRailIds = new Map(), beforeMotion = new Map(), lastArcadeImpact = new Map();
 const numberOf = ball => ball.number ?? ballNumber(rackIndexOfHead(heads.indexOf(ball)));
@@ -540,6 +541,8 @@ function resetView() {
   else if (innerHeight <= 600) { camera.position.set(-100, -56, FELT_Z + 38); controls.target.set(-4, 0, FELT_Z); }
   else if (environmentId === 'minimal') camera.position.set(-HW * 1.6, 0, FELT_Z + 21);
   else { camera.position.set(-115, -65, FELT_Z + 40); controls.target.z = FELT_Z - 7; }
+  // Give the solo demo a closer view of the shots and search effects.
+  if (attractMode) camera.position.sub(controls.target).multiplyScalar(0.8).add(controls.target);
   controls.update();
 }
 
@@ -586,7 +589,7 @@ function lampRoom() {
 // ---------- sound ----------
 const audio = new PoolAudio();
 const arcade = new PoolArcade({ scene, camera, feltZ: FELT_Z, audio, spatial, refresh: updateScore,
-  context: () => ({ mode: gameMode, match, input: interactionMode, difficulty, calledPocket, pockets, seat: online.seat }) });
+  context: () => ({ mode: gameMode, attract: attractMode, match, input: interactionMode, difficulty, calledPocket, pockets, seat: online.seat }) });
 const computerThoughts = new ComputerThoughts({ scene, camera, feltZ: FELT_Z, settings: () => arcade.hud });
 const replay = new ShotReplay();
 const replayView = new ReplayView({ scene, exit: () => stopReplay(true) });
@@ -1059,8 +1062,17 @@ function fitOverhead() {
     surfaceZ: FELT_Z + RAIL_H + 0.5, top, bottom, left, right,
   });
 }
+function setAttract(active) {
+  attractMode = active; attractWait = 0;
+  // DOM labels must live in the dialog's top layer while the demo is showing.
+  const parent = active ? document.getElementById('welcome') : document.body;
+  if (active) { arcade.effects.ensure(); computerThoughts.ensure(); resetView(); }
+  for (const element of [arcade.effects.overlay, computerThoughts.label]) if (element) parent.append(element);
+  if (!active && controls) controls.autoRotate = false;
+}
 function startGame(mode, roomId = null) {
-  if (!roomId && shots && (gameMode === 'free' || match.winner === null) && !window.confirm('Start a new game and clear this rack?')) return false;
+  if (!attractMode && !roomId && shots && (gameMode === 'free' || match.winner === null) && !window.confirm('Start a new game and clear this rack?')) return false;
+  setAttract(false);
   stopReplay(); replay.reset();
   online.leave(); history.replaceState(null, '', location.pathname);
   gameMode = mode;
@@ -1133,7 +1145,7 @@ function settleShot(dt) {
   const completed = activeShot;
   replay.finish(physicsTime, readReplayPoses, gameMode === 'online');
   activeShot = null; calledPocket = null; settledFor = 0;
-  const result = resolveShot(match, completed);
+  const result = attractMode ? resolveSoloShot(match, completed) : resolveShot(match, completed);
   completed.arcade = arcade.finish(completed, result);
   // Both clients animate the shot; only the shooter prepares a result for the server.
   if (gameMode === 'online' && online.seat !== onlineShooter) { updateScore(); return; }
@@ -1204,7 +1216,7 @@ function updateComputer(dt) {
   if (!computerTurn() || activeShot || !tableStill()) { computerWait = 0; return; }
   if (computerWorker) return;
   if (!computerPlan) {
-    if (difficulty === 'hard') {
+    if (attractMode || difficulty === 'hard') {
       const worker = new Worker(new URL('./computer-worker.js', import.meta.url), { type: 'module' });
       computerWorker = worker;
       const fallback = () => {
@@ -1345,6 +1357,7 @@ export default {
     joinInvite();
   },
   exit() {
+    setAttract(false);
     stopReplay(); replay.reset();
     finishRack(false);
     arcade.effects.dispose(); audio.stopArcade();
@@ -1436,6 +1449,12 @@ export default {
   pointercancel: endGesture,   // explicit cancellation never fires a shot or fling
   step() {
     if (replayView.active) return false;
+    if (attractMode && document.hidden) return false;
+    if (attractMode && match.winner !== null) {
+      attractWait += world.timestep;
+      if (attractWait >= 2) { attractWait = 0; match = newMatch(); layout(); }
+      return false;
+    }
     if (rackMotion) {
       eventQueue.drainCollisionEvents(() => {}); physicsTime += world.timestep; return;
     }
@@ -1470,7 +1489,8 @@ export default {
   ballStyle: () => ballStyle,
   environment: () => environmentId,
   setGame: (mode) => startGame(mode),
-  matchState: () => ({ mode: gameMode, match: structuredClone(match), shot: activeShot && structuredClone(activeShot), calledPocket, racking: !!rackMotion }),
+  startAttract: () => setAttract(true),
+  matchState: () => ({ mode: gameMode, attract: attractMode, match: structuredClone(match), shot: activeShot && structuredClone(activeShot), calledPocket, racking: !!rackMotion }),
   balls: allBalls,
   controls: () => controls,   // for scripted testing
   audio,

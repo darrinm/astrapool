@@ -4,6 +4,17 @@ import { PoolArcade } from './arcade.js';
 import { newArcade } from './arcade-score.js';
 import { newMatch, resolveShot } from './eight-ball.js';
 
+test('attract play never records a personal best', () => {
+  const arcade = Object.create(PoolArcade.prototype);
+  let recorded = 0;
+  Object.assign(arcade, { context: () => ({ attract: true }), hud: { record() { recorded++; } } });
+  arcade.recordBest();
+  assert.equal(recorded, 0);
+  arcade.context = () => ({ mode: 'computer' });
+  arcade.recordBest();
+  assert.equal(recorded, 1);
+});
+
 // Exercise event orchestration with presentation sinks, independently of WebGL.
 function controller(match) {
   const reactions = [], pockets = Array.from({ length: 6 }, (_, i) => ({ x: i * 10, y: 0 }));

@@ -152,6 +152,7 @@ export class PoolArcade {
   }
   recordBest() {
     const c = this.context();
+    if (c.attract) return;
     this.hud.record(this.state, this.category, c.mode === 'online' ? c.seat === null ? [] : [c.seat] : c.mode === 'computer' || c.mode === 'free' ? [0] : [0, 1]);
   }
   update() {
