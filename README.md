@@ -5,7 +5,7 @@ three computer opponents, and private rooms you share with a link.
 
 **[Play it at astrapool.darrinm.com](https://astrapool.darrinm.com)** — no install, no account, nothing to sign up for.
 
-![A pool table racked for eight-ball in an orbital lounge, Earth through the window.](public/og.jpg)
+![A pool table in an orbital lounge, racked with the planets and broken with a glowing Sun for a cue ball.](public/og.jpg)
 
 Built with [three.js](https://threejs.org) and [Rapier](https://rapier.rs), served from a Cloudflare Worker.
 
