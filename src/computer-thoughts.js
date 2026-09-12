@@ -19,7 +19,7 @@ export class ComputerThoughts {
     const material = color => new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, toneMapped: false });
     for (let i = 0; i < 2; i++) {
       const group = new THREE.Group(); group.visible = false; this.group.add(group);
-      const lines = [C.cream, C.gold].map(color => {
+      const lines = [C.cream, C.gold, C.mint, C.plum].map(color => {
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_POINTS * 3), 3).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array(MAX_POINTS), 1).setUsage(THREE.DynamicDrawUsage));
@@ -52,7 +52,10 @@ export class ComputerThoughts {
     const cue = preview.paths.find(p => p.number === 0)?.points || [];
     const object = preview.paths.find(p => p.number === preview.target)?.points || [];
     slot.cue = cue;
-    for (const [i, points] of [cue, object].entries()) {
+    const others = preview.paths.filter(p => p.number !== 0 && p.number !== preview.target && p.points.length > 1)
+      .sort((a, b) => Number(preview.traceTargets?.includes(b.number)) - Number(preview.traceTargets?.includes(a.number)))
+      .slice(0, 2).map(p => p.points);
+    for (const [i, points] of [cue, object, others[0] || [], others[1] || []].entries()) {
       const line = slot.lines[i], positions = line.geometry.attributes.position, distances = line.geometry.attributes.lineDistance;
       const length = Math.min(MAX_POINTS, points.length);
       let distance = 0;
@@ -68,11 +71,11 @@ export class ComputerThoughts {
     if (slot.target) slot.halo.position.set(slot.target.x, slot.target.y, this.feltZ + 0.1);
     const pocket = pockets[preview.pocket]; slot.pocket.visible = !!pocket;
     if (pocket) slot.pocket.position.set(pocket.x, pocket.y, this.feltZ + 0.12);
-    this.label.textContent = chosen ? 'Aha!' : 'Hmm…';
+    this.label.textContent = preview.label || (chosen ? 'Aha!' : 'Hmm…');
     this.label.classList.toggle('chosen', chosen);
   }
   choose(shot, balls) {
-    this.show({ target: shot.target, pocket: shot.pocket,
+    this.show({ target: shot.target, pocket: shot.pocket, label: shot.label,
       paths: balls.filter(b => b.number === 0 || b.number === shot.target).map(b => ({ number: b.number, points: [{ x: b.x, y: b.y }] })) }, true);
   }
   frame() {

@@ -661,7 +661,7 @@ function drainSounds() {
       }
     }
     const railId = arcadeRailIds.get(cushionHandles.has(a) ? a : b);
-    if (ha && hb) arcade.hit(numberOf(ha), numberOf(hb), beforeMotion.get(numberOf(ha)), beforeMotion.get(numberOf(hb)), dragging?.ball === ha || dragging?.ball === hb);
+    if (ha && hb) arcade.hit(numberOf(ha), numberOf(hb), beforeMotion.get(numberOf(ha)), beforeMotion.get(numberOf(hb)), dragging?.ball === ha || dragging?.ball === hb, ha.body.linvel(), hb.body.linvel());
     if (railBall) {
       const p = railBall.body.translation();
       arcade.rail(numberOf(railBall), railId, !pockets.some(hole => Math.hypot(p.x - hole.x, p.y - hole.y) < POCKET_R * 2.2));
@@ -1218,7 +1218,7 @@ function updateComputer(dt) {
   if (!computerTurn() || activeShot || !tableStill()) { computerWait = 0; return; }
   if (computerWorker) return;
   if (!computerPlan) {
-    if (attractMode || difficulty === 'hard') {
+    if (attractMode || difficulty === 'hard' || difficulty === 'tricky') {
       const worker = new Worker(new URL('./computer-worker.js', import.meta.url), { type: 'module' });
       computerWorker = worker;
       const fallback = () => {
@@ -1237,7 +1237,7 @@ function updateComputer(dt) {
         cancelComputerSearch(); prepareComputerPlan(data.shot);
       };
       worker.onerror = fallback;
-      worker.postMessage({ balls: tablePositions(), state: structuredClone(match), previews: arcade.hud.enabled, table: {
+      worker.postMessage({ difficulty: attractMode ? 'hard' : difficulty, solo: attractMode, arcade: structuredClone(arcade.state), balls: tablePositions(), state: structuredClone(match), previews: arcade.hud.enabled, table: {
         snapshot: world.takeSnapshot(), feltZ: FELT_Z, cushions: [...cushionHandles],
         handles: allBalls().filter(b => !pocketedSet.has(b)).map(b => ({ number: numberOf(b), handle: b.body.handle })),
       } });
@@ -1469,6 +1469,10 @@ export default {
       // Keep the exact snapshot, including contact/sleep state, until the strike.
       // The eventual impulse also precedes felt friction, as it does in the worker.
       if (computerWorker || computerPlan) return false;
+    }
+    if (arcade.active) for (const ball of allBalls()) {
+      const p = ball.body.translation();
+      if (!pocketedSet.has(ball) && p.z >= FELT_Z) arcade.active.tracker.sample(numberOf(ball), p);
     }
     rollingResistance(world.timestep);
     updateDrag();

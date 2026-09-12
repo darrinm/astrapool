@@ -40,12 +40,17 @@ pocketing only one group assigns it. Hit your own group first, then pocket a bal
 a cushion. All fouls give ball-in-hand anywhere. The 8 is called into a pocket and played on its
 own shot; regular shots need no call.
 
-**Vs Computer** has three opponents. Easy favours simple pots with forgiving aim and loose power.
+**Vs Computer** has four styles. Easy favours simple pots with forgiving aim and loose power.
 Medium aims and controls power more precisely and selects shots geometrically, but does not plan
 ahead; both lose accuracy on long or thin cuts. Hard is the default: it tests pots, banks, legal
 escapes, power and spin in a copy of the live world, rejects scratches and early 8s, weighs the
 next shot against a defensive leave, searches ball-in-hand placements, and calls the 8. It adds no
 random aiming error, and searches in a background worker so the table stays responsive.
+
+Tricky plays for arcade points, searching banks, kicks, combinations and caroms, checking the
+margin for error and the next scoring chance. Its practice paths show projected points. The
+in-game Help includes the expanded bonus table; [Tricky mode](docs/tricky-mode.md) describes
+the scoring evidence and search limits.
 
 **Free Play** adds **Fling**: grab any ball and throw it across the felt.
 
@@ -98,6 +103,7 @@ npm test                     # rules, computer, pointer behaviour, server protoc
 npm run physics-test         # the 26 physics checks
 npm run test:online          # a real local Worker and two WebSocket clients
 npm run benchmark:computer   # Easy, Medium and Hard over eight fixed endgames
+npm run benchmark:tricky     # Hard and Tricky with equal search limits
 ```
 
 Node 24, from `.nvmrc`. Scale is 1 unit = 26 mm, g = 377.
@@ -106,6 +112,7 @@ Node 24, from `.nvmrc`. Scale is 1 unit = 26 mm, g = 377.
 - `src/pool.js` — the game: table, colliders, aim guide, cue stick, presentation.
 - `src/eight-ball.js` — the rules engine, shared with the server.
 - `src/hard-computer.js`, `src/shot-simulation.js`, `src/computer-worker.js` — the Hard search.
+- `src/tricky-computer.js`, `src/trick-shots.js` — arcade score search and trick-shot candidates.
 - `physics/poolphysics.js` — table physics as a plain module, shared by the game and the harness.
 - `physics/validate.mjs` — the 26 checks.
 - `server/worker.js`, `server/protocol.js` — Durable Object rooms and validated actions.

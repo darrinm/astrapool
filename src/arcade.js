@@ -1,4 +1,4 @@
-import { ArcadeEvents, EVENT, collisionDirection } from './arcade-events.js';
+import { ArcadeEvents, EVENT } from './arcade-events.js';
 import { newArcade, scoreArcade, commitArcade, arcadeFault, FAULT_NAMES } from './arcade-score.js';
 import { ArcadeEffects, ARCADE_COLORS as C } from './arcade-effects.js';
 import { ArcadeHud } from './arcade-hud.js';
@@ -41,16 +41,16 @@ export class PoolArcade {
       this.settled = 0;
     }
     this.active.tracker.add(EVENT.launch, this.tick, ball);
+    this.active.tracker.sample(ball, at);
     this.effects.launch(at); this.updatePreview();
   }
   touch(number) { if (this.active) this.active.tracker.add(EVENT.touch, this.tick, number); }
-  hit(a, b, beforeA, beforeB, manual = false) {
+  hit(a, b, beforeA, beforeB, manual = false, afterA, afterB) {
     if (!this.active) return;
     const play = this.active;
     if (play.report.first === null && (a === 0 || b === 0)) play.report.first = a === 0 ? b : a;
     if (manual) { this.touch(a); this.touch(b); return; }
-    const direction = collisionDirection(beforeA, beforeB);
-    play.tracker.add(direction ? EVENT.hit : EVENT.ambiguous, this.tick, direction < 0 ? b : a, direction < 0 ? a : b);
+    play.tracker.hit(this.tick, a, b, beforeA, beforeB, afterA, afterB);
   }
   rail(number, index, qualifies = true) {
     if (!this.active) return;
@@ -61,7 +61,7 @@ export class PoolArcade {
   pocket(number, pocket, at, off = false) {
     const play = this.active;
     if (!play) { this.effects.ring(at, C.cream, 2); return; }
-    play.tracker.add(off ? EVENT.off : EVENT.pot, this.tick, number, off ? 0 : pocket);
+    play.tracker.pot(this.tick, number, pocket, off);
     if (off) play.report.offTable.push(number); else play.report.pocketed.push({ number, pocket });
     this.updatePreview();
     const fault = this.preview?.fault;
@@ -80,7 +80,7 @@ export class PoolArcade {
     const points = awards.reduce((sum, a) => sum + a.points, 0);
     const kinds = new Set(awards.map(a => a.kind)), n = this.preview.count;
     const sub = kinds.has('finish') ? 'RACK FINISH!' : kinds.has('multi') ? (n === 2 ? 'DOUBLE POT!' : n === 3 ? 'TRIPLE POT!' : `${n} POTS!`) :
-      kinds.has('combo') ? 'COMBINATION!' : kinds.has('kick') ? 'KICK SHOT!' : kinds.has('bank') ? 'BANK SHOT!' : 'NICE POT!';
+      kinds.has('double') ? 'DOUBLE KISS!' : kinds.has('carom') ? 'CAROM!' : kinds.has('combo') ? 'COMBINATION!' : kinds.has('kick') ? 'KICK SHOT!' : kinds.has('bank') ? 'BANK SHOT!' : kinds.has('thin') ? 'THIN CUT!' : kinds.has('long') ? 'LONG POT!' : 'NICE POT!';
     this.effects.pocket(at, `+${points.toLocaleString()}`, sub, { key: `pot-${this.state?.rack}-${this.state?.lastPlay}-${pocket}`, player: play.player, pending: true });
   }
   showFault(kind, at, play) {

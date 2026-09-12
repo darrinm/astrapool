@@ -1,7 +1,7 @@
 {
   "name": "astrapool",
   "version": "1.0.0",
-  "description": "A 7-foot pool table you can walk around, in the browser: real physics, house-rules 8-ball, three computer opponents, private online rooms, and a solar system you can rack",
+  "description": "A 7-foot pool table you can walk around, in the browser: real physics, house-rules 8-ball, four computer styles, private online rooms, and a solar system you can rack",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test physics/*.test.mjs src/*.test.mjs server/protocol.test.mjs tools/*.test.mjs",
+    "benchmark:tricky": "node physics/benchmark-tricky.mjs",
     "benchmark:computer": "node physics/benchmark-computer.mjs",
     "physics-test": "node physics/validate.mjs",
     "deploy": "npm run heads:guard && npm run build && wrangler deploy",
