@@ -544,8 +544,11 @@ function resetView() {
   else if (innerHeight <= 600) { camera.position.set(-100, -56, FELT_Z + 38); controls.target.set(-4, 0, FELT_Z); }
   else if (environmentId === 'minimal') camera.position.set(-HW * 1.6, 0, FELT_Z + 21);
   else { camera.position.set(-115, -65, FELT_Z + 40); controls.target.z = FELT_Z - 7; }
-  // Give the solo demo a closer view of the shots and search effects.
-  if (attractMode) camera.position.sub(controls.target).multiplyScalar(0.8).add(controls.target);
+  // Give the solo demo a closer view, with more room around the table on mobile.
+  if (attractMode) {
+    const mobile = matchMedia('(max-width: 600px), (hover: none) and (pointer: coarse)').matches;
+    camera.position.sub(controls.target).multiplyScalar(mobile ? 0.9 : 0.8).add(controls.target);
+  }
   controls.update();
   if (attractMode) frameAttract();
 }
