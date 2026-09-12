@@ -1,30 +1,29 @@
 # Astra Pool
 
-A 7-foot pool table you can walk around, in the browser. Real physics, house-rules 8-ball,
-three computer opponents, and private rooms you share with a link.
+Eight-ball on a 7-foot table, in a browser tab. Orbit the table, pull back from the cue ball,
+release. Rack the planets, a standard set, or faces.
 
-**[Play it at astrapool.darrinm.com](https://astrapool.darrinm.com)** — no install, no account, nothing to sign up for.
+**[Play it at astrapool.darrinm.com](https://astrapool.darrinm.com)** — no install, no account.
 
 ![A pool table in an orbital lounge, racked with the planets and broken with a glowing Sun for a cue ball.](public/og.jpg)
 
-Built with [three.js](https://threejs.org) and [Rapier](https://rapier.rs), served from a Cloudflare Worker.
+[three.js](https://threejs.org) and [Rapier](https://rapier.rs), served from a Cloudflare Worker.
 
-- **Physics, not animation.** Rapier steps the table at 480 Hz: a triangle-mesh felt with six real
-  holes and pocket wells underneath so balls physically drop in, cushions with a real nose profile,
-  rolling resistance and spin friction applied per step, and off-centre strikes with follow / draw /
-  english. `physics/validate.mjs` checks 26 headless results against closed-form answers — the 90°
-  and 30° rules, collision laws, cushion rebound, timestep sensitivity, tunnelling and determinism.
-- **A computer that searches.** Hard copies the live physics world and tests pots, banks, legal
-  escapes, power and spin, rejecting scratches and early 8s, then weighs the next shot or a defensive
-  leave. It gets no aiming advantage — the same spin limits and 24 mph power cap a human has — and it
-  runs in a worker, so the table stays responsive while it thinks.
-- **Online rooms.** One SQLite-backed Durable Object per room. The server assigns seats, validates
-  turn ownership and resolves the house rules; browsers simulate the shots. Casual friend matches: no
-  accounts, no matchmaking, no rankings.
-- **Nine rooms.** Generated photographic panoramas plus Blender-modelled furniture and matching
-  reflection lighting, downloaded only when you choose one.
-- **Sampled sound.** Ball-on-ball, cushion, cue tip, pocket drop and rattle; each hit picks a random
-  take with strength-driven level, pitch and brightness, panned and attenuated from the camera.
+The table steps at 480 Hz. `RATE=120 npm run physics-test` shows the losses at coarser steps that
+led to that rate. The felt is a triangle mesh with six real holes and wells underneath, so a ball
+drops into a pocket instead of vanishing at the lip. `physics/validate.mjs` checks 26 results
+against closed-form answers, including the 90° and 30° rules, cushion rebound, tunnelling and
+determinism. One known deviation: heavy topspin into a rail rebounds livelier than on a real table.
+
+The Hard opponent does not fudge its aim. It copies the live physics world and simulates whole
+shots: pots, banks, escapes, power and spin, rejecting scratches and early 8s, then weighing the
+next shot against a defensive leave. Its spin limits and 24 mph power cap are the ones you play
+with. The search runs in a worker, so the table stays responsive while it thinks.
+
+Phones get their own layout rather than a scaled-down one. In portrait the table turns lengthwise
+and starts overhead, fitted between the score and the controls, which move into a compact bar off
+the felt. Drag to orbit, two fingers to pan, pinch to zoom, and while holding a shot, tap Cancel
+with another finger to abandon it.
 
 Modes: **Local 8-ball** (two players, one device), **Vs Computer** (Easy / Medium / Hard),
 **Play a Friend** (private link), and **Free Play** (no rules, plus Fling).
@@ -57,13 +56,12 @@ token scoped to the account in `wrangler.jsonc` and the `darrinm.com` zone. Use 
 “Edit Cloudflare Workers” token template. The account ID and custom domain are configured in
 `wrangler.jsonc`.
 
-The product is Astra Pool, but three names deliberately stay `pool` and should not be
-"finished": the Worker name in `wrangler.jsonc` (renaming it creates a *new* Worker with a new
-Durable Object namespace, orphaning every live online room), the `POOL_ROOMS` binding and its
-migration tag, and the `pool.*` / `playful.*` localStorage keys (renaming those silently resets
-every existing player's room, ball collection and arcade preferences). The Worker's *routes* did
-move to `astrapool.darrinm.com`; a Worker's name and its routes are independent, so the hostname
-changed without disturbing the rooms.
+Three names stay `pool` on purpose. Renaming the Worker in `wrangler.jsonc` creates a second
+Worker with its own Durable Object namespace and orphans every live online room; the `POOL_ROOMS`
+binding and its migration tag go with it. Renaming the `pool.*` and `playful.*` localStorage keys
+resets every existing player's saved room, ball collection and arcade preferences. Routes are
+independent of the Worker's name, which is how the site moved to astrapool.darrinm.com without
+disturbing the rooms.
 
 For a manual local deployment, `nvm use` selects Node 24 (see `.nvmrc`), then `npm run deploy`
 builds and publishes the local files, including uncommitted changes. Use your Wrangler login;
@@ -281,55 +279,39 @@ and choose **Cue** or press `F` again to return to cue shots.
 
 ## Head textures
 
-The head balls can be textured with photographs of real people. Those images are not in this
-repository and are not redistributable, so a checkout has no `public/heads/`. Nothing is missing:
-numbered balls are the default appearance, and the head balls fall back to plain colours when the
+The head balls can be textured with photographs of real people. Those photographs are not in this
+repository and are not redistributable, so a checkout has no `public/heads/`. The game does not
+need them: numbered balls are the default, and the head balls fall back to plain colours when the
 files are absent.
 
-The canonical copy lives in a store outside the repository, so no git operation inside it can put
-them back into history. `$POOL_HEADS_DIR` overrides the default location (`~/.pool-heads`).
+If you have a copy, it lives in a store outside the repository (`~/.pool-heads`, or
+`$POOL_HEADS_DIR`). `npm run heads:restore` puts it in the working tree and `heads:status`,
+`heads:stash` and `heads:clear` manage it; `heads:clear` refuses to run while the store is empty.
+`npm run deploy:private` restores the textures and deploys to the separate Worker in
+`wrangler.private.jsonc`, whose hostname is unlisted rather than protected. The public
+`npm run deploy` and CI both run `heads:guard`, which refuses to build while any texture sits in
+the working tree.
 
-```sh
-npm run heads:status    # what is in the store and in the working tree
-npm run heads:stash     # working tree -> store, first-time setup
-npm run heads:restore   # store -> working tree, before a private build
-npm run heads:clear     # remove them from the working tree
-```
-
-A restored working tree builds and deploys exactly like any other, because Vite copies `public/`
-into `dist/` either way. `heads:clear` refuses to run while the store is empty, so it cannot destroy
-the only copy.
-
-**Deploying with them.** `npm run deploy:private` restores the textures and deploys to the separate
-Worker in `wrangler.private.jsonc` — its own hostname and its own Durable Object namespace, so the
-public site never receives them. That hostname is unlisted, not protected; put Cloudflare Access in
-front of it if the textures should not be reachable by anyone who guesses the name.
-
-The public `npm run deploy` runs `heads:guard` first and refuses to build while any texture is in
-the working tree, which is what stops a deploy right after a private one from publishing them. CI
-runs the same guard before deploying to astrapool.darrinm.com.
-
-**Before making this repository public**, run `npm run check:publishable`. Untracking the textures
-does not remove them from earlier commits, and a public repository publishes its whole history. The
-check fails until the blobs are unreachable from every ref, and prints the `git filter-repo` recipe.
+`npm run check:publishable` is the gate before a repository goes public. Untracking the textures
+leaves the blobs in earlier commits, and a public repository publishes its whole history.
 
 ## License
 
-Code is [MIT](LICENSE).
-
-The art and audio assets are **not** covered by that grant, and are included only so the
-game runs from a checkout:
+Code is [MIT](LICENSE). The art and audio are not covered by it. Each set has its own terms:
 
 - `public/environments/` — generated panoramas and Blender-modelled furniture.
-- `public/planets/` — maps by [Solar System Scope](https://www.solarsystemscope.com/textures/),
-  licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and extracted textures from
-  [NASA / VTAD models](https://science.nasa.gov/3d-resources/) under NASA media usage guidelines; see `public/planets/credits.json` for source URLs and runtime modifications.
+- `public/planets/` — eleven maps by [Solar System Scope](https://www.solarsystemscope.com/textures/)
+  under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), which requires that attribution
+  be carried with them; eight from [NASA / VTAD models](https://science.nasa.gov/3d-resources/) and
+  USGS under public-domain and NASA media usage terms; and six generated, including the Sun and the
+  reconstructed terrain on Pluto, Charon, Titania, Oberon and Triton, which are artistic rather than
+  calibrated imagery. `public/planets/credits.json` has the source URL, checksum and modifications
+  for each file.
 - `public/sfx/` — sound takes generated with ElevenLabs Sound Effects; their reuse follows
   ElevenLabs' terms, not this repository's.
-- `public/heads/` — optional head textures of real, identifiable people. All rights reserved:
-  they are not licensed for redistribution, modification, or any use beyond running this game.
-  The game does not need them — numbered balls are the default, and if the files are absent the
-  head balls fall back to plain colours.
+- `public/heads/` — photographs of real, identifiable people, and not part of this repository.
+  All rights reserved: not licensed for redistribution, modification, or any use beyond running
+  this game.
 
 Third-party runtime dependencies keep their own licenses — [three.js](https://github.com/mrdoob/three.js)
 (MIT), [Rapier](https://github.com/dimforge/rapier) (Apache-2.0), and the
