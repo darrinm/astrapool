@@ -265,7 +265,7 @@ button:disabled { opacity: .45; cursor: default; }
 #loading-progress::-webkit-progress-bar { background: var(--edge); border-radius: 999px; }
 #loading-progress::-webkit-progress-value { background: var(--accent); border-radius: 999px; }
 #loading-progress::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
-/* Shown once. The table is the pitch, so it stays visible above the title and
+/* Fresh startup. The table is the pitch, so it stays visible above the title and
    drifts gently behind it; the scrim only darkens what sits under the words. */
 #welcome { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: 0; color: var(--ink); background: none; }
 /* Keep the demo at normal brightness; the gradient below carries the words. */
