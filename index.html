@@ -136,10 +136,19 @@
           </div>
 
           <div class="field">
-            <span class="eyebrow" id="table-label">On the table</span>
-            <div id="style" class="segmented" role="group" aria-labelledby="table-label">
-              <button data-style="heads" aria-pressed="false">Heads</button>
-              <button data-style="balls" aria-pressed="true">Balls</button>
+            <span class="eyebrow" id="table-label">Ball collection</span>
+            <div id="style" class="ball-sets" role="group" aria-labelledby="table-label"></div>
+            <p id="ball-set-status" role="status"></p>
+            <div id="planet-options" hidden>
+              <label class="planet-color-label" for="planet-saturation">Color intensity <output id="planet-saturation-value" for="planet-saturation">100%</output></label>
+              <input id="planet-saturation" type="range" min="1" max="1.7" step="0.05" value="1">
+              <div class="planet-range-labels"><span>Natural</span><span>Vivid</span></div>
+              <p>Fifteen different worlds. Eight planets, five moons, Pluto, and a black-hole 8; the Sun is your cue ball. Small companions and rings are enlarged for play. Moons visibly orbit; numbered caps appear while you aim.</p>
+              <details class="planet-guide"><summary>Meet the planets &amp; credits</summary>
+                <p>Cue Sun · 1 Mercury · 2 Venus · 3 Earth · 4 Mars · 5 Jupiter · 6 Saturn · 7 Uranus · 8 Black hole · 9 Neptune · 10 Moon · 11 Io · 12 Europa · 13 Ganymede · 14 Titan · 15 Pluto.</p>
+                <p>Earth has the Moon; Mars has Phobos and Deimos. The outer planets show a selection of major moons, with simplified smaller companions. Pluto has Charon. All four outer planets have rings; faint rings are brightened. Sizes and spacing are arranged for the table. Rings and moons rotate with their world.</p>
+                <p>Maps by <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>, based on NASA imagery. Additional world and moon maps from <a href="https://science.nasa.gov/3d-resources/" target="_blank" rel="noopener">NASA / VTAD</a>, <a href="https://space.jpl.nasa.gov/tmaps/mars.html" target="_blank" rel="noopener">JPL / USGS</a>, and <a href="https://www.usgs.gov/media/images/charon-new-horizons-global-mosaic-300m" target="_blank" rel="noopener">New Horizons / USGS</a>. Pluto, Charon, Titania, Oberon and Triton use AI artistic reconstructions of missing and blurry terrain, based on their credited source maps. The Sun is an artistic solar texture with animated glow. Color adjusted for play; Neptune rebalanced toward blue-green.</p>
+              </details>
             </div>
             <button class="switch" data-sound-toggle aria-pressed="true"><span>Sound</span><span class="switch-track" aria-hidden="true"></span><span data-sound-state hidden>on</span></button>
           </div>
@@ -153,10 +162,10 @@
           <details class="rules">
             <summary>How to play &amp; house rules</summary>
             <div class="help-panel">
-              <p>In Cue mode, pull back from the white ball and release to shoot. In Free Play’s Fling mode, grab any ball and throw it — hold still to place it.</p>
+              <p>In Cue mode, pull back from the cue ball and release to shoot. In Free Play’s Fling mode, grab any ball and throw it — hold still to place it.</p>
               <p>Replay (V) shows the last completed shot in every game, including computer shots and Free Play flings. Pause, scrub, or change speed while orbiting the table. Scores and turns stay intact. Online replay returns to live play when the table updates.</p>
               <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag / two fingers</dd></div><div><dt>Zoom</dt><dd>Scroll / pinch</dd></div></dl>
-              <dl class="shortcuts"><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Heads / balls</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
+              <dl class="shortcuts"><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Ball collection</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
               <h3>House rules</h3>
               <p>Arcade adds playful effects and a separate points score in every game. Pots earn 100; banks, kicks, combinations and multi-pots add bonuses. Consecutive scoring shots build a multiplier up to ×3. Floating points are pending until the shot settles; scratches and fouls void that shot's points. Racks won still decide the match. Choose Reduced effects for calmer motion. Free Play Cue and Fling have separate personal bests; changing modes during a rack makes it mixed practice.</p>
               <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>

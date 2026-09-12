@@ -95,6 +95,43 @@ the old room's graphics resources. Minimal requires no room downloads.
 Art prompts, editable Blender files, and the reproducible asset builder live in
 [`pipeline/environments`](pipeline/environments/README.md). Runtime WebP and GLB files are in `public/environments`.
 
+## Ball collections
+
+Choose **Game → Ball collection → Planets** for a miniature solar system, or use **B** to
+cycle Classic, Planets, and Heads. Selecting Orbital Lounge defaults to Planets; every other
+room defaults to Classic, including on startup. You can then choose another collection manually.
+The **Color intensity** slider is saved on this device. Switching collections preserves the game
+and physics, and each online player chooses their own appearance.
+
+Mercury through Uranus occupy 1–7; a black hole is the 8. Neptune, the Moon, Io, Europa,
+Ganymede, Titan, and Pluto occupy 9–15. All 15 object balls are different worlds; the cue ball becomes the Sun. The same numbered cap artwork used by Heads appears on the uppermost face of each world: colored caps
+for 1–8, white caps with colored rings for 9–15. They stay facing world-up independently of the ball’s rotation and appear only while the local human player is aiming; release, cancel, and replay hide them. The remaining-ball HUD uses matching maps.
+Earth has a separate cloud shell and Moon; Mars has both small moons. Jupiter, Saturn, Uranus
+and Neptune have rings and selected major companions, orbiting once every 11–21 seconds in the planet’s local equatorial plane; Pluto has Charon. The black hole traces curved light paths through one animated gold disk, connecting the front band to the arcs around its dark center. This bounded shader keeps a compact silhouette; it does not refract the table/background. Decorations follow live balls, rack
+animations, and replay clones, disappear with pocketed balls, and never participate in input
+hit testing or collisions. Worlds rack with their north poles straight up. Rings align with the planetary equator; rings and companions keep their local orientation
+and rotate with the planet. Triton orbits in the opposite direction from the other companions.
+Moons cast and receive dynamic shadows, including while their parent ball is stationary.
+Saturn has fine ring-density bands, a main division and thin outer ring; dense bands cast shadows
+onto the planet while the transparent divisions remain open. The Sun cue ball has a golden photosphere,
+subtle animated granulation, a compact corona and small prominence loops. It keeps the normal cue-ball
+collision shape and has no numbered cap. Its warm light illuminates nearby balls and felt,
+with local shadows, and follows the displayed cue during replay. The Sun itself casts no shadow. Solar and black-hole motion follow replay pause/seek.
+
+The maps are based on NASA imagery, with extra saturation for play and a blue-green rebalance
+of the historically enhanced Neptune map. This is an illustrated collection: the source maps
+include reconstructed or unobserved regions. Pluto, Charon, Titania, Oberon and Triton use AI artistic reconstructions
+of blurry and missing terrain, based on their credited source maps. Every companion has its own texture; sizes,
+spacing and ring visibility are deliberately exaggerated. The 100% slider setting
+uses the source palette (plus Neptune's adjustment), not a calibrated scientific color rendering.
+
+The approximately 11.3 MB of maps load only when Planets is first selected; selection applies
+once all maps are ready, and a failed download leaves the current collection playable. Successful
+maps and materials are cached for the lifetime of the table and shared by companions and replay clones.
+The catalog and shortcut order are in `src/ball-sets.js`; rendering is in `src/planet-balls.js`.
+Source URLs, SHA-256 checksums and credits are in `public/planets/credits.json`.
+See [the asset notes](pipeline/planets/README.md) for reproduction and art direction.
+
 ## Shot replay
 
 **Replay** in the table controls, or **V**, plays the last completed shot in Local 8-ball, Vs Computer,
@@ -182,7 +219,7 @@ touch); grabbing slightly beside it preserves the direction of the drag and neve
 Press `Esc` while lining up a cue shot to cancel without shooting.
 Drag back from the cue ball to shoot; the further the pull, the harder the hit (up to 24 mph / 10.7 m/s). The ball
 widget (bottom right) sets follow / draw / english; Reset centers the contact point. Left-drag the table to orbit, right-drag to pan, wheel to zoom,
-`C` resets the view. Numbered **Balls** are the default. Heads / Balls buttons (or `B`) swap the heads for authentic numbered balls. `M` mutes,
+`C` resets the view. **Planets** default in Orbital Lounge; numbered **Classic** balls default in all other rooms. **Game → Ball collection** selects Classic, Planets, or Heads; `B` cycles collections. `M` mutes,
 `R` re-racks. The desktop setup dock groups play mode, ball appearance, reset view, and re-rack. It hides after the first shot or fling and stays tucked away between racks; the small **Game** button reopens these settings.
 The header shows pocketed balls and shots, with sound and a Help menu for controls and shortcuts.
 
@@ -206,7 +243,7 @@ and choose **Cue** or press `F` again to return to cue shots.
   cue stick that pulls back and elevates over the rail. Presentation: procedural felt / wood / carpet textures
   (`src/textures.js`), clearcoat heads, an overhead panel light plus a shadow-casting spotlight (the fixture fades out
   as the camera climbs to it), room environment reflections, ACES tone mapping, fog, contact shadows.
-  The cue ball is always plain white and the 8 is a plain black ball at the centre of the rack; the 14 heads take the
+  In Classic and Heads, the cue ball is plain white and the 8 is a plain black ball at the centre of the rack; the 14 heads take the
   other numbers, with a standard numbered cap baked into the bottom of each texture (`src/ballcaps.js`). Heads rack
   face-up and upright as seen from the cue ball; balls rack number-up. Scale: 1 unit = 26 mm, g = 377.
 - `src/sounds.js` – sampled impact sounds: ball-on-ball (soft and hard takes), cushion, cue tip, pocket drop and rattle;
@@ -272,6 +309,9 @@ The art and audio assets are **not** covered by that grant, and are included onl
 game runs from a checkout:
 
 - `public/environments/` — generated panoramas and Blender-modelled furniture.
+- `public/planets/` — maps by [Solar System Scope](https://www.solarsystemscope.com/textures/),
+  licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and extracted textures from
+  [NASA / VTAD models](https://science.nasa.gov/3d-resources/) under NASA media usage guidelines; see `public/planets/credits.json` for source URLs and runtime modifications.
 - `public/sfx/` — sound takes generated with ElevenLabs Sound Effects; their reuse follows
   ElevenLabs' terms, not this repository's.
 - `public/heads/` — optional head textures of real, identifiable people. All rights reserved:

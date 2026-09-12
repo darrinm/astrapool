@@ -3,6 +3,16 @@ import { replayFrame } from './replay.js';
 
 const clockText = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
+// Three's clone shares surface materials but omits custom shadow materials.
+// Preserve both through the hierarchy so ring gaps cast the same replay shadow.
+export function cloneReplayMesh(source) {
+  const clone = source.clone(false);
+  clone.customDepthMaterial = source.customDepthMaterial;
+  clone.customDistanceMaterial = source.customDistanceMaterial;
+  for (const child of source.children) clone.add(cloneReplayMesh(child));
+  return clone;
+}
+
 export class ReplayView {
   constructor({ scene, exit }) {
     this.scene = scene; this.active = false; this.balls = []; this.layers = new Map();
@@ -36,7 +46,7 @@ export class ReplayView {
     // Suppress live rendering with layers, not visibility: physics and online
     // bookkeeping use the originals' visibility and must remain untouched.
     this.balls = clip.numbers.map(number => {
-      const source = balls.find(b => b.number === number), mesh = source.mesh.clone(true);
+      const source = balls.find(b => b.number === number), mesh = cloneReplayMesh(source.mesh);
       this.group.add(mesh);
       source.mesh.traverse(object => { this.layers.set(object, object.layers.mask); object.layers.mask = 0; });
       return { number, mesh };

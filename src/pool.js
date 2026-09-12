@@ -12,6 +12,10 @@ import { RAPIER, DEPTH, renderer, scene, camera, world, eventQueue, heads, light
   setHeadRadius, addMesh, addBody, addStaticCollider, registerProp, clearProps, pointerToPlane, meshUnderPointer, ui } from './core.js';
 import { noiseBump, feltMap, woodMap, clothNormal, radialShadow, gradientStrip } from './textures.js';
 import { bakeCap, authenticBall, chooseBallMap, loadedHead, BALL_COLORS } from './ballcaps.js';
+import { ballSetById, nextBallSet, planetForBall } from './ball-sets.js';
+import { createPlanetSet, updatePlanetOrbits, updatePlanetCaps } from './planet-balls.js';
+import { updateSunLight } from './sun.js';
+import { buildBallSetPicker, updateBallSetPicker } from './ball-set-picker.js';
 import { PoolAudio } from './sounds.js';
 import { trackShadowChanges } from './shadow-updates.js';
 import { buildEnvironment, environmentById, readEnvironment } from './environments.js';
@@ -34,6 +38,7 @@ const MAX_PULL = 24, MAX_SPEED = 24 * 0.44704 / 0.026;   // 24 mph in game units
 const SPEED_PER_PULL = MAX_SPEED / MAX_PULL;
 const FELT_Z = -DEPTH, BALL_Z = FELT_Z + R;
 const RAIL_W = 3.2, WELL_DEPTH = P.WELL_DEPTH;
+let sunLight;
 let cue, aiming = null, pockets = [], guide, cueStick, marker, pocketed = 0, shots = 0, spin = { x: 0, y: 0 }, spinEl, controls;
 let lastViewport = { w: innerWidth, h: innerHeight }, refitPending = false;
 // The three framings resetView() knows about. A change of shape needs a fresh camera, not just a
@@ -43,7 +48,10 @@ let pocketedSet = new Set(), respotAt = 0, pmrem, envTex, feltCol, lastStatus = 
 const WHITE = new THREE.Color(0xffffff);
 const capped = new Map();   // head -> { plain, capped, ball } textures; caps are baked lazily once the plain map has loaded
 let capsOn = false;
-let ballStyle = localStorage.getItem('playful.ballStyle') === 'heads' ? 'heads' : 'balls';   // 'heads' | 'balls'
+let ballStyle = 'balls', rackStyle = 'balls', planetSet, planetLoading, styleRequest = 0;
+const classicMaterials = new Map(heads.map(ball => [ball, ball.mesh.material]));
+let planetSaturation = 1;
+try { const value = Number(localStorage.getItem('pool.planetSaturation')); if (value >= 1 && value <= 1.7) planetSaturation = value; } catch {}
 let interactionMode = 'cue', dragging = null;
 const CUE_LEARNED = 'pool.cueLearned';
 let cueLearned = false;
@@ -67,7 +75,7 @@ const computerTurn = () => gameMode === 'computer' && match.turn === 1 && match.
 const cushionHandles = new Set();
 const arcadeRailIds = new Map(), beforeMotion = new Map(), lastArcadeImpact = new Map();
 const numberOf = ball => ball.number ?? ballNumber(rackIndexOfHead(heads.indexOf(ball)));
-// The cue ball is always a plain white ball, and the plain black 8 sits at the centre of the rack. The 14 heads
+// In Classic and Heads, the cue ball is plain white, and the plain black 8 sits at the centre of the rack. The 14 heads
 // take the other numbers (1-7 and 9-15). `extras` holds the two plain balls; `objects()` is the rack order.
 let extras = [];
 const shadowsChanged = trackShadowChanges();
@@ -76,7 +84,8 @@ const objects = () => { const eight = extras.find((e) => e.number === 8); return
 const allBalls = () => [cue, ...objects()].filter(Boolean);
 // Orientation at rack time: a plain ball shows its number (bottom pole of the texture, local -y) upward; a head in
 // heads mode shows its face (texture centre, local +x) upward; a head in balls mode shows its number.
-// Both orientations end with a quarter turn about the table normal so that what should read as "up" (the crown of
+// Planets stand their north pole (local +y) upward, with equatorial rings parallel to the table.
+// The number/face orientations end with a quarter turn about the table normal so that what should read as "up" (the crown of
 // a head, the top of a digit) points away from the cue ball (+x): a player at the head of the table sees faces and
 // numbers upright. Derivation: the crown is local +y; standing the face (local +x) up leaves +y pointing across the
 // table (+y world). A digit's top in the cap is the texture's u = 0.25 direction, local +z; standing the bottom pole
@@ -84,13 +93,18 @@ const allBalls = () => [cue, ...objects()].filter(Boolean);
 const TOWARD_FAR_RAIL = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
 const NUMBER_UP = TOWARD_FAR_RAIL.clone().multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1)));
 const FACE_UP = TOWARD_FAR_RAIL.clone().multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)));
-const rackRot = (ball) => { const q = (heads.includes(ball) && ballStyle === 'heads') ? FACE_UP : NUMBER_UP; return { x: q.x, y: q.y, z: q.z, w: q.w }; };
+const POLE_UP = TOWARD_FAR_RAIL.clone().multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)));
+const rackRot = (ball) => {
+  const q = rackStyle === 'planets' ? POLE_UP
+    : heads.includes(ball) && rackStyle === 'heads' ? FACE_UP : NUMBER_UP;
+  return { x: q.x, y: q.y, z: q.z, w: q.w };
+};
 const IDENTITY = { x: 0, y: 0, z: 0, w: 1 };
 const saved = {};
 let environmentId = readEnvironment(localStorage), room, pendingRoom, tableFinish, tableLights;
 let environmentRequest = 0;
-async function setEnvironment(id) {
-  const theme = environmentById(id), request = ++environmentRequest;
+async function setEnvironment(id, applyBallDefault = true) {
+  const theme = environmentById(id), request = ++environmentRequest, initialStyleRequest = styleRequest;
   pendingRoom?.dispose(); pendingRoom = null;
   if (!tableFinish) return false;
   if (room?.group.name === `environment-${theme.id}`) return true;
@@ -100,7 +114,11 @@ async function setEnvironment(id) {
   try { if (!minimal) await next.ready; }
   catch (error) {
     next.dispose();
-    if (request === environmentRequest) pendingRoom = null;
+    if (request === environmentRequest) {
+      pendingRoom = null;
+      rackStyle = ballStyle;
+      if (rackMotion) for (const entry of rackMotion.entries) entry.rotationTo.copy(rackRot(entry.ball));
+    }
     console.warn(`Could not load ${theme.name}`, error);
     return false;
   }
@@ -147,6 +165,10 @@ async function setEnvironment(id) {
   document.documentElement.dataset.environment = theme.id;
   applyRoomAccent(theme);
   if (!minimal && atDefaultView) resetView();
+  // A manual collection choice made while the room loads takes precedence.
+  if (applyBallDefault && styleRequest === initialStyleRequest) {
+    void setBallStyle(theme.id === 'orbital' ? 'planets' : 'balls');
+  }
   return true;
 }
 
@@ -258,6 +280,15 @@ function build() {
   spot.target.position.set(0, 0, FELT_Z); addMesh(spot.target);
   spot.castShadow = true; spot.shadow.mapSize.set(2048, 2048); spot.shadow.bias = -0.0004; spot.shadow.normalBias = 0.02; spot.shadow.camera.near = 5; spot.shadow.camera.far = 80;
 
+  // A single scene light follows the displayed cue (live or replay), avoiding
+  // duplicate illumination from the hidden live Sun during replay.
+  sunLight = addMesh(new THREE.PointLight('#ffd29a', 18, 14, 2));
+  sunLight.name = 'sun-light'; sunLight.visible = false; sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(512, 512);
+  // Clip the emitting sphere out of its own shadow cube.
+  sunLight.shadow.camera.near = R * 1.04; sunLight.shadow.camera.far = 14;
+  sunLight.shadow.bias = -0.001; sunLight.shadow.normalBias = 0.025;
+
   tableFinish = { felt: feltMat, wood: [slabWood, railLong, railShort, apronWood, apronWoodEnd, legWood], trim: mouldMat, shade: shade.material };
   tableLights = [area, spot];
   tableFinish.original = { felt: feltMat.map, wood: tableFinish.wood.map(material => material.map), lights: tableLights.map(light => light.color.clone()), intensities: tableLights.map(light => light.intensity) };
@@ -282,6 +313,7 @@ function build() {
     return { id: n === 0 ? 'cue' : `ball${n}`, body, mesh, number: n };
   });
   cue = extras[0];
+  for (const ball of extras) classicMaterials.set(ball, ball.mesh.material);
 
   // ---- aiming guide (line to first impact, ghost ball, object-ball direction) and the cue stick ----
   guide = new THREE.Group(); addMesh(guide);
@@ -313,9 +345,11 @@ export function ballNumber(j) { return j < 4 ? j + 1 : j === 4 ? 8 : j <= 7 ? j 
 // texture. Only the capped head does. Gating the whole entry on a loaded head
 // meant that when public/heads is absent — the public build — the map never
 // arrived and all fourteen balls kept the placeholder colour core.js gives them.
+const wantMap = entry => chooseBallMap(entry, ballStyle === 'heads' ? 'heads' : 'balls');
+
 function applyCaps() {
   for (let i = 0; i < heads.length; i++) {
-    const h = heads[i], m = h.mesh.material;
+    const h = heads[i], m = classicMaterials.get(h);
     let entry = capped.get(h);
     if (!entry) {
       const number = ballNumber(rackIndexOfHead(i));
@@ -325,7 +359,7 @@ function applyCaps() {
     }
     const head = loadedHead(m.map, entry);
     if (head && !entry.capped) { entry.plain = head; entry.capped = bakeCap(head.image, entry.number); }
-    const want = chooseBallMap(entry, ballStyle);
+    const want = wantMap(entry);
     // color multiplies map, so it has to go white or the placeholder tints the ball.
     if (capsOn && m.map !== want) { m.map = want; m.color.setHex(0xffffff); m.needsUpdate = true; }
   }
@@ -339,23 +373,61 @@ function capsPending() {
   if (capped.size < heads.length) return true;
   for (const h of heads) {
     const entry = capped.get(h);
-    if (!entry || h.mesh.material.map !== chooseBallMap(entry, ballStyle)) return true;
+    if (!entry || classicMaterials.get(h).map !== wantMap(entry)) return true;
   }
   return false;
 }
 
 function removeCaps() {
   for (const [h, entry] of capped) {
-    const m = h.mesh.material;
+    const m = classicMaterials.get(h);
     if (m.map !== entry.plain) { m.map = entry.plain; m.color.copy(entry.plain ? WHITE : entry.base); m.needsUpdate = true; }
   }
 }
-function setBallStyle(style) {
-  ballStyle = style; localStorage.setItem('playful.ballStyle', style);
+function setPlanetSaturation(value) {
+  planetSaturation = THREE.MathUtils.clamp(value, 1, 1.7);
+  planetSet?.setSaturation(planetSaturation);
+  document.getElementById('planet-saturation').value = planetSaturation;
+  document.getElementById('planet-saturation-value').textContent = `${Math.round(planetSaturation * 100)}%`;
+  try { localStorage.setItem('pool.planetSaturation', String(planetSaturation)); } catch {}
+}
+async function setBallStyle(id) {
+  const style = ballSetById(id).id, request = ++styleRequest;
+  if (style === 'planets' && !planetSet) {
+    updateBallSetPicker(ballStyle === 'planets' ? 'balls' : ballStyle, style);
+    try {
+      planetLoading ??= createPlanetSet().then(set => {
+        if (!capsOn) { set.dispose(); throw new Error('Table closed'); }
+        planetSet = set; return set;
+      }).finally(() => { planetLoading = null; });
+      await planetLoading;
+    } catch (error) {
+      if (request === styleRequest) {
+        if (ballStyle === 'planets') ballStyle = 'balls';
+        rackStyle = ballStyle;
+        if (rackMotion) for (const entry of rackMotion.entries) entry.rotationTo.copy(rackRot(entry.ball));
+        updateBallSetPicker(ballStyle, null, 'Planets could not load. Choose Planets to try again.');
+      }
+      return false;
+    }
+    if (request !== styleRequest) return false;
+  }
+  stopReplay();
+  ballStyle = rackStyle = style;
+  try { localStorage.setItem('playful.ballStyle', style); } catch {}
+  for (const ball of allBalls()) {
+    planetSet?.detach(ball.mesh);
+    ball.mesh.material = classicMaterials.get(ball);
+    if (style === 'planets') planetSet.attach(ball.mesh, numberOf(ball));
+  }
+  planetSet?.setSaturation(planetSaturation);
   if (rackMotion) for (const entry of rackMotion.entries) entry.rotationTo.copy(rackRot(entry.ball));
-  if (tableStill()) for (const h of heads) if (h.mesh.visible && !pocketedSet.has(h)) h.body.setRotation(rackRot(h), true);   // re-orient resting heads face/number up
-  document.querySelectorAll('#style button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.style === style)));
-  applyCaps();
+  // Appearance is private presentation. Never rotate a live physics body: an
+  // online shot or computer plan may already have snapshotted it.
+  updateBallSetPicker(style, null);
+  applyCaps(); updateScore();
+  renderer.shadowMap.needsUpdate = true;
+  return true;
 }
 
 function layout(animate = true) {
@@ -365,7 +437,10 @@ function layout(animate = true) {
   rackMotion = null;
   eventQueue.drainCollisionEvents(() => {});
   resetHeads({ linearDamping: 0, angularDamping: 0.02, restitution: E_BALL, friction: MU_BALL });
-  for (const h of heads) h.body.collider(0).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+  for (const h of heads) {
+    h.body.collider(0).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+    h.mesh.receiveShadow = ballStyle === 'planets';
+  }
   for (const e of extras) { e.body.setEnabled(true); e.mesh.visible = true; }
   spot(cue, -HW * 0.5, 0, IDENTITY);
   for (const position of rackPositions()) {
@@ -525,7 +600,7 @@ function readReplayPoses() {
 function beginReplayRecording(input) {
   const label = gameMode === 'free' ? `Free Play · ${input === 'fling' ? 'Fling' : 'Cue'}` :
     `${playerName(match.turn, gameMode, online.seat)} · ${match.breaking ? 'Break' : 'Shot'}`;
-  replay.begin(physicsTime, allBalls().map(numberOf), readReplayPoses, { label,
+  replay.begin(physicsTime, allBalls().map(numberOf), readReplayPoses, { label, planetTime: performance.now() / 1000,
     online: gameMode === 'online' ? { seq: onlineShotSeq, rack: arcade.state?.rack ?? null,
       play: arcade.state?.lastPlay, shots: match.shots, breaker: match.breaker } : null });
 }
@@ -721,8 +796,9 @@ function showGameControls(show) {
   document.getElementById('vignette').hidden = !show;
   document.getElementById('hud').hidden = !show;
   const styleEl = document.getElementById('style'); styleEl.hidden = !show;
-  wireOnce(styleEl, (b) => setBallStyle(b.dataset.style));
-  styleEl.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.style === ballStyle)));
+  buildBallSetPicker(setBallStyle, setPlanetSaturation);
+  setPlanetSaturation(planetSaturation);
+  updateBallSetPicker(ballStyle, null);
   if (!spinEl) {
     spinEl = document.getElementById('spin');
     spinEl.addEventListener('pointerdown', (e) => {
@@ -934,7 +1010,8 @@ function updateScore() {
       const digit = document.createElement('span'); digit.textContent = n; chip.append(digit);
       chip.style.setProperty('--ball-color', BALL_COLORS[((n - 1) % 8) + 1]);
       chip.className = `ball-chip${n > 8 ? ' stripe' : ''}${match.down.includes(n) ? ' down' : ''}`;
-      chip.title = `${n}${match.down.includes(n) ? ' pocketed' : ' remaining'}`;
+      if (ballStyle === 'planets') { chip.classList.add('planet-chip'); chip.style.setProperty('--planet-map', n === 8 ? 'radial-gradient(circle, #000 40%, #ffc078 48%, #5c2910 61%, #000 72%)' : `url(/planets/${planetForBall(n).id}.jpg)`); }
+      chip.title = `${n}${ballStyle === 'planets' ? ` · ${planetForBall(n).name}` : ''}${match.down.includes(n) ? ' pocketed' : ' remaining'}`;
       chip.setAttribute('aria-label', chip.title);
       return chip;
     }));
@@ -958,11 +1035,11 @@ function updateScore() {
     gameMode === 'online' && online.pending ? 'The next turn begins when the result is confirmed.' :
     computerTurn() ? (computerWorker ? 'The computer is studying the table.' : 'The computer is lining up its shot.') :
     remoteTurn() ? (online.connected.every(Boolean) ? 'Your friend is lining up a shot.' : 'Share the invite link. Play begins when both players are connected.') :
-    match.ballInHand ? 'Ball in hand: click an empty spot on the felt, or drag the white ball into place.' :
+    match.ballInHand ? 'Ball in hand: click an empty spot on the felt, or drag the cue ball into place.' :
     onEight() && calledPocket === null ? 'Choose where the 8-ball will go before you shoot.' :
-    onEight() ? (cueLearned ? 'You can change your pocket call before shooting.' : 'Pull back from the white ball to shoot, or change your pocket call.') :
+    onEight() ? (cueLearned ? 'You can change your pocket call before shooting.' : 'Pull back from the cue ball to shoot, or change your pocket call.') :
     !match.groups[match.turn] && !match.breaking ? 'Pocket a solid or stripe on a legal shot to claim your group.' :
-    cueLearned ? '' : 'Pull back from the white ball. Release to shoot.');
+    cueLearned ? '' : 'Pull back from the cue ball. Release to shoot.');
   if (overhead && !aiming) fitOverhead();
 }
 function overheadView() {
@@ -1257,11 +1334,13 @@ export default {
   enter() {
     setHeadRadius(R); world.gravity = { x: 0, y: 0, z: -G };
     RectAreaLightUniformsLib.init();
-    build(); layout(!/^#room=/.test(location.hash)); setupCamera(); setLook(true);
     const initialEnvironment = environmentId;
-    setEnvironment('minimal');
+    // Rack orientation must be ready before asynchronous room and map loading.
+    rackStyle = initialEnvironment === 'orbital' ? 'planets' : 'balls';
+    build(); applyCaps(); layout(!/^#room=/.test(location.hash)); setupCamera(); setLook(true);
+    showGameControls(true); capsOn = true;
+    setEnvironment('minimal', initialEnvironment === 'minimal');
     if (initialEnvironment !== 'minimal') setEnvironment(initialEnvironment);
-    showGameControls(true); capsOn = true; setBallStyle(ballStyle);
     window.addEventListener('hashchange', joinInvite);
     joinInvite();
   },
@@ -1275,6 +1354,11 @@ export default {
     endGesture();
     ++environmentRequest; pendingRoom?.dispose(); pendingRoom = null;
     room?.dispose(); room = null;
+    ++styleRequest;
+    for (const ball of allBalls()) { planetSet?.detach(ball.mesh); ball.mesh.material = classicMaterials.get(ball); }
+    planetSet?.dispose(); planetSet = null;
+    sunLight?.dispose(); sunLight = null;
+    for (const ball of extras) classicMaterials.delete(ball);
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     hudObserver?.disconnect(); hudObserver = null;
     controls?.dispose(); controls = null; setLook(false);
@@ -1288,7 +1372,7 @@ export default {
       if (['r', 'b', 'f'].includes(k)) stopReplay();
       else return;
     }
-    if (k === 'escape') endGesture(); if (k === 'r') restart(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(ballStyle === 'heads' ? 'balls' : 'heads'); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue');
+    if (k === 'escape') endGesture(); if (k === 'r') restart(); if (k === 'c') { endGesture(); resetView(); } if (k === 'b') setBallStyle(nextBallSet(ballStyle)); if (k === 'f') setInteractionMode(interactionMode === 'cue' ? 'fling' : 'cue');
   },
   resize() {
     // Mobile browsers fire resize when the URL bar hides, with no change in size at all. Re-fitting
@@ -1382,6 +1466,8 @@ export default {
     }
   },
   setEnvironment,
+  setBallStyle,
+  ballStyle: () => ballStyle,
   environment: () => environmentId,
   setGame: (mode) => startGame(mode),
   matchState: () => ({ mode: gameMode, match: structuredClone(match), shot: activeShot && structuredClone(activeShot), calledPocket, racking: !!rackMotion }),
@@ -1419,16 +1505,31 @@ export default {
     for (const m of fixture) { m.visible = fade > 0; m.material.opacity = fade; }
     if (capsOn && capsPending()) applyCaps();
     const balls = replayView.active ? replayView.balls : allBalls();
+    if (ballStyle === 'planets') {
+      updatePlanetCaps(balls, !!aiming && !computerTurn() && !remoteTurn() && !replayView.active);
+      const seconds = replayView.active ? (replayView.clip.metadata.planetTime ?? 0) + replayView.time : performance.now() / 1000;
+      planetSet?.setTime(seconds);
+      updatePlanetOrbits(balls, seconds);
+    }
+    updateSunLight(sunLight, balls.find(ball => ball.number === 0)?.mesh, ballStyle === 'planets', FELT_Z);
     const pixelScale = innerHeight * renderer.getPixelRatio() * camera.projectionMatrix.elements[5] / 2;
     balls.forEach((h, i) => {
       setBallDetail(h.mesh, R * pixelScale / h.mesh.position.distanceTo(camera.position));
       const cs = contactShadows[i]; if (!cs) return;
       const t = h.mesh.position, on = h.mesh.visible && (replayView.active || h.body.isEnabled() || !!rackMotion) && t.z > BALL_Z - 0.3;
-      cs.visible = on; if (on) cs.position.set(h.mesh.position.x, h.mesh.position.y, FELT_Z + 0.015);
+      // The emitting Sun has no painted contact shadow either, including in replay.
+      cs.visible = on && !(ballStyle === 'planets' && h.number === 0);
+      if (cs.visible) cs.position.set(h.mesh.position.x, h.mesh.position.y, FELT_Z + 0.015);
     });
-    // Update shadows only when a ball or the cue changes, including hiding a pocketed ball.
+    // Orbiting moons move even when their parent ball is still. Include their
+    // local transforms alongside the parent visibility/rotation gates.
+    const shadowObjects = [cueStick, cueStick.holder, sunLight];
+    for (const { mesh } of balls) {
+      shadowObjects.push(mesh);
+      mesh.traverseVisible(child => { if (child !== mesh && child.castShadow) shadowObjects.push(child); });
+    }
     renderer.shadowMap.autoUpdate = false;
-    if (shadowsChanged([...balls.map(ball => ball.mesh), cueStick, cueStick.holder])) renderer.shadowMap.needsUpdate = true;
+    if (shadowsChanged(shadowObjects)) renderer.shadowMap.needsUpdate = true;
     layoutPocketMap();
     if (pocketMarker) {
       pocketMarker.visible = !replayView.active && gameMode !== 'free' && calledPocket !== null && match.winner === null;

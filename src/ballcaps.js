@@ -3,7 +3,8 @@
 import * as THREE from 'three';
 
 export const BALL_COLORS = { 1: '#f2c400', 2: '#1b4fd8', 3: '#d62828', 4: '#6a2c91', 5: '#f58220', 6: '#1e8f4e', 7: '#7b1f2e', 8: '#111111' };
-const CAP_DEG = 38, DISC_DEG = 19, RING_IN_DEG = 22;
+export const CAP_DEG = 38;
+const DISC_DEG = 19, RING_IN_DEG = 22;
 
 // Which texture a ball should be showing. `capped` is a head with its number baked
 // on and only exists once that head has loaded; falling back to the generated ball
@@ -20,7 +21,7 @@ export function loadedHead(map, entry) {
   return map && map !== entry.ball && map !== entry.capped && map.image?.width ? map : null;
 }
 
-function capCanvas(number, size = 512) {
+export function capCanvas(number, size = 512) {
   const c = document.createElement('canvas'); c.width = c.height = size;
   const ctx = c.getContext('2d'), cx = size / 2, r = size / 2;
   const color = BALL_COLORS[((number - 1) % 8) + 1], stripe = number > 8;

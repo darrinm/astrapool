@@ -1,0 +1,371 @@
+{
+  "changes": "The cue ball is an artistically generated Sun with animated photosphere, corona and prominence loops. Color intensity adjusted at runtime, Neptune blue-green rebalance, Earth cloud layering, compressed decorative rings and major moons. Source maps include enhanced color and reconstructed/unmapped regions. Every companion uses its own sourced image map. Pluto, Charon, Titania, Oberon and Triton use AI artistic reconstructions of poorly resolved and missing terrain; other unobserved regions remain neutral; Charon presentation margins are removed. Number and stripe caps use the same artwork as Heads, projected onto curved patches that stay on the world-up face and show only during local human aiming. Moons orbit at exaggerated rates; the black-hole ball, animated disk, lensing arcs and glow are procedural illustrations, not a relativistic simulation. Ring density and spacing are exaggerated for play.",
+  "assets": [
+    {
+      "file": "clouds.jpg",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_earth_clouds.jpg",
+      "sha256": "fffd7f68d41b37274822150e54a6ef605af1d3ec35624d9f628c3b896bfa42ed",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "earth.jpg",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_earth_daymap.jpg",
+      "sha256": "767ee1dc6eb3802699bfccf6f264880f8acd0b80de3191cd24984fe279b07b7c",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "jupiter.jpg",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_jupiter.jpg",
+      "sha256": "b0f04d005350252636b0e3396fc592548cbd9e9126b269d32d5c6abd4b0e4f2b",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "mars.jpg",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_mars.jpg",
+      "sha256": "2d187f3e77a98eaa8cea5f4cc722f633c122ef170b9e94ace6b5fb6cbc3f8e01",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "mercury.jpg",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_mercury.jpg",
+      "sha256": "5a5c80607f643496bac9a631e71957def35ed788895f18b678ac849c2b38e48a",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "moon.jpg",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_moon.jpg",
+      "sha256": "2764ba6535ea0481a062846ee033cc7a909dae05b31a8fd13f3e98f3a7fd92bd",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "neptune.jpg",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_neptune.jpg",
+      "sha256": "cb42ea82709741d28b0af44d8b283cbc6dbd0c521a7f0e1e1e010ade00977df6",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "saturn-ring.png",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_saturn_ring_alpha.png",
+      "sha256": "4b0644b2f3ef259fd0bfaedd9dc52f9e7d9738f65f50363e8c4dd19f650d7334",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "saturn.jpg",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_saturn.jpg",
+      "sha256": "54a900ca9bf7ab62e70f862852759abdf342e6d6436a95a2fe9ebdb6bcd3bbac",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "uranus.jpg",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_uranus.jpg",
+      "sha256": "d15239d46f82d3ea13d2b260b5b29b2a382f42f2916dae0694d0387b1204a09d",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "venus.jpg",
+      "source": "https://www.solarsystemscope.com/textures/download/2k_venus_atmosphere.jpg",
+      "sha256": "225012ad4911730605c4e189ca2a3bf674fce50cc48aab4102b936b47d6991ac",
+      "creator": "Solar System Scope / INOVE",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    {
+      "file": "europa.jpg",
+      "source": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/e/Europa_1_3138.glb",
+      "sourcePage": "https://science.nasa.gov/resource/europa-3d-model/",
+      "sourceSha256": "fe88cbe326574a658c9d3b0885d1a38deea3ebfb354772eb3b95fe0f3f3d542c",
+      "sha256": "dbc6be1b5ba6e3c84769d3a9df59f178dc5b16363863ab6aaf1fc6795d9db76f",
+      "creator": "NASA Visualization Technology Applications and Development (VTAD)",
+      "license": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "extract": "glb-base-color",
+      "changes": "Embedded base-color image extracted, resized to 2048 x 1024, encoded JPEG quality 91. Original map geography/colors retained."
+    },
+    {
+      "file": "io.jpg",
+      "source": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/i/Io_1_3643.glb",
+      "sourcePage": "https://science.nasa.gov/resource/io-3d-model/",
+      "sourceSha256": "118a6bf7eda476ea6b454039f621778189141a82acb3ad0aaa762f1771c5a723",
+      "sha256": "fa1d030a5fa64e323e2df7e32f5019ed893fdcc94374cfbd6fc2c222275a7111",
+      "creator": "NASA Visualization Technology Applications and Development (VTAD)",
+      "license": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "extract": "glb-base-color",
+      "changes": "Embedded base-color image extracted, resized to 2048 x 1024, encoded JPEG quality 91. Original map geography/colors retained."
+    },
+    {
+      "file": "ganymede.jpg",
+      "source": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/g/Ganymede_1_5268.glb",
+      "sourcePage": "https://science.nasa.gov/resource/ganymede-3d-model/",
+      "sourceSha256": "367bc128197bf1d25ef5af5269f2d1902aababaae167c3c8d6529443b0100d6f",
+      "sha256": "c9de85dbba7d3214a0af103b6b7e459ec06a8a2c3404189e036c6d7a667e559d",
+      "creator": "NASA Visualization Technology Applications and Development (VTAD)",
+      "license": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "extract": "glb-base-color",
+      "changes": "Embedded base-color image extracted, resized to 2048 x 1024, encoded JPEG quality 91. Original map geography/colors retained."
+    },
+    {
+      "file": "callisto.jpg",
+      "source": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/c/Callisto_1_4821.glb",
+      "sourcePage": "https://science.nasa.gov/resource/callisto-3d-model/",
+      "sourceSha256": "0bdbd5600a4be4bef4bd85e53f6226f49e73a66c85310219402627e59457c303",
+      "sha256": "e48aca76ce81be065658d5511ca3811c006a8b6f26e7e213034a469b8087ddd9",
+      "creator": "NASA Visualization Technology Applications and Development (VTAD)",
+      "license": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "extract": "glb-base-color",
+      "changes": "Embedded base-color image extracted, resized to 2048 x 1024, encoded JPEG quality 91. Original map geography/colors retained."
+    },
+    {
+      "file": "titan.jpg",
+      "source": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/t/Titan_1_5150.glb",
+      "sourcePage": "https://science.nasa.gov/resource/titan-3d-model/",
+      "sourceSha256": "9e92e30902a26130895bf2558172d7f36186eb4a51368a60bc3ec1d01134fde4",
+      "sha256": "799ca10f108d154fe7549997b07a5d3191a98283605164b136dd4f55d7dbd756",
+      "creator": "NASA Visualization Technology Applications and Development (VTAD)",
+      "license": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "extract": "glb-base-color",
+      "changes": "Embedded base-color image extracted, resized to 2048 x 1024, encoded JPEG quality 91. Original map geography/colors retained."
+    },
+    {
+      "file": "pluto.jpg",
+      "sourceFile": "pipeline/planets/sources/pluto-reconstructed.png",
+      "sourceSha256": "4fc45ee1f6cf6944305bcb6cf4acf8832d91142c860a80d2b581a9a8ac3f9668",
+      "sha256": "0d9dbac050839e53448a453e81c55459b49ce1055f8295c73beb935bf266c128",
+      "creator": "OpenAI image generation, using the NASA VTAD Pluto texture as reference",
+      "extract": "image",
+      "maxSize": [
+        1774,
+        887
+      ],
+      "reference": {
+        "source": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/p/l/Pluto_1_2374.glb",
+        "sourcePage": "https://science.nasa.gov/resource/pluto-3d-model/",
+        "sourceSha256": "9915e6874ff7e7cd64faf8ef016ea16de6c8058417c42909efa099a88f2dd25b",
+        "sha256": "cd1d62db27c0953d4904788cde7cd849037ce6ae65ba81cb7ff1d288ca10581a",
+        "creator": "NASA Visualization Technology Applications and Development (VTAD)",
+        "license": "NASA media usage guidelines",
+        "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+      },
+      "changes": "User-approved artistic reconstruction of blurry and missing terrain. Generated detail is conjectural, not recovered scientific imagery; the model also reinterprets some observed terrain. Broad geography and color distribution follow the reference. Native generated dimensions retained, JPEG quality 91; runtime longitude alignment unchanged.",
+      "generation": {
+        "tool": "built-in image_gen",
+        "promptFile": "pipeline/planets/sources/pluto-reconstruction-prompt.txt"
+      }
+    },
+    {
+      "file": "triton.jpg",
+      "sourceFile": "pipeline/planets/sources/triton-reconstructed.png",
+      "sourceSha256": "e7fb841bb7ccdac93f0a6ae26d34524f21ec4cdac8fa710de8e58ad1e292cd44",
+      "sha256": "9493c3738fef732e36db35313a6c2821341271cfaabf3b9eb040d8023ed1ea6f",
+      "creator": "OpenAI image generation, using the credited Triton texture as reference",
+      "extract": "image",
+      "maxSize": [
+        1774,
+        887
+      ],
+      "reference": {
+        "source": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/t/Triton_1_2707.glb",
+        "sourcePage": "https://science.nasa.gov/resource/triton-3d-model/",
+        "sourceSha256": "a25df7ee7fe8679e3da8cca7f1a09ec7241ad5e0c7ad97a39f057b8c1a0043ce",
+        "sha256": "e91d985293aca957b8c7b14377cd665426eed4720b6bedab38bdb057777ffc9b",
+        "creator": "NASA Visualization Technology Applications and Development (VTAD)",
+        "license": "NASA media usage guidelines",
+        "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+        "extract": "glb-base-color",
+        "maxSize": [
+          1024,
+          512
+        ],
+        "changes": "Base-color map extracted and resized to 1024 x 512 JPEG quality 91. Unmapped regions in the NASA source remain unchanged."
+      },
+      "changes": "Artistic reconstruction of blurry and missing terrain, requested by the user. Generated detail is conjectural, not recovered scientific imagery; some observed terrain is also reinterpreted. Broad geography and muted color palette follow the reference. Native generated dimensions retained, JPEG quality 91.",
+      "generation": {
+        "tool": "built-in image_gen",
+        "promptFile": "pipeline/planets/sources/triton-reconstruction-prompt.txt"
+      }
+    },
+    {
+      "file": "enceladus.jpg",
+      "source": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/e/Enceladus_1_504.glb",
+      "sourcePage": "https://science.nasa.gov/resource/enceladus-3d-model/",
+      "sourceSha256": "7548234bae15047d6c1af6bec4f348748b1acae7d4e7bfbe50e5bb3dda75506f",
+      "sha256": "6360cfc0112d8bda5afa7d270e714ba7b1b8f395a4a5d480818066b77cf72118",
+      "creator": "NASA Visualization Technology Applications and Development (VTAD)",
+      "license": "NASA media usage guidelines",
+      "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "extract": "glb-base-color",
+      "maxSize": [
+        1024,
+        512
+      ],
+      "changes": "Base-color map extracted and resized to 1024 x 512 JPEG quality 91. Unmapped regions in the NASA source remain unchanged."
+    },
+    {
+      "file": "titania.jpg",
+      "sourceFile": "pipeline/planets/sources/titania-reconstructed.png",
+      "sourceSha256": "f1bd48720ba4f5e5ea631c0dfe2eee7bbecd04e69c2efb828c337439aea9ca3e",
+      "sha256": "3d5c83e457a19e40f8a855e7951a4d057ef25ea0fdddbe0e393a4bd6a683f73f",
+      "creator": "OpenAI image generation, using the credited Titania texture as reference",
+      "extract": "image",
+      "maxSize": [
+        1774,
+        887
+      ],
+      "reference": {
+        "source": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/t/Titania_1_1577.glb",
+        "sourcePage": "https://science.nasa.gov/resource/titania-3d-model/",
+        "sourceSha256": "08556622082b283f2f52c9214636c22acf27300889374dd37197f11a4448324c",
+        "sha256": "52bbd437572e1f8cafa35d9fe3cd1acd43a9f705eddb3d222094216a8a3300e1",
+        "creator": "NASA Visualization Technology Applications and Development (VTAD)",
+        "license": "NASA media usage guidelines",
+        "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+        "extract": "glb-base-color",
+        "maxSize": [
+          1024,
+          512
+        ],
+        "changes": "Base-color map extracted and resized to 1024 x 512 JPEG quality 91. Unmapped regions in the NASA source remain unchanged."
+      },
+      "changes": "Artistic reconstruction of blurry and missing terrain, requested by the user. Generated detail is conjectural, not recovered scientific imagery; some observed terrain is also reinterpreted. Broad geography and muted color palette follow the reference. Native generated dimensions retained, JPEG quality 91.",
+      "generation": {
+        "tool": "built-in image_gen",
+        "promptFile": "pipeline/planets/sources/titania-reconstruction-prompt.txt"
+      }
+    },
+    {
+      "file": "oberon.jpg",
+      "sourceFile": "pipeline/planets/sources/oberon-reconstructed.png",
+      "sourceSha256": "78e33f5188c99588eba74f25e2f15e3cb9db62ec66c1e6ce0d7a52efa1c25189",
+      "sha256": "094ae1fc8c70c7561940ced9c5528b8484274487c3db6d88e91c3ce1546636c4",
+      "creator": "OpenAI image generation, using the credited Oberon texture as reference",
+      "extract": "image",
+      "maxSize": [
+        1774,
+        887
+      ],
+      "reference": {
+        "source": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/o/Oberon_1_1523.glb",
+        "sourcePage": "https://science.nasa.gov/resource/oberon-3d-model/",
+        "sourceSha256": "7b42c417e523db2a22c744cd471587c26f07581564dae7c3b0c20986eea93add",
+        "sha256": "b9b8784da1538e4cbf446ba2801329a2582a6e52d010e3a7b3d5581b66be51e0",
+        "creator": "NASA Visualization Technology Applications and Development (VTAD)",
+        "license": "NASA media usage guidelines",
+        "licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+        "extract": "glb-base-color",
+        "maxSize": [
+          1024,
+          512
+        ],
+        "changes": "Base-color map extracted and resized to 1024 x 512 JPEG quality 91. Unmapped regions in the NASA source remain unchanged."
+      },
+      "changes": "Artistic reconstruction of blurry and missing terrain, requested by the user. Generated detail is conjectural, not recovered scientific imagery; some observed terrain is also reinterpreted. Broad geography and muted color palette follow the reference. Native generated dimensions retained, JPEG quality 91.",
+      "generation": {
+        "tool": "built-in image_gen",
+        "promptFile": "pipeline/planets/sources/oberon-reconstruction-prompt.txt"
+      }
+    },
+    {
+      "file": "phobos.jpg",
+      "source": "https://space.jpl.nasa.gov/tmaps/pix/mar1kuu2.jpg",
+      "sourcePage": "https://space.jpl.nasa.gov/tmaps/mars.html",
+      "sha256": "84eb21c08626a0558d1e88ccb666bd1e914606146423f9ebcf6c09953d7543af",
+      "creator": "Caltech/JPL/USGS; Viking imagery",
+      "license": "Public domain government imagery",
+      "licenseUrl": "https://www.jpl.nasa.gov/jpl-image-use-policy/",
+      "changes": "Original grayscale map, unchanged. Unmapped regions are retained."
+    },
+    {
+      "file": "deimos.jpg",
+      "source": "https://space.jpl.nasa.gov/tmaps/pix/mar2kuu2.jpg",
+      "sourcePage": "https://space.jpl.nasa.gov/tmaps/mars.html",
+      "sha256": "e8902c5b34e634c5146e5d8d2bf352bb5f45181c715ed15644edb5f009826ed6",
+      "creator": "Caltech/JPL/USGS; Viking imagery",
+      "license": "Public domain government imagery",
+      "licenseUrl": "https://www.jpl.nasa.gov/jpl-image-use-policy/",
+      "changes": "Original grayscale map, unchanged. Unmapped regions are retained."
+    },
+    {
+      "file": "charon.jpg",
+      "sourceFile": "pipeline/planets/sources/charon-reconstructed.png",
+      "sourceSha256": "1522a71d7c0805a66e843ce60456ac167c0ebf99fae95dd5ede3f09c1b8fed6f",
+      "sha256": "ddaa65090075e99c5af063b692f0bf79848e397d803a6bd00b247cfb066644c8",
+      "creator": "OpenAI image generation, using the credited Charon texture as reference",
+      "extract": "image",
+      "maxSize": [
+        1774,
+        887
+      ],
+      "reference": {
+        "source": "https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/thumbnails/image/2880756eb5ae5f9c027389cc27cc4cef_Charon_NewHorizons_Global_Mosaic_300m_Jul2017_1024_Sample%20_1.jpg",
+        "sourcePage": "https://www.usgs.gov/media/images/charon-new-horizons-global-mosaic-300m",
+        "sha256": "8caf4f20ed8e7af828e1deab4bbdd6af428723339b56b6341e183f5a334ef0e7",
+        "creator": "NASA/Johns Hopkins University Applied Physics Laboratory/Southwest Research Institute/Lunar and Planetary Institute; USGS distribution",
+        "license": "Public domain government imagery",
+        "licenseUrl": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+        "changes": "Removed presentation side margins to restore 2:1 projection. Unobserved black no-data pixels replaced with neutral gray; no terrain invented. JPEG quality 91.",
+        "sourceSha256": "c6d1ba801e61b8de76bc7e85f087edaab0d7a9171bcc7de2e228a4b749db9a7e",
+        "extract": "image",
+        "crop": [
+          220,
+          0,
+          980,
+          380
+        ],
+        "maxSize": [
+          1024,
+          512
+        ],
+        "fillNoData": [
+          112,
+          112,
+          112
+        ]
+      },
+      "changes": "Artistic reconstruction of blurry and missing terrain, requested by the user. Generated detail is conjectural, not recovered scientific imagery; some observed terrain is also reinterpreted. Broad geography and muted color palette follow the reference. Native generated dimensions retained, JPEG quality 91.",
+      "generation": {
+        "tool": "built-in image_gen",
+        "promptFile": "pipeline/planets/sources/charon-reconstruction-prompt.txt"
+      }
+    },
+    {
+      "file": "sun.jpg",
+      "sourceFile": "pipeline/planets/sources/sun.png",
+      "sourceSha256": "742415c1ec47eb9cd8b699ce19bd63afca9c653c4c994cd0dbd8257a7893b5ba",
+      "sha256": "3310965611f6a31b1fa6c77a070c153a996e4fbc86635a17056d6043fe2b5f6d",
+      "creator": "OpenAI image generation",
+      "extract": "image",
+      "maxSize": [
+        1774,
+        887
+      ],
+      "changes": "Artistic solar photosphere with exaggerated granulation and sunspots for the cue ball. Not calibrated scientific imagery. Native generated dimensions, JPEG quality 91. Runtime adds animated plasma, limb darkening, corona and prominence loops.",
+      "generation": {
+        "tool": "built-in image_gen",
+        "promptFile": "pipeline/planets/sources/sun-generation-prompt.txt"
+      }
+    }
+  ]
+}

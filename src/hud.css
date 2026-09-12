@@ -189,6 +189,40 @@ button:disabled { opacity: .45; cursor: default; }
 .segmented button:hover { color: var(--ink); }
 .segmented button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 
+/* Collection cards share one catalog; new sets need no new picker controls. */
+.ball-sets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
+.ball-sets button { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 10px; text-align: left; border: 1px solid var(--edge); border-radius: var(--r-sm); background: var(--raise); }
+.ball-sets button:hover { border-color: var(--edge-strong); background: var(--raise-hover); }
+.ball-sets button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-wash); }
+.ball-sets button.loading { opacity: .6; }
+.ball-sets strong { font: 500 var(--t-lead)/1.2 var(--display); }
+.ball-sets button > span:last-child { font-size: var(--t-micro); line-height: 1.4; color: var(--ink-faint); }
+.ball-set-art { display: block; position: relative; width: 100%; height: 60px; margin-bottom: 3px; }
+.ball-set-art i { position: absolute; width: 33px; height: 33px; left: calc(50% - 38px); top: 21px; border-radius: 50%; box-shadow: inset -8px -6px 12px #0009, inset 3px 3px 7px #ffffff30, 0 6px 9px #0006; background: #d99424; }
+.ball-set-art i:nth-child(2) { left: calc(50% - 5px); top: 9px; background: #234f98; }
+.ball-set-art i:nth-child(3) { width: 35px; height: 35px; left: calc(50% - 5px); top: 30px; background: linear-gradient(#efece3 24%, #bd4240 24% 76%, #efece3 76%); }
+.art-planets i { background: #bd6b39; }
+.art-planets i:nth-child(2) { background: repeating-linear-gradient(5deg, #aa8d62 0 3px, #d2b88b 4px 8px); }
+.art-planets i:nth-child(2)::after { content: ''; position: absolute; inset: 7px -12px; border: 5px solid #d9c69abf; border-radius: 50%; transform: rotate(-27deg); }
+.art-planets i:nth-child(3) { background: radial-gradient(ellipse at 30% 35%, #638d61 0 19%, transparent 21%), radial-gradient(ellipse at 62% 64%, #7fa577 0 18%, transparent 20%), #347fb7; }
+.art-heads i { background: #aa8e75; }
+.art-heads i:nth-child(2) { background: #b8a18b; }
+.art-heads i:nth-child(3) { background: #c4a18a; }
+.art-heads i::after { content: '• •'; position: absolute; top: 7px; left: 9px; font: 12px Arial; color: #463328; }
+#ball-set-status { margin: 0; font-size: var(--t-micro); color: var(--ink-dim); }
+#ball-set-status:empty { display: none; }
+#planet-options { padding: 14px; border: 1px solid var(--edge); border-radius: var(--r-sm); background: #0002; }
+.planet-color-label, .planet-range-labels { display: flex; justify-content: space-between; gap: 8px; font-size: var(--t-body); }
+.planet-color-label output { color: var(--accent); font-variant-numeric: tabular-nums; }
+#planet-saturation { width: 100%; margin: 12px 0 5px; accent-color: var(--accent); }
+.planet-range-labels, #planet-options p, .planet-guide { color: var(--ink-faint); font-size: var(--t-micro); line-height: 1.6; }
+#planet-options p { margin: 12px 0 0; }
+.planet-guide { margin-top: 12px; }
+.planet-guide summary, .planet-guide a { color: var(--accent); }
+.planet-guide summary { cursor: pointer; }
+.ball-chip.planet-chip { background-image: var(--planet-map); background-size: auto 100%; background-position: center; }
+.ball-chip.planet-chip.stripe { outline: 1px solid #fff9; outline-offset: -2px; }
+
 /* A switch reads as a state; a button reads as an action. Sound is a state. */
 .switch { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); width: 100%; min-height: 40px; padding: 0; border: 0; background: transparent; font-size: var(--t-body); }
 .switch-track { position: relative; width: 40px; height: 23px; border-radius: var(--r-pill); background: #ffffff26; transition: background .18s; flex: none; }
