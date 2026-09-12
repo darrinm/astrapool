@@ -105,7 +105,7 @@ export class ComputerThoughts {
     const x = (this.point.x + 1) * innerWidth / 2, y = (1 - this.point.y) * innerHeight / 2;
     const width = this.label.offsetWidth, height = this.label.offsetHeight;
     const welcome = document.querySelector('#welcome[open] .welcome-inner');
-    const header = welcome ? { bottom: 0 } : document.querySelector('.topbar').getBoundingClientRect();
+    const header = document.querySelector(welcome ? '.welcome-heading' : '.topbar').getBoundingClientRect();
     const footer = (welcome || document.querySelector('.bottom-hud')).getBoundingClientRect();
     const left = THREE.MathUtils.clamp(x + 9, 8, innerWidth - width - 8), top = y - height - 10;
     const overFooter = left < footer.right && left + width > footer.left;

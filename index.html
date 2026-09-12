@@ -29,11 +29,20 @@
     <link rel="stylesheet" href="/src/arcade.css" />
   </head>
   <body>
+    <div id="loading-screen" aria-labelledby="loading-title">
+      <div class="loading-card">
+        <h1 id="loading-title">Astra Pool</h1>
+        <p id="loading-status" role="status">Loading game…</p>
+        <progress id="loading-progress" max="4" aria-label="Loading Astra Pool" aria-describedby="loading-status"></progress>
+        <button id="loading-retry" class="quiet-button" hidden>Try again</button>
+        <noscript>Enable JavaScript to play Astra Pool.</noscript>
+      </div>
+    </div>
     <div id="vignette" hidden></div>
     <dialog id="welcome" aria-labelledby="welcome-title" hidden>
+      <header class="welcome-heading"><h1 id="welcome-title">Astra Pool</h1></header>
       <div class="welcome-inner">
-        <h1 id="welcome-title">Astra Pool</h1>
-        <p class="welcome-lede">Pick a game &mdash; you can change it later.</p>
+        <p class="welcome-lede">Choose your game.</p>
         <div class="choices" role="group" aria-label="Choose a game">
           <button data-game="local"><strong>Local 8-ball</strong><span>Two players, one device</span></button>
           <button data-game="computer"><strong>Vs Computer</strong><span>Play the house</span></button>
@@ -42,7 +51,7 @@
         </div>
       </div>
     </dialog>
-    <div id="hud" hidden>
+    <div id="hud" hidden inert>
       <header class="topbar">
         <div class="brand"><span class="brand-ball" aria-hidden="true">8</span><span>Astra Pool</span></div>
         <div id="free-score" class="scoreboard" aria-label="Game score">
@@ -189,6 +198,6 @@
 
       </div>
     </dialog>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/startup.js"></script>
   </body>
 </html>

@@ -254,6 +254,14 @@ button:disabled { opacity: .45; cursor: default; }
 #room-status { margin: 0; color: var(--ink-faint); font-size: var(--t-micro); min-height: 1.2em; }
 
 /* ---------------------------------------------------------------- welcome */
+#loading-screen { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); background: #0d0b09; }
+.loading-card { display: grid; justify-items: center; gap: 16px; width: min(280px, 100%); text-align: center; }
+.loading-card h1 { position: absolute; top: max(24px, env(safe-area-inset-top)); margin: 0; font: 400 42px/1.1 var(--display); }
+#loading-status { margin: 0; color: var(--ink-dim); }
+#loading-progress { width: 100%; height: 6px; border: 0; border-radius: 999px; overflow: hidden; accent-color: var(--accent); background: var(--edge); }
+#loading-progress::-webkit-progress-bar { background: var(--edge); border-radius: 999px; }
+#loading-progress::-webkit-progress-value { background: var(--accent); border-radius: 999px; }
+#loading-progress::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
 /* Shown once. The table is the pitch, so it stays visible above the title and
    drifts gently behind it; the scrim only darkens what sits under the words. */
 #welcome { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: 0; color: var(--ink); background: none; }
@@ -261,25 +269,37 @@ button:disabled { opacity: .45; cursor: default; }
 #welcome::backdrop { background: transparent; }
 /* The solo demo needs no scoreboard or playing controls behind the title. */
 body:has(#welcome[open]) #hud { visibility: hidden; }
+.welcome-heading { position: absolute; inset: 0 0 auto; z-index: 3; padding: max(var(--s5), env(safe-area-inset-top)) var(--s4) var(--s6); text-align: center; background: linear-gradient(#0b090899, #0b090800); pointer-events: none; }
 .welcome-inner {
   z-index: 3;
   position: absolute; inset: auto 0 0 0; display: grid; justify-items: center; gap: var(--s3);
   padding: var(--s6) max(var(--s5), env(safe-area-inset-left)) max(var(--s6), env(safe-area-inset-bottom));
-  /* Reaches full strength early: the title sits over bright felt in some rooms,
-     and the lede measured only 4.6:1 against the Orbital table before this. */
+  /* Keep game choices readable over bright felt without shading the full table. */
   background: linear-gradient(#0b090800, #0b0908b3 22%, #0b0908f0 60%);
   text-align: center;
 }
 #welcome h1 { margin: 0; font: 400 clamp(44px, 9vw, 68px)/1 var(--display); letter-spacing: -.02em; }
 .welcome-lede { max-width: 54ch; margin: 0 0 var(--s3); color: var(--ink-dim); font-size: var(--t-lead); line-height: 1.55; text-wrap: balance; }
-#welcome .choices { width: min(560px, 100%); text-align: left; }
+#welcome .choices { width: min(560px, 100%); grid-template-columns: repeat(2, minmax(0, 1fr)); text-align: left; }
 /* A shade more present than in the sheet: here they are the only thing to do. */
 #welcome .choices button { background: #ffffff14; border-color: var(--edge-strong); }
 #welcome .choices button:hover { background: #ffffff24; border-color: var(--accent); }
+@media (max-width: 600px) {
+  .welcome-inner { gap: var(--s2); padding: var(--s4) max(var(--s4), env(safe-area-inset-right)) max(var(--s4), env(safe-area-inset-bottom)) max(var(--s4), env(safe-area-inset-left)); }
+  #welcome h1 { font-size: 36px; }
+  .welcome-lede { margin-bottom: var(--s2); font-size: var(--t-body); }
+  #welcome .choices button { min-height: 60px; padding: var(--s2) var(--s3); align-content: center; }
+  #welcome .choices span { font-size: 11px; line-height: 1.3; }
+}
 @media (max-height: 620px) {
   .welcome-inner { gap: var(--s2); padding-top: var(--s5); }
   #welcome h1 { font-size: 38px; }
   .welcome-lede { font-size: var(--t-body); margin-bottom: var(--s2); }
+}
+@media (orientation: landscape) and (max-height: 600px) and (min-width: 480px) {
+  .welcome-inner { padding: var(--s4) max(var(--s4), env(safe-area-inset-right)) max(var(--s4), env(safe-area-inset-bottom)) max(var(--s4), env(safe-area-inset-left)); }
+  #welcome .choices { width: min(760px, 100%); grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #welcome .choices button { min-height: 60px; padding: var(--s2); align-content: center; }
 }
 
 /* ------------------------------------------------------------ pocket call */

@@ -29,6 +29,7 @@ import { newMatch, targets, groupBalls, shotRecord, resolveShot, resolveSoloShot
 import { PoolArcade } from './arcade.js';
 import { planRack, rackPose, RACK_DURATION } from './rack-animation.js';
 import { ComputerThoughts } from './computer-thoughts.js';
+import { setLoadingStage } from './loading.js';
 import { ShotReplay } from './replay.js';
 import { ReplayView } from './replay-view.js';
 import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
@@ -168,7 +169,7 @@ async function setEnvironment(id, applyBallDefault = true) {
   if (!minimal && atDefaultView) resetView();
   // A manual collection choice made while the room loads takes precedence.
   if (applyBallDefault && styleRequest === initialStyleRequest) {
-    void setBallStyle(theme.id === 'orbital' ? 'planets' : 'balls');
+    await setBallStyle(theme.id === 'orbital' ? 'planets' : 'balls');
   }
   return true;
 }
@@ -395,6 +396,7 @@ function setPlanetSaturation(value) {
 async function setBallStyle(id) {
   const style = ballSetById(id).id, request = ++styleRequest;
   if (style === 'planets' && !planetSet) {
+    setLoadingStage(3, 'Loading balls…');
     updateBallSetPicker(ballStyle === 'planets' ? 'balls' : ballStyle, style);
     try {
       planetLoading ??= createPlanetSet().then(set => {
@@ -1351,10 +1353,12 @@ export default {
     rackStyle = initialEnvironment === 'orbital' ? 'planets' : 'balls';
     build(); applyCaps(); layout(!/^#room=/.test(location.hash)); setupCamera(); setLook(true);
     showGameControls(true); capsOn = true;
-    setEnvironment('minimal', initialEnvironment === 'minimal');
-    if (initialEnvironment !== 'minimal') setEnvironment(initialEnvironment);
+    setLoadingStage(2, 'Loading room…');
+    const minimalReady = setEnvironment('minimal', initialEnvironment === 'minimal');
+    const ready = initialEnvironment === 'minimal' ? minimalReady : setEnvironment(initialEnvironment);
     window.addEventListener('hashchange', joinInvite);
     joinInvite();
+    return ready;
   },
   exit() {
     setAttract(false);

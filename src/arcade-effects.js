@@ -182,7 +182,7 @@ export class ArcadeEffects {
     if (!this.header || now - this.lastMetrics > 0.25) {
       this.lastMetrics = now;
       const welcome = document.querySelector('#welcome[open] .welcome-inner');
-      this.header = welcome ? { bottom: 0 } : document.querySelector('.topbar').getBoundingClientRect();
+      this.header = document.querySelector(welcome ? '.welcome-heading' : '.topbar').getBoundingClientRect();
       this.footer = (welcome || document.querySelector('.bottom-hud')).getBoundingClientRect();
     }
     const placed = [];
