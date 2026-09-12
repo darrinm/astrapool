@@ -1248,7 +1248,7 @@ function updateComputer(dt) {
         cancelComputerSearch(); prepareComputerPlan(data.shot);
       };
       worker.onerror = fallback;
-      worker.postMessage({ difficulty: attractMode ? 'hard' : difficulty, solo: attractMode, arcade: structuredClone(arcade.state), balls: tablePositions(), state: structuredClone(match), previews: arcade.hud.enabled, table: {
+      worker.postMessage({ difficulty: attractMode ? 'tricky' : difficulty, solo: attractMode, arcade: structuredClone(arcade.state), balls: tablePositions(), state: structuredClone(match), previews: arcade.hud.enabled, table: {
         snapshot: world.takeSnapshot(), feltZ: FELT_Z, cushions: [...cushionHandles],
         handles: allBalls().filter(b => !pocketedSet.has(b)).map(b => ({ number: numberOf(b), handle: b.body.handle })),
       } });

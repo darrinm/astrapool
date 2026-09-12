@@ -49,6 +49,7 @@ random aiming error, and searches in a background worker so the table stays resp
 
 Tricky plays for arcade points, searching banks, kicks, combinations and caroms, checking the
 margin for error and the next scoring chance. Its practice paths show projected points. The
+welcome demo uses Tricky to play solo with these same thinking previews. The
 in-game Help includes the expanded bonus table; [Tricky mode](docs/tricky-mode.md) describes
 the scoring evidence and search limits.
 
