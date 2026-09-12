@@ -25,7 +25,7 @@ export function connectWelcome(game) {
     if (controls) controls.autoRotate = false;
     if (welcome.open) welcome.close();
     welcome.hidden = true;
-    if (mode) game.setGame(mode);
+    game.setGame(mode || game.matchState().mode);
     game.key('c');                          // settle onto the playing view the drift moved away from
   }
 
@@ -39,4 +39,5 @@ export function connectWelcome(game) {
 
   welcome.hidden = false;
   welcome.showModal();
+  game.startAttract();
 }

@@ -79,7 +79,7 @@ export class ComputerThoughts {
     if (!this.group || !this.current) return;
     const { enabled, reduced } = this.settings();
     if (!enabled || document.hidden) { this.clear(); return; }
-    const now = performance.now(), blocked = !!document.querySelector('dialog[open]');
+    const now = performance.now(), blocked = !!document.querySelector('dialog[open]:not(#welcome)');
     this.group.visible = !blocked;
     for (const slot of this.slots) {
       const age = now - slot.start;
@@ -104,7 +104,9 @@ export class ComputerThoughts {
     this.point.set(current.target.x, current.target.y, this.feltZ + P.R * 2).project(this.camera);
     const x = (this.point.x + 1) * innerWidth / 2, y = (1 - this.point.y) * innerHeight / 2;
     const width = this.label.offsetWidth, height = this.label.offsetHeight;
-    const header = document.querySelector('.topbar').getBoundingClientRect(), footer = document.querySelector('.bottom-hud').getBoundingClientRect();
+    const welcome = document.querySelector('#welcome[open] .welcome-inner');
+    const header = welcome ? { bottom: 0 } : document.querySelector('.topbar').getBoundingClientRect();
+    const footer = (welcome || document.querySelector('.bottom-hud')).getBoundingClientRect();
     const left = THREE.MathUtils.clamp(x + 9, 8, innerWidth - width - 8), top = y - height - 10;
     const overFooter = left < footer.right && left + width > footer.left;
     this.label.hidden = this.point.z < -1 || this.point.z > 1 || top < header.bottom + 4 || top + height > (overFooter ? footer.top - 4 : innerHeight - 8);

@@ -29,6 +29,10 @@ Built with [three.js](https://threejs.org) and [Rapier](https://rapier.rs), serv
 Modes: **Local 8-ball** (two players, one device), **Vs Computer** (Easy / Medium / Hard),
 **Play a Friend** (private link), and **Free Play** (no rules, plus Fling).
 
+On the first visit, the welcome screen orbits a live solo demo: Hard searches and shoots with the
+usual arcade effects, plays both groups before the 8, and automatically re-racks. Choosing a game
+or pressing Escape starts a fresh rack; demo scores never count toward personal bests.
+
 ## Run it
 
 ```sh

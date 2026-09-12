@@ -181,8 +181,9 @@ export class ArcadeEffects {
     if (!this.labels.some(l => l.alive)) return;
     if (!this.header || now - this.lastMetrics > 0.25) {
       this.lastMetrics = now;
-      this.header = document.querySelector('.topbar').getBoundingClientRect();
-      this.footer = document.querySelector('.bottom-hud').getBoundingClientRect();
+      const welcome = document.querySelector('#welcome[open] .welcome-inner');
+      this.header = welcome ? { bottom: 0 } : document.querySelector('.topbar').getBoundingClientRect();
+      this.footer = (welcome || document.querySelector('.bottom-hud')).getBoundingClientRect();
     }
     const placed = [];
     for (const l of this.labels) {

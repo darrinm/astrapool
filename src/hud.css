@@ -259,9 +259,10 @@ button:disabled { opacity: .45; cursor: default; }
 #welcome { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: 0; color: var(--ink); background: none; }
 /* Light: the room behind is the pitch, and the scrim below carries the words. */
 #welcome::backdrop { background: #0b09084d; }
-/* No scoreboard or controls behind a title screen — there is no game yet. */
+/* The solo demo needs no scoreboard or playing controls behind the title. */
 body:has(#welcome[open]) #hud { visibility: hidden; }
 .welcome-inner {
+  z-index: 3;
   position: absolute; inset: auto 0 0 0; display: grid; justify-items: center; gap: var(--s3);
   padding: var(--s6) max(var(--s5), env(safe-area-inset-left)) max(var(--s6), env(safe-area-inset-bottom));
   /* Reaches full strength early: the title sits over bright felt in some rooms,
