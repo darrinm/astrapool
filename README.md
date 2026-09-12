@@ -62,8 +62,8 @@ Three collections, cycled with `B` or **Game → Ball collection**.
 Neptune, the Moon, Io, Europa, Ganymede, Titan and Pluto are 9–15; the cue ball is the Sun. The
 gas giants carry rings and moons, Earth has a cloud shell, and numbered caps appear on each
 world's upper face while you aim. It is an illustrated set, not calibrated imagery: sizes and ring
-spacing are exaggerated, and five bodies use reconstructed terrain where the source maps are blank
-or blurred. About 11.3 MB of maps load the first time it is selected.
+spacing are exaggerated, and six bodies use reconstructed terrain where the source maps are blank
+or blurred. About 11.5 MB of maps load the first time it is selected.
 
 **Classic** is a standard numbered set. **Heads** needs textures that are not in this repository —
 see [Head textures](#head-textures).
@@ -157,9 +157,9 @@ Code is [MIT](LICENSE). The art and audio are not; each set has its own terms.
 
 - `public/planets/` — eleven maps from [Solar System Scope](https://www.solarsystemscope.com/textures/)
   under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), which requires that attribution
-  travel with them; eight from [NASA / VTAD](https://science.nasa.gov/3d-resources/) and USGS under
-  public-domain and NASA media terms; six generated, including the Sun and the reconstructed terrain
-  on Pluto, Charon, Titania, Oberon and Triton. Per-file sources, checksums and modifications are in
+  travel with them; seven from [NASA / VTAD](https://science.nasa.gov/3d-resources/) and USGS under
+  public-domain and NASA media terms; seven generated, including the Sun and the reconstructed terrain
+  on Pluto, Charon, Titania, Oberon, Triton and Deimos. Per-file sources, checksums and modifications are in
   `public/planets/credits.json`.
 - `public/environments/` — generated panoramas and Blender-modelled furniture.
 - `public/sfx/` — takes generated with ElevenLabs Sound Effects; reuse follows their terms.

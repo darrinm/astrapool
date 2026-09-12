@@ -21,8 +21,12 @@ are incomplete. Attribution is also accessible in the collection's in-game detai
 Additional maps: **NASA Visualization Technology Applications and Development (VTAD)**,
 https://science.nasa.gov/3d-resources/, under NASA media usage guidelines. Each model's resource
 page, direct download, source checksum and extraction recipe are recorded per asset in the manifest.
-No NASA logos or implied endorsement. Apart from the five artistic reconstructions described below, their source colors and neutral unmapped regions are retained. Phobos and Deimos use the
-JPL Solar System Simulator’s grayscale Viking maps, which fit the sphere projection. Charon’s reconstruction reference is the USGS-distributed New Horizons mosaic, cropped to
+No NASA logos or implied endorsement. Apart from the six artistic reconstructions described
+below, their source colors and neutral unmapped regions are retained. Phobos uses the JPL Solar
+System Simulator’s grayscale Viking map unchanged. Deimos uses an artistic reconstruction of
+its Viking map from the same source; the original source and checksum remain in the manifest.
+Both maps fit the sphere projection. Charon’s reconstruction reference is the USGS-distributed
+New Horizons mosaic, cropped to
 restore 2:1 projection with its black no-data pixels initially replaced by neutral gray.
 That reference and preparation recipe remain in the manifest.
 
@@ -59,7 +63,7 @@ That reference and preparation recipe remain in the manifest.
   Io has mottled sulfur/volcanic terrain, Europa has fractured ice, Ganymede and Callisto have
   cratered surfaces, Titan has an opaque golden haze, and Pluto has an artistic reconstruction based on the NASA global map.
   The cue is the Sun in this collection; Classic and Heads retain the plain white cue. Pluto has a compressed Charon companion.
-  Pluto, Charon, Titania, Oberon and Triton use 1774 × 887 artistic reconstructions
+  Pluto, Charon, Titania, Oberon, Triton and Deimos use 1774 × 887 artistic reconstructions
   generated with built-in image_gen from each moon/world’s own map.
   Blurry and missing terrain is artistically filled; some observed details are also reinterpreted.
   This is not recovered scientific imagery. The original source URLs, preparation recipes and checksums remain
@@ -69,6 +73,8 @@ That reference and preparation recipe remain in the manifest.
 - Charon retains dark polar terrain and smoother fractured plains; Titania has cratered
   terrain and long fractures; Oberon emphasizes old impact terrain and brighter ejecta;
   Triton has pale icy plains, subtle cellular terrain and a bright southern frost region.
+- Deimos retains the Viking map’s broad crater placement and muted gray dusty-rock palette,
+  with the blank margins and blurry coverage filled into continuous, softly cratered terrain.
 - Every companion uses its own image map; namesake full-size balls share the same source textures. Phobos and Deimos are elongated; the larger companions are round.
 
 NASA references: https://science.nasa.gov/solar-system/moons/,
