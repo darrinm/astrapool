@@ -51,6 +51,9 @@ button:disabled { opacity: .45; cursor: default; }
 
 /* ---------------------------------------------------------------- scaffold */
 #vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 45%, #000a 100%); }
+@media (max-width: 600px), (hover: none) and (pointer: coarse) {
+  #vignette { display: none; }
+}
 /* The HUD is one grid over the viewport, so every cluster sits in a real cell
    instead of being positioned independently and hoping the edges agree. */
 #hud {
