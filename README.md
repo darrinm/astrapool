@@ -5,7 +5,7 @@ release. Rack the planets, a standard set, or faces.
 
 **[Play it at astrapool.darrinm.com](https://astrapool.darrinm.com)** — no install, no account.
 
-![A pool table in an orbital lounge, racked with the planets and broken with a glowing Sun for a cue ball.](public/og.jpg)
+![Astra Pool — Rack the planets. A glowing Sun cue ball and planetary billiard balls on teal felt in an orbital lounge.](public/og.jpg)
 
 [three.js](https://threejs.org) and [Rapier](https://rapier.rs), served from a Cloudflare Worker.
 
