@@ -1,6 +1,7 @@
 // Shared setup: renderer, camera, lights, physics world, the 14 heads, and the helpers the pool scene builds on.
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
+import { setLoadingStage } from './loading.js';
 
 export const PEOPLE = Array.from({ length: 14 }, (_, i) => `p${String(i + 1).padStart(2, '0')}`);
 export const RADIUS = 1.5;          // base head radius (world units); scenes may scale it
@@ -8,6 +9,7 @@ export const DEPTH = RADIUS * 1.1;  // the felt sits this far below the origin
 export const CAMERA_Z = 30;
 const HEADS_VERSION = 10;           // bump when the maps in public/heads change, so browsers refetch them
 
+setLoadingStage(1, 'Starting physics…');
 await RAPIER.init();
 export { RAPIER };
 
