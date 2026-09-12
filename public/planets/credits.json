@@ -1,5 +1,5 @@
 {
-  "changes": "The cue ball is an artistically generated Sun with animated photosphere, corona and prominence loops. Color intensity adjusted at runtime, Neptune blue-green rebalance, Earth cloud layering, compressed decorative rings and major moons. Source maps include enhanced color and reconstructed/unmapped regions. Every companion uses its own sourced image map. Pluto, Charon, Titania, Oberon and Triton use AI artistic reconstructions of poorly resolved and missing terrain; other unobserved regions remain neutral; Charon presentation margins are removed. Number and stripe caps use the same artwork as Heads, projected onto curved patches that stay on the world-up face and show only during local human aiming. Moons orbit at exaggerated rates; the black-hole ball, animated disk, lensing arcs and glow are procedural illustrations, not a relativistic simulation. Ring density and spacing are exaggerated for play.",
+  "changes": "The cue ball is an artistically generated Sun with animated photosphere, corona and prominence loops. Color intensity adjusted at runtime, Neptune blue-green rebalance, Earth cloud layering, compressed decorative rings and major moons. Source maps include enhanced color and reconstructed/unmapped regions. Every companion uses its own sourced image map. Pluto, Charon, Titania, Oberon, Triton and Deimos use AI artistic reconstructions of poorly resolved and missing terrain; other unobserved regions remain neutral; Charon presentation margins are removed. Number and stripe caps use the same artwork as Heads, projected onto curved patches that stay on the world-up face and show only during local human aiming. Moons orbit at exaggerated rates; the black-hole ball, animated disk, lensing arcs and glow are procedural illustrations, not a relativistic simulation. Ring density and spacing are exaggerated for play.",
   "assets": [
     {
       "file": "clouds.jpg",
@@ -299,13 +299,29 @@
     },
     {
       "file": "deimos.jpg",
-      "source": "https://space.jpl.nasa.gov/tmaps/pix/mar2kuu2.jpg",
-      "sourcePage": "https://space.jpl.nasa.gov/tmaps/mars.html",
-      "sha256": "e8902c5b34e634c5146e5d8d2bf352bb5f45181c715ed15644edb5f009826ed6",
-      "creator": "Caltech/JPL/USGS; Viking imagery",
-      "license": "Public domain government imagery",
-      "licenseUrl": "https://www.jpl.nasa.gov/jpl-image-use-policy/",
-      "changes": "Original grayscale map, unchanged. Unmapped regions are retained."
+      "sourceFile": "pipeline/planets/sources/deimos-reconstructed.png",
+      "sourceSha256": "558acffc4377a525ec459cd424d32219297382c767e0d60f9b4bcfa6916e8b3f",
+      "sha256": "4d4637bd1a2d540ad45eb7bfc0a5b00b1e37f0ef424d3f07a66a6ae6f9cd1965",
+      "creator": "OpenAI image generation, using the Caltech/JPL/USGS Viking Deimos map as reference",
+      "extract": "image",
+      "maxSize": [
+        1774,
+        887
+      ],
+      "reference": {
+        "source": "https://space.jpl.nasa.gov/tmaps/pix/mar2kuu2.jpg",
+        "sourcePage": "https://space.jpl.nasa.gov/tmaps/mars.html",
+        "sha256": "e8902c5b34e634c5146e5d8d2bf352bb5f45181c715ed15644edb5f009826ed6",
+        "creator": "Caltech/JPL/USGS; Viking imagery",
+        "license": "Public domain government imagery",
+        "licenseUrl": "https://www.jpl.nasa.gov/jpl-image-use-policy/",
+        "changes": "Original grayscale map, unchanged. Unmapped regions are retained."
+      },
+      "changes": "Artistic reconstruction of blurry and missing terrain, requested by the user. Generated detail is conjectural, not recovered scientific imagery; some observed terrain is also reinterpreted. Broad mapped features, original longitude registration and muted gray palette follow the reference. Coverage boundaries and mosaic seams blended into continuous dusty terrain. Native generated dimensions retained, JPEG quality 91.",
+      "generation": {
+        "tool": "built-in image_gen",
+        "promptFile": "pipeline/planets/sources/deimos-reconstruction-prompt.txt"
+      }
     },
     {
       "file": "charon.jpg",
