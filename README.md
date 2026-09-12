@@ -1,9 +1,9 @@
-# Pool
+# Astra Pool
 
 A 7-foot pool table you can walk around, in the browser. Real physics, house-rules 8-ball,
 three computer opponents, and private rooms you share with a link.
 
-**[Play it at pool.darrinm.com](https://pool.darrinm.com)** — no install, no account, nothing to sign up for.
+**[Play it at astrapool.darrinm.com](https://astrapool.darrinm.com)** — no install, no account, nothing to sign up for.
 
 ![A pool table racked for eight-ball in an orbital lounge, Earth through the window.](public/og.jpg)
 
@@ -41,7 +41,7 @@ npm run physics-test         # the 26-check physics harness
 Node 24; `nvm use` picks it up from `.nvmrc`.
 
 ## Deployment
-Live at [pool.darrinm.com](https://pool.darrinm.com).
+Live at [astrapool.darrinm.com](https://astrapool.darrinm.com).
 
 GitHub Actions checks pull requests targeting `main`. Every push to `main` (including a merged PR)
 runs the game-rule, AI, input and online-room tests, physics harness, and production build, then deploys to Cloudflare.
@@ -52,6 +52,14 @@ The repository Actions secret `CLOUDFLARE_API_TOKEN` must contain a Cloudflare W
 token scoped to the account in `wrangler.jsonc` and the `darrinm.com` zone. Use Cloudflare's
 “Edit Cloudflare Workers” token template. The account ID and custom domain are configured in
 `wrangler.jsonc`.
+
+The product is Astra Pool, but three names deliberately stay `pool` and should not be
+"finished": the Worker name in `wrangler.jsonc` (renaming it creates a *new* Worker with a new
+Durable Object namespace, orphaning every live online room), the `POOL_ROOMS` binding and its
+migration tag, and the `pool.*` / `playful.*` localStorage keys (renaming those silently resets
+every existing player's room, ball collection and arcade preferences). The Worker's *routes* did
+move to `astrapool.darrinm.com`; a Worker's name and its routes are independent, so the hostname
+changed without disturbing the rooms.
 
 For a manual local deployment, `nvm use` selects Node 24 (see `.nvmrc`), then `npm run deploy`
 builds and publishes the local files, including uncommitted changes. Use your Wrangler login;
@@ -295,7 +303,7 @@ front of it if the textures should not be reachable by anyone who guesses the na
 
 The public `npm run deploy` runs `heads:guard` first and refuses to build while any texture is in
 the working tree, which is what stops a deploy right after a private one from publishing them. CI
-runs the same guard before deploying to pool.darrinm.com.
+runs the same guard before deploying to astrapool.darrinm.com.
 
 **Before making this repository public**, run `npm run check:publishable`. Untracking the textures
 does not remove them from earlier commits, and a public repository publishes its whole history. The

@@ -5,7 +5,7 @@
 //
 // That restores public/heads/ from the store (tools/heads.mjs) and deploys with
 // this config instead of wrangler.jsonc, so the public site at
-// pool.darrinm.com never receives them.
+// astrapool.darrinm.com never receives them.
 //
 // This is a SEPARATE Worker with its own Durable Object namespace, so its
 // online rooms are independent of the public site's. Change "pattern" below to
@@ -26,7 +26,7 @@
   },
   "routes": [
     {
-      "pattern": "pool-private.darrinm.com",
+      "pattern": "astrapool-private.darrinm.com",
       "custom_domain": true
     }
   ],

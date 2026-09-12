@@ -1327,7 +1327,7 @@ function collectPocketed() {
 }
 
 export default {
-  name: 'pool', label: 'Pool',
+  name: 'pool', label: 'Astra Pool',
   // 480 Hz: Rapier's contact model loses restitution on slow impacts at coarse steps (see physics/validate.mjs);
   // at 480 Hz a 0.95 ball reads 0.91-0.95 across the speed range instead of 0.68-0.94 at 120 Hz.
   stepRate: 480,

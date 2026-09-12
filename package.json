@@ -1,7 +1,7 @@
 {
-  "name": "pool",
+  "name": "astrapool",
   "version": "1.0.0",
-  "description": "A 7-foot pool table you can walk around, in the browser: real physics, house-rules 8-ball, three computer opponents, and private online rooms",
+  "description": "A 7-foot pool table you can walk around, in the browser: real physics, house-rules 8-ball, three computer opponents, private online rooms, and a solar system you can rack",
   "private": true,
   "type": "module",
   "scripts": {
@@ -32,5 +32,5 @@
     "ws": "^8.21.3"
   },
   "license": "MIT",
-  "homepage": "https://pool.darrinm.com"
+  "homepage": "https://astrapool.darrinm.com"
 }
