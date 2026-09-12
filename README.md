@@ -20,6 +20,11 @@ shots: pots, banks, escapes, power and spin, rejecting scratches and early 8s, t
 next shot against a defensive leave. Its spin limits and 24 mph power cap are the ones you play
 with. The search runs in a worker, so the table stays responsive while it thinks.
 
+Phones get their own layout rather than a scaled-down one. In portrait the table turns lengthwise
+and starts overhead, fitted between the score and the controls, which move into a compact bar off
+the felt. Drag to orbit, two fingers to pan, pinch to zoom, and while holding a shot, tap Cancel
+with another finger to abandon it.
+
 Modes: **Local 8-ball** (two players, one device), **Vs Computer** (Easy / Medium / Hard),
 **Play a Friend** (private link), and **Free Play** (no rules, plus Fling).
 
