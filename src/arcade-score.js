@@ -34,8 +34,9 @@ export function scoreArcade({ state, before, shot, evidence = new Map(), result 
     if (free && !route?.active) continue;
     count++; award('pot', number, pocket, 100);
     if (route?.banks) award('bank', number, pocket, 150 + 75 * (Math.min(3, route.banks) - 1));
-    if (route?.combo) award('combo', number, pocket, 200);
-    if (input === 'cue' && route?.kick && !kickAwarded) { award('kick', number, pocket, 200); kickAwarded = true; }
+    if (route?.combo) award('combo', number, pocket, route.combo >= 2 ? 350 : 200);
+    if (input === 'cue' && route?.kick && !kickAwarded) { award('kick', number, pocket, 200 + 100 * (Math.min(3, Number(route.kick)) - 1)); kickAwarded = true; }
+    for (const [kind, bonus] of [['carom', 200], ['double', 300], ['thin', 100], ['long', 75]]) if (route?.[kind] && !(kind === 'carom' && route.double)) award(kind, number, pocket, bonus);
     if (count > 1) award('multi', number, pocket, count * 100);
     if (!free && number === 8 && !before.breaking && pocket === shot.calledPocket) award('finish', number, pocket, 500);
   }
@@ -54,7 +55,7 @@ export function commitArcade(state, receipt) {
   return { ...state, totals, streaks, lastPlay: receipt.play, last: receipt };
 }
 
-export const AWARD_NAMES = { pot: 'Pot', bank: 'Bank', combo: 'Combination', kick: 'Kick', multi: 'Multi-pot', finish: 'Rack finish' };
+export const AWARD_NAMES = { pot: 'Pot', bank: 'Bank', combo: 'Combination', kick: 'Kick', multi: 'Multi-pot', finish: 'Rack finish', carom: 'Carom', double: 'Double kiss', thin: 'Thin cut', long: 'Long pot' };
 export const FAULT_NAMES = { scratch: 'Scratch', off: 'Off the table', early: 'Early 8-ball', wrong: 'Wrong pocket', foul: 'Foul' };
 export function arcadeSummary(receipt) {
   if (!receipt) return '';

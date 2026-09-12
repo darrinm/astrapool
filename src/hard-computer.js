@@ -12,7 +12,7 @@ function bouncePoint(a, b, axis, wall) {
   return t > 0 && t < 1 && Math.abs(p.x) <= P.HW - P.R && Math.abs(p.y) <= P.HH - P.R &&
     !pockets.some(q => distance(p, q) < 4) ? p : null;
 }
-function bankOptions(balls, legal) {
+export function bankOptions(balls, legal) {
   const cue = balls.find(b => b.number === 0), options = [];
   for (const ball of balls.filter(b => legal.includes(b.number))) for (const [pocket, p] of pockets.entries()) for (const [axis, wall] of walls) {
     const bounce = bouncePoint(ball, p, axis, wall);
@@ -28,7 +28,7 @@ function bankOptions(balls, legal) {
   }
   return options.sort((a, b) => b.score - a.score);
 }
-function contactOptions(balls, legal) {
+export function contactOptions(balls, legal) {
   const cue = balls.find(b => b.number === 0), options = [];
   for (const ball of balls.filter(b => legal.includes(b.number))) {
     const aims = clearPath(cue, ball, balls, [0, ball.number]) ? [ball] : [];
@@ -44,7 +44,7 @@ function contactOptions(balls, legal) {
   }
   return options;
 }
-function placements(balls, legal) {
+export function placements(balls, legal) {
   const options = [];
   for (const ball of balls.filter(b => legal.includes(b.number))) for (const p of pockets) for (const gap of [4, 8, 14]) {
     const d = distance(ball, p), position = { x: ball.x + (ball.x - p.x) / d * gap, y: ball.y + (ball.y - p.y) / d * gap };
@@ -59,7 +59,7 @@ function placements(balls, legal) {
     const key = `${s.target}:${s.pocket}`; if (seen.has(key)) return false; seen.add(key); return true;
   }).slice(0, 12);
 }
-function variation(shot, angle = 0, power = 1, spin = shot.spin) {
+export function variation(shot, angle = 0, power = 1, spin = shot.spin) {
   const a = Math.atan2(shot.dir.y, shot.dir.x) + angle;
   return { ...shot, dir: { x: Math.cos(a), y: Math.sin(a) }, speed: Math.min(MAX_SPEED, Math.max(8, shot.speed * power)), spin: spin || { x: 0, y: 0 } };
 }
@@ -70,7 +70,7 @@ function value(result, previous, shot) {
   const legal = targets(previous), ownPots = result.report.pocketed.filter(p => legal.includes(p.number)).length;
   const next = potOptions(result.balls, targets(result.state));
   const cue = result.balls.find(b => b.number === 0);
-  if (result.state.turn === previous.turn) return 4000 + ownPots * 1200 + (next[0]?.score ?? -40) * 5 - Math.hypot(cue.x / P.HW, cue.y / P.HH) * 12;
+  if (result.state.turn === previous.turn && ownPots > 0) return 4000 + ownPots * 1200 + (next[0]?.score ?? -40) * 5 - Math.hypot(cue.x / P.HW, cue.y / P.HH) * 12;
   // A legal safety should leave few pots and a long or obstructed first contact.
   const opponent = result.balls.filter(b => targets(result.state).includes(b.number));
   const contact = opponent.filter(b => clearPath(cue, b, result.balls, [0, b.number]));
@@ -78,15 +78,19 @@ function value(result, previous, shot) {
   const nearPocket = target && shot.pocket !== null ? distance(target, pockets[shot.pocket]) : 0;
   return -(next[0]?.score ?? -30) * 8 - next.length * 25 + (contact.length ? Math.min(...contact.map(b => distance(cue, b))) : 250) - nearPocket;
 }
-export function hardComputerShot(balls, state, liveTable, onPreview) {
+export function hardComputerShot(balls, state, liveTable, onPreview, { maxMs = Infinity, maxSimulations = Infinity, solo = false } = {}) {
   const table = liveTable || practiceTable(balls), legal = targets(state), evaluated = [], seen = new Set();
-  let lastPreview = -Infinity;
+  let lastPreview = -Infinity, simulations = 0;
+  const deadline = performance.now() + maxMs;
+  const available = () => simulations < maxSimulations && performance.now() < deadline;
+  const simulate = (t, before, shot, preview = false) => { simulations++; return simulateShot(t, before, shot, preview, { solo }); };
   const evaluate = shot => {
+    if (!available() && evaluated.length) return;
     const key = JSON.stringify([shot.dir, shot.speed, shot.spin, shot.position, shot.pocket]);
     if (seen.has(key)) return; seen.add(key);
     const now = performance.now(), preview = !!onPreview && now - lastPreview >= 100;
     if (preview) lastPreview = now;
-    const result = simulateShot(table, state, shot, preview), entry = { shot, result, score: value(result, state, shot) };
+    const result = simulate(table, state, shot, preview), entry = { shot, result, score: value(result, state, shot) };
     if (preview) {
       onPreview({ target: shot.target, pocket: shot.pocket, paths: result.paths });
       delete result.paths;
@@ -125,23 +129,25 @@ export function hardComputerShot(balls, state, liveTable, onPreview) {
   const finalists = evaluated.toSorted((a, b) => b.score - a.score).slice(0, 4);
   for (const entry of finalists) {
     const { result, shot } = entry;
-    if (entry.score >= 4000 && entry.score < 100000 && !result.respot.length) {
+    if (available() && entry.score >= 4000 && entry.score < 100000 && !result.respot.length) {
       const nextTable = practiceTable(result.balls);
       let continuation = -1000;
       for (const next of potOptions(result.balls, targets(result.state)).slice(0, 5)) {
-        const attempt = simulateShot(nextTable, result.state, variation(next));
+        if (!available()) break;
+        const attempt = simulate(nextTable, result.state, variation(next));
         continuation = Math.max(continuation, value(attempt, result.state, next));
       }
       entry.score += Math.max(-500, Math.min(1800, continuation * 0.2));
     }
     // Prefer a shot with margin over one that only works at a single exact angle.
     for (const angle of [-0.0007, 0.0007]) {
-      const perturbed = simulateShot(table, state, variation(shot, angle));
+      if (!available()) break;
+      const perturbed = simulate(table, state, variation(shot, angle));
       const score = value(perturbed, state, shot);
       if (score < -10000) entry.score -= 3000;
       else if (entry.score >= 4000 && score < 4000) entry.score -= 1200;
     }
   }
   const best = finalists.sort((a, b) => b.score - a.score)[0];
-  return { ...best.shot, evaluated: seen.size, expected: { pocketed: best.result.report.pocketed, foul: best.result.state.ballInHand || best.result.rerack } };
+  return { ...best.shot, evaluated: simulations, expected: { pocketed: best.result.report.pocketed, foul: best.result.state.ballInHand || best.result.rerack } };
 }

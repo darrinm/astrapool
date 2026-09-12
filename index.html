@@ -112,11 +112,12 @@
           </div>
 
           <div class="field" id="difficulty-group" hidden>
-            <span class="eyebrow" id="difficulty-label">Difficulty</span>
+            <span class="eyebrow" id="difficulty-label">Computer style</span>
             <div id="difficulty" class="segmented" role="group" aria-labelledby="difficulty-label">
               <button data-difficulty="easy" aria-pressed="false">Easy</button>
               <button data-difficulty="medium" aria-pressed="false">Medium</button>
               <button data-difficulty="hard" aria-pressed="true">Hard</button>
+              <button data-difficulty="tricky" aria-pressed="false" title="Plays for points. Loves a bank, kick, or combination.">Tricky</button>
             </div>
           </div>
 
@@ -177,9 +178,24 @@
               <dl class="shortcuts"><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Ball collection</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
               <h3>House rules</h3>
               <p>Arcade adds playful effects and a separate points score in every game. Pots earn 100; banks, kicks, combinations and multi-pots add bonuses. Consecutive scoring shots build a multiplier up to ×3. Floating points are pending until the shot settles; scratches and fouls void that shot's points. Racks won still decide the match. Choose Reduced effects for calmer motion. Free Play Cue and Fling have separate personal bests; changing modes during a rack makes it mixed practice.</p>
+              <table class="arcade-scoring"><caption>Arcade bonuses · added to each 100-point pot</caption>
+                <thead><tr><th scope="col">Shot</th><th scope="col">Bonus</th></tr></thead>
+                <tbody>
+                  <tr><td>Bank · 1 / 2 / 3+ cushions</td><td>150 / 225 / 300</td></tr>
+                  <tr><td>Kick · 1 / 2 / 3+ cushions before first contact</td><td>200 / 300 / 400</td></tr>
+                  <tr><td>Combination · 2 / 3+ object balls</td><td>200 / 350</td></tr>
+                  <tr><td>Carom · scoring ball deflects off an object ball</td><td>200</td></tr>
+                  <tr><td>Double kiss · repeat contact redirects the scoring ball</td><td>300</td></tr>
+                  <tr><td>Thin cut · 60° or more</td><td>100</td></tr>
+                  <tr><td>Long pot · half the table diagonal travelled</td><td>75</td></tr>
+                  <tr><td>Second / third / later pot in one shot</td><td>200 / 300 / …</td></tr>
+                  <tr><td>Legal called 8-ball finish</td><td>500</td></tr>
+                </tbody>
+              </table>
+              <p>Distinct bonuses stack before the streak multiplier. Each family pays its highest tier; a double kiss replaces the carom bonus for the same ball. Kicks pay once per shot. Only measured, contributing contacts count; cushion chatter and ambiguous collisions earn no trick bonus.</p>
               <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>
               <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack.</p>
-              <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed.</p>
+              <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed. Tricky plays for arcade points, searching for trick shots while protecting its scoring streak.</p>
             </div>
           </details>
         </section>

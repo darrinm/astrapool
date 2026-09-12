@@ -1,6 +1,6 @@
 #arcade-effects { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
 body:has(#hud-sheet[open]) #arcade-effects { visibility: hidden; }
-#computer-thought { position: fixed; top: 0; left: 0; z-index: 2; pointer-events: none; padding: 4px 10px; border-radius: 14px 14px 14px 3px; background: #ffe08a; color: #352219; box-shadow: 0 2px 7px #0003; font: 750 14px/1.3 ui-rounded, system-ui, sans-serif; }
+#computer-thought { max-width: min(320px, calc(100vw - 36px)); box-sizing: border-box; position: fixed; top: 0; left: 0; z-index: 2; pointer-events: none; padding: 4px 10px; border-radius: 14px 14px 14px 3px; background: #ffe08a; color: #352219; box-shadow: 0 2px 7px #0003; font: 750 14px/1.3 ui-rounded, system-ui, sans-serif; }
 #computer-thought.chosen { background: #a8e8be; }
 .arcade-float { position: absolute; top: 0; left: 0; max-width: 210px; text-align: center; color: var(--arcade-color, #ffe08a); transform-origin: center; will-change: transform, opacity; font-family: ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif; }
 .arcade-float strong { display: block; font-size: 27px; font-weight: 850; line-height: 1.15; letter-spacing: -.035em; -webkit-text-stroke: 3px #352219; paint-order: stroke fill; text-shadow: 2px 3px 0 #352219, 0 3px 9px #0008; }
@@ -30,3 +30,8 @@ body:has(#hud-sheet[open]) #arcade-effects { visibility: hidden; }
   .arcade-float { max-width: 185px; }
 }
 @media (prefers-reduced-motion: reduce) { .arcade-float { will-change: opacity; } }
+
+.arcade-scoring { width: 100%; border-collapse: collapse; font-size: 12px; line-height: 1.5; }
+.arcade-scoring caption { text-align: left; margin: 12px 0 6px; }
+.arcade-scoring th, .arcade-scoring td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid #ffffff18; }
+.arcade-scoring th:last-child, .arcade-scoring td:last-child { text-align: right; white-space: nowrap; }
