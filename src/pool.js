@@ -524,9 +524,10 @@ function setupCamera() {
   controls.addEventListener('start', () => { overhead = false; controls.minPolarAngle = 0.05; });
   resetView();
   hudObserver = new ResizeObserver(() => {
-    if (overhead && !aiming && !placing && !dragging) fitOverhead();
+    if (attractMode) frameAttract();
+    else if (overhead && !aiming && !placing && !dragging) fitOverhead();
   });
-  for (const selector of ['.topbar', '.bottom-hud']) hudObserver.observe(document.querySelector(selector));
+  for (const selector of ['.topbar', '.bottom-hud', '.welcome-inner']) hudObserver.observe(document.querySelector(selector));
 }
 // The default view shows the room the player picked. Portrait sights down the long rail so a tall
 // window still frames the whole table; Overhead stays one tap away in the compact bar.
@@ -546,6 +547,14 @@ function resetView() {
   // Give the solo demo a closer view of the shots and search effects.
   if (attractMode) camera.position.sub(controls.target).multiplyScalar(0.8).add(controls.target);
   controls.update();
+  if (attractMode) frameAttract();
+}
+function frameAttract() {
+  // Lift the orbit above the choices without changing its distance or pivot.
+  // Keep the offset smaller in landscape, where vertical room is limited.
+  const choices = document.querySelector('.welcome-inner').getBoundingClientRect();
+  const lift = Math.min(choices.height / 2, innerHeight * (innerHeight > innerWidth ? 0.16 : 0.08));
+  camera.setViewOffset(innerWidth, innerHeight, 0, lift, innerWidth, innerHeight);
 }
 
 // The chrome borrows the room's own accent, so the HUD belongs to the table it sits on.
@@ -787,6 +796,7 @@ function refitView() {
   lastViewport = { w: innerWidth, h: innerHeight };
   if (overhead) fitOverhead();
   else if (shape !== before) resetView();
+  else if (attractMode) frameAttract();
   else camera.clearViewOffset();
 }
 function updateDrag() {
@@ -1065,6 +1075,7 @@ function fitOverhead() {
   });
 }
 function setAttract(active) {
+  if (attractMode && !active) camera.clearViewOffset();
   attractMode = active; attractWait = 0;
   // DOM labels must live in the dialog's top layer while the demo is showing.
   const parent = active ? document.getElementById('welcome') : document.body;
@@ -1396,6 +1407,7 @@ export default {
     // then would move the camera out from under the shot being aimed, so do nothing unless the
     // viewport really changed, and never interrupt a gesture in progress.
     if (innerWidth === lastViewport.w && innerHeight === lastViewport.h) return;
+    if (attractMode) { refitView(); return; }
     // A rotation mid-aim is deferred, not dropped: lastViewport still holds the pre-change size, so
     // endGesture() re-frames as soon as the shot is taken or cancelled.
     if (aiming || placing || dragging) { refitPending = true; return; }
