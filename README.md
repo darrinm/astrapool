@@ -1,4 +1,4 @@
-# Pool
+# Astra Pool
 
 A 7-foot pool table you can walk around, in the browser. Real physics, house-rules 8-ball,
 three computer opponents, and private rooms you share with a link.
@@ -52,6 +52,13 @@ The repository Actions secret `CLOUDFLARE_API_TOKEN` must contain a Cloudflare W
 token scoped to the account in `wrangler.jsonc` and the `darrinm.com` zone. Use Cloudflare's
 “Edit Cloudflare Workers” token template. The account ID and custom domain are configured in
 `wrangler.jsonc`.
+
+The product is Astra Pool, but three names deliberately stay `pool` and should not be
+"finished": the Worker name in `wrangler.jsonc` (renaming it creates a *new* Worker with a new
+Durable Object namespace, orphaning every live online room), the `POOL_ROOMS` binding and its
+migration tag, and the `pool.*` / `playful.*` localStorage keys (renaming those silently resets
+every existing player's room, ball collection and arcade preferences). The hostname is unchanged
+for the same reason links already point at it.
 
 For a manual local deployment, `nvm use` selects Node 24 (see `.nvmrc`), then `npm run deploy`
 builds and publishes the local files, including uncommitted changes. Use your Wrangler login;
