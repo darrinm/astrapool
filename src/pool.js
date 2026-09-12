@@ -63,7 +63,7 @@ let rackMotion = null;
 let computerWait = 0, computerPlan = null, computerWorker = null;
 let attractMode = false, attractWait = 0;
 const COMPUTER_CUE_TIME = 0.18;
-let difficulty = 'hard', onlineShotSeq = null, onlineShooter = null;
+let difficulty = 'tricky', onlineShotSeq = null, onlineShooter = null;
 let overhead = false, hudObserver;
 const online = new OnlineRoom(receiveOnline, text => {
   document.getElementById('online-status').textContent = text;
@@ -544,8 +544,11 @@ function resetView() {
   else if (innerHeight <= 600) { camera.position.set(-100, -56, FELT_Z + 38); controls.target.set(-4, 0, FELT_Z); }
   else if (environmentId === 'minimal') camera.position.set(-HW * 1.6, 0, FELT_Z + 21);
   else { camera.position.set(-115, -65, FELT_Z + 40); controls.target.z = FELT_Z - 7; }
-  // Give the solo demo a closer view of the shots and search effects.
-  if (attractMode) camera.position.sub(controls.target).multiplyScalar(0.8).add(controls.target);
+  // Give the solo demo a closer view, with more room around the table on mobile.
+  if (attractMode) {
+    const mobile = matchMedia('(max-width: 600px), (hover: none) and (pointer: coarse)').matches;
+    camera.position.sub(controls.target).multiplyScalar(mobile ? 0.9 : 0.8).add(controls.target);
+  }
   controls.update();
   if (attractMode) frameAttract();
 }
@@ -1248,7 +1251,7 @@ function updateComputer(dt) {
         cancelComputerSearch(); prepareComputerPlan(data.shot);
       };
       worker.onerror = fallback;
-      worker.postMessage({ difficulty: attractMode ? 'hard' : difficulty, solo: attractMode, arcade: structuredClone(arcade.state), balls: tablePositions(), state: structuredClone(match), previews: arcade.hud.enabled, table: {
+      worker.postMessage({ difficulty: attractMode ? 'tricky' : difficulty, solo: attractMode, arcade: structuredClone(arcade.state), balls: tablePositions(), state: structuredClone(match), previews: arcade.hud.enabled, table: {
         snapshot: world.takeSnapshot(), feltZ: FELT_Z, cushions: [...cushionHandles],
         handles: allBalls().filter(b => !pocketedSet.has(b)).map(b => ({ number: numberOf(b), handle: b.body.handle })),
       } });

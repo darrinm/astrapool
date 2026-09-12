@@ -43,13 +43,14 @@ own shot; regular shots need no call.
 
 **Vs Computer** has four styles. Easy favours simple pots with forgiving aim and loose power.
 Medium aims and controls power more precisely and selects shots geometrically, but does not plan
-ahead; both lose accuracy on long or thin cuts. Hard is the default: it tests pots, banks, legal
+ahead; both lose accuracy on long or thin cuts. Hard tests pots, banks, legal
 escapes, power and spin in a copy of the live world, rejects scratches and early 8s, weighs the
 next shot against a defensive leave, searches ball-in-hand placements, and calls the 8. It adds no
 random aiming error, and searches in a background worker so the table stays responsive.
 
-Tricky plays for arcade points, searching banks, kicks, combinations and caroms, checking the
+Tricky is the default. It plays for arcade points, searching banks, kicks, combinations and caroms, checking the
 margin for error and the next scoring chance. Its practice paths show projected points. The
+welcome demo uses Tricky to play solo with these same thinking previews. The
 in-game Help includes the expanded bonus table; [Tricky mode](docs/tricky-mode.md) describes
 the scoring evidence and search limits.
 

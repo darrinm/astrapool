@@ -44,7 +44,7 @@ export function trickyComputerShot(balls, state, liveTable, onPreview, arcade = 
     entries.push(entry); familiesTried.add(shot.family || 'Contact');
     if (preview) {
       lastPreview = performance.now();
-      onPreview({ target: shot.target, pocket: shot.pocket, paths: result.paths, traceTargets: shot.traceTargets, label: projectedLabel(receipt, `Trying ${shot.family || 'a shot'}…`) });
+      onPreview({ target: shot.target, pocket: shot.pocket, paths: result.paths, traceTargets: shot.traceTargets, label: projectedLabel(receipt, `${shot.family || 'Shot'}…`) });
       delete result.paths;
     }
     return entry;
