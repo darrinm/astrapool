@@ -24,8 +24,9 @@ off the felt.
 ## Playing
 
 Four modes: **Local 8-ball** (two people, one device), **Vs Computer**, **Play a Friend** (a
-private link), and **Free Play** (no rules). On a first visit the welcome screen plays a solo
-demo behind the menu; choosing a mode or pressing Escape starts a fresh rack.
+private link), and **Free Play** (no rules). On every refresh the welcome screen plays a solo
+demo behind the menu; choosing a mode or pressing Escape starts a fresh rack. Online room links
+restore the player and table directly instead of starting the demo.
 
 Drag back from the cue ball and release. The further the pull, the harder the hit, up to 24 mph.
 The ball widget sets follow, draw and english. Left-drag to orbit, right-drag to pan, wheel to
