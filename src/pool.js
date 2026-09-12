@@ -11,7 +11,7 @@ import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUnifo
 import { RAPIER, DEPTH, renderer, scene, camera, world, eventQueue, heads, lights, DEFAULT_LIGHTS, setBallDetail, resetHeads, placeHead, hideHead,
   setHeadRadius, addMesh, addBody, addStaticCollider, registerProp, clearProps, pointerToPlane, meshUnderPointer, ui } from './core.js';
 import { noiseBump, feltMap, woodMap, clothNormal, radialShadow, gradientStrip } from './textures.js';
-import { bakeCap, authenticBall, BALL_COLORS } from './ballcaps.js';
+import { bakeCap, authenticBall, chooseBallMap, loadedHead, BALL_COLORS } from './ballcaps.js';
 import { PoolAudio } from './sounds.js';
 import { trackShadowChanges } from './shadow-updates.js';
 import { buildEnvironment, environmentById, readEnvironment } from './environments.js';
@@ -40,6 +40,7 @@ let lastViewport = { w: innerWidth, h: innerHeight }, refitPending = false;
 // cleared view offset: a landscape position leaves half the table off a portrait screen.
 const viewShape = (w, h) => (h > w ? 'portrait' : h <= 600 ? 'short' : 'wide');
 let pocketedSet = new Set(), respotAt = 0, pmrem, envTex, feltCol, lastStatus = '', contactShadows = [], fixture = [], fixtureFade = [0, 1];
+const WHITE = new THREE.Color(0xffffff);
 const capped = new Map();   // head -> { plain, capped, ball } textures; caps are baked lazily once the plain map has loaded
 let capsOn = false;
 let ballStyle = localStorage.getItem('playful.ballStyle') === 'heads' ? 'heads' : 'balls';   // 'heads' | 'balls'
@@ -47,7 +48,7 @@ let interactionMode = 'cue', dragging = null;
 const CUE_LEARNED = 'pool.cueLearned';
 let cueLearned = false;
 try { cueLearned = localStorage.getItem(CUE_LEARNED) === '1'; } catch {}
-let gameMode = 'local', match = newMatch(), activeShot = null, calledPocket = null;
+let gameMode = 'computer', match = newMatch(), activeShot = null, calledPocket = null;
 let settledFor = 0, physicsTime = 0, placing = null, pocketMarker;
 let rackMotion = null;
 let computerWait = 0, computerPlan = null, computerWorker = null;
@@ -308,21 +309,46 @@ function build() {
 
 // ---------- heads on the table ----------
 export function ballNumber(j) { return j < 4 ? j + 1 : j === 4 ? 8 : j <= 7 ? j : j + 1; }   // rack index -> number: 1-4, 8, 5-7, 9-15
+// The numbered ball is drawn from scratch by authenticBall and needs no head
+// texture. Only the capped head does. Gating the whole entry on a loaded head
+// meant that when public/heads is absent — the public build — the map never
+// arrived and all fourteen balls kept the placeholder colour core.js gives them.
 function applyCaps() {
   for (let i = 0; i < heads.length; i++) {
     const h = heads[i], m = h.mesh.material;
     let entry = capped.get(h);
     if (!entry) {
-      if (!m.map || !m.map.image || !m.map.image.width) continue;   // plain texture not loaded yet; try again next frame
-      const n = ballNumber(rackIndexOfHead(i));
-      entry = { plain: m.map, capped: bakeCap(m.map.image, n), ball: authenticBall(n) }; capped.set(h, entry);
+      const number = ballNumber(rackIndexOfHead(i));
+      // base is that placeholder colour, kept so removeCaps can put it back.
+      entry = { number, base: m.color.clone(), plain: null, capped: null, ball: authenticBall(number) };
+      capped.set(h, entry);
     }
-    const want = ballStyle === 'balls' ? entry.ball : entry.capped;
-    if (capsOn && m.map !== want) { m.map = want; m.needsUpdate = true; }
+    const head = loadedHead(m.map, entry);
+    if (head && !entry.capped) { entry.plain = head; entry.capped = bakeCap(head.image, entry.number); }
+    const want = chooseBallMap(entry, ballStyle);
+    // color multiplies map, so it has to go white or the placeholder tints the ball.
+    if (capsOn && m.map !== want) { m.map = want; m.color.setHex(0xffffff); m.needsUpdate = true; }
   }
 }
+
+// core.js assigns material.map straight from the texture loader, so a head can
+// land after applyCaps has already set a generated map. Re-run whenever any
+// material is not showing what it should; with no heads to load this settles on
+// the first frame and stays quiet.
+function capsPending() {
+  if (capped.size < heads.length) return true;
+  for (const h of heads) {
+    const entry = capped.get(h);
+    if (!entry || h.mesh.material.map !== chooseBallMap(entry, ballStyle)) return true;
+  }
+  return false;
+}
+
 function removeCaps() {
-  for (const [h, entry] of capped) { const m = h.mesh.material; if (m.map !== entry.plain) { m.map = entry.plain; m.needsUpdate = true; } }
+  for (const [h, entry] of capped) {
+    const m = h.mesh.material;
+    if (m.map !== entry.plain) { m.map = entry.plain; m.color.copy(entry.plain ? WHITE : entry.base); m.needsUpdate = true; }
+  }
 }
 function setBallStyle(style) {
   ballStyle = style; localStorage.setItem('playful.ballStyle', style);
@@ -885,6 +911,7 @@ function updateScore() {
   document.getElementById('online-panel').hidden = gameMode !== 'online';
   document.getElementById('rerack').hidden = gameMode === 'online';
   document.getElementById('difficulty-group').hidden = gameMode !== 'computer';
+  document.querySelectorAll('#game-mode button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.game === gameMode)));
   document.getElementById('free-score').hidden = !free;
   document.getElementById('match-score').hidden = free;
   document.getElementById('interaction-group').hidden = !free;
@@ -961,7 +988,6 @@ function startGame(mode, roomId = null) {
   online.leave(); history.replaceState(null, '', location.pathname);
   gameMode = mode;
   arcade.onlineCreating = mode === 'online' && !roomId;
-  document.querySelectorAll('#game-mode button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.game === mode)));
   document.getElementById('rematch').disabled = false; document.getElementById('rematch').textContent = 'Rematch'; match = newMatch(); layout(mode !== 'online' || !roomId);
   if (mode === 'online') { if (roomId) online.join(roomId); else void online.create(); }
   setInteractionMode('cue');
@@ -1391,7 +1417,7 @@ export default {
     audio.setMuted(!!window.playful?.mute || document.hidden || replayView.active);
     const fade = THREE.MathUtils.clamp((fixtureFade[1] - camera.position.z) / (fixtureFade[1] - fixtureFade[0]), 0, 1);   // lamp fixture fades as the camera climbs to it
     for (const m of fixture) { m.visible = fade > 0; m.material.opacity = fade; }
-    if (capsOn && capped.size < heads.length) applyCaps();
+    if (capsOn && capsPending()) applyCaps();
     const balls = replayView.active ? replayView.balls : allBalls();
     const pixelScale = innerHeight * renderer.getPixelRatio() * camera.projectionMatrix.elements[5] / 2;
     balls.forEach((h, i) => {
