@@ -5,3 +5,9 @@ __pycache__/
 .wrangler/
 .dev.vars*
 .env*
+.DS_Store
+
+# Private head textures (see tools/heads.mjs). Photographs of identifiable
+# people; not part of the public repository. `npm run heads:restore` puts them
+# back for a private build.
+public/heads/

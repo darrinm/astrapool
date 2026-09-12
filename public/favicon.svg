@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Pool">
+  <defs>
+    <radialGradient id="b" cx="38%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#5a5a5e"/>
+      <stop offset="55%" stop-color="#1c1c1f"/>
+      <stop offset="100%" stop-color="#000"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="31" fill="url(#b)"/>
+  <circle cx="32" cy="32" r="14" fill="#fff"/>
+  <text x="32" y="33" text-anchor="middle" dominant-baseline="central"
+        font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="21" fill="#111">8</text>
+  <ellipse cx="23" cy="18" rx="9" ry="6" fill="#fff" opacity=".18" transform="rotate(-28 23 18)"/>
+</svg>

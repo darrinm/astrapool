@@ -1,0 +1,54 @@
+// Private deployment: the same game, deployed separately, with the head
+// textures included.
+//
+//   npm run deploy:private
+//
+// That restores public/heads/ from the store (tools/heads.mjs) and deploys with
+// this config instead of wrangler.jsonc, so the public site at
+// pool.darrinm.com never receives them.
+//
+// This is a SEPARATE Worker with its own Durable Object namespace, so its
+// online rooms are independent of the public site's. Change "pattern" below to
+// the hostname you want. The first deploy creates the DNS record and
+// certificate by itself.
+//
+// The hostname is unlisted, not protected. Put Cloudflare Access in front of it
+// if the textures should not be reachable by anyone who guesses the name.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pool-private",
+  "account_id": "f1a4a152b72d6ebcb0b82a8b384d4c1b",
+  "compatibility_date": "2026-09-06",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "routes": [
+    {
+      "pattern": "pool-private.darrinm.com",
+      "custom_domain": true
+    }
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "main": "server/worker.js",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "POOL_ROOMS",
+        "class_name": "PoolRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PoolRoom"]
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
+}

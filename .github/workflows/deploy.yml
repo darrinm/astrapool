@@ -44,4 +44,5 @@ jobs:
             echo "::error::Set the repository Actions secret CLOUDFLARE_API_TOKEN to a Cloudflare Workers deployment token."
             exit 1
           fi
+          npm run heads:guard
           npx --no-install wrangler deploy

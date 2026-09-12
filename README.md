@@ -1,20 +1,47 @@
 # Pool
 
-A 7-foot pool table you can walk around, built with three.js and Rapier, racked with the Playful Heads: the
-Hatch 2025 team as 3D head textures on the balls. Extracted from `playful-photos` (which keeps the head-map pipeline).
+A 7-foot pool table you can walk around, in the browser. Real physics, house-rules 8-ball,
+three computer opponents, and private rooms you share with a link.
 
-`npm install && npm run dev`, then open the printed URL. `npm run physics-test` runs the physics harness.
+**[Play it at pool.darrinm.com](https://pool.darrinm.com)** — no install, no account, nothing to sign up for.
 
-When it is your turn on the 8-ball, **Call the 8-ball pocket** appears above the table controls.
-Your chosen pocket stays marked on the table and named in the guidance. **Change pocket** lets you
-revise the call until you take the shot; the shot uses that final choice.
+![A pool table racked for eight-ball in an orbital lounge, Earth through the window.](public/og.jpg)
 
-Re-racking gathers the balls from their current table positions. Missing balls return at random clear
-spots first, then all sixteen balls glide into the rack and cue-ball position. Shooting resumes after
-the brief setup animation; it creates no shots or arcade points. Reduced motion places the rack immediately.
+Built with [three.js](https://threejs.org) and [Rapier](https://rapier.rs), served from a Cloudflare Worker.
+
+- **Physics, not animation.** Rapier steps the table at 480 Hz: a triangle-mesh felt with six real
+  holes and pocket wells underneath so balls physically drop in, cushions with a real nose profile,
+  rolling resistance and spin friction applied per step, and off-centre strikes with follow / draw /
+  english. `physics/validate.mjs` checks 26 headless results against closed-form answers — the 90°
+  and 30° rules, collision laws, cushion rebound, timestep sensitivity, tunnelling and determinism.
+- **A computer that searches.** Hard copies the live physics world and tests pots, banks, legal
+  escapes, power and spin, rejecting scratches and early 8s, then weighs the next shot or a defensive
+  leave. It gets no aiming advantage — the same spin limits and 24 mph power cap a human has — and it
+  runs in a worker, so the table stays responsive while it thinks.
+- **Online rooms.** One SQLite-backed Durable Object per room. The server assigns seats, validates
+  turn ownership and resolves the house rules; browsers simulate the shots. Casual friend matches: no
+  accounts, no matchmaking, no rankings.
+- **Nine rooms.** Generated photographic panoramas plus Blender-modelled furniture and matching
+  reflection lighting, downloaded only when you choose one.
+- **Sampled sound.** Ball-on-ball, cushion, cue tip, pocket drop and rattle; each hit picks a random
+  take with strength-driven level, pitch and brightness, panned and attenuated from the camera.
+
+Modes: **Local 8-ball** (two players, one device), **Vs Computer** (Easy / Medium / Hard),
+**Play a Friend** (private link), and **Free Play** (no rules, plus Fling).
+
+## Run it
+
+```sh
+npm install && npm run dev   # local / computer / free-play game
+npm run dev:online           # adds the Cloudflare runtime, needed for online rooms
+npm test                     # rules, computer, pointer behaviour, server protocol
+npm run physics-test         # the 26-check physics harness
+```
+
+Node 24; `nvm use` picks it up from `.nvmrc`.
 
 ## Deployment
-Live at [pool.darrinm.com](https://pool.darrinm.com). The repository lives at `~/src/pool`.
+Live at [pool.darrinm.com](https://pool.darrinm.com).
 
 GitHub Actions checks pull requests targeting `main`. Every push to `main` (including a merged PR)
 runs the game-rule, AI, input and online-room tests, physics harness, and production build, then deploys to Cloudflare.
@@ -24,7 +51,7 @@ manual runs from the Actions tab on `main`; production deployments run one at a 
 The repository Actions secret `CLOUDFLARE_API_TOKEN` must contain a Cloudflare Workers deployment
 token scoped to the account in `wrangler.jsonc` and the `darrinm.com` zone. Use Cloudflare's
 “Edit Cloudflare Workers” token template. The account ID and custom domain are configured in
-`wrangler.jsonc`, following `~/src/darrinm.com/README.md`.
+`wrangler.jsonc`.
 
 For a manual local deployment, `nvm use` selects Node 24 (see `.nvmrc`), then `npm run deploy`
 builds and publishes the local files, including uncommitted changes. Use your Wrangler login;
@@ -125,6 +152,14 @@ online messages use **You**, **Computer**, and **Friend** consistently with the 
 After a foul, click clear felt or drag the cue ball to place it. Choose a pocket before shooting the 8; the selected
 pocket glows gold on the table. **Overhead** gives a top-down view.
 
+When it is your turn on the 8-ball, **Call the 8-ball pocket** appears above the table controls.
+Your chosen pocket stays marked on the table and named in the guidance. **Change pocket** lets you
+revise the call until you take the shot; the shot uses that final choice.
+
+Re-racking gathers the balls from their current table positions. Missing balls return at random clear
+spots first, then all sixteen balls glide into the rack and cue-ball position. Shooting resumes after
+the brief setup animation; it creates no shots or arcade points. Reduced motion places the rack immediately.
+
 Pool uses house rules: the table stays open after the break; the first legal shot pocketing only one group assigns
 solids / stripes. Hit your own group first, then pocket a ball or drive a ball to a cushion. All fouls give ball-in-hand
 anywhere. The 8 must be played on a separate shot after clearing your group, into the called pocket. An early 8,
@@ -185,10 +220,65 @@ and choose **Cue** or press `F` again to return to cue shots.
   rules, cushion rebound, engine hygiene (timestep sensitivity, tunnelling, determinism), and a pocket sweep including 24 mph shots.
   `RATE=120 npm run physics-test` shows the coarse-step losses that led to stepping at 480 Hz. Known deviation: heavy
   topspin into a rail rebounds livelier than on a real table.
-- `public/heads/` – the 14 equirectangular head maps (generated in `playful-photos/pipeline`).
+- `public/heads/` – the optional equirectangular head maps, kept out of this repository
+  (see [Head textures](#head-textures)). Absent, the head balls fall back to plain colours and the
+  game is unaffected; numbered balls are the default appearance either way.
 - `public/sfx/` – the sound samples plus `manifest.json`.
 - `pipeline/` – sound-effect generation (Python; `python3 -m venv .venv && .venv/bin/pip install -r pipeline/requirements.txt`):
-  `sfx.py` generates takes per event with ElevenLabs Sound Effects v2 on fal (`FAL_API_KEY` read from `~/src/iris/.env`);
+  `sfx.py` generates takes per event with ElevenLabs Sound Effects v2 on fal (`FAL_API_KEY` from the environment);
   `sfx_analyze.py` measures onset, attack, ring time and spectral centroid, strips the generator's edge clicks, rejects
   quiet and double-hit takes, trims, normalises and writes `public/sfx/` with the manifest (`--write`).
 - `tasks/` – plan and lessons.
+
+## Head textures
+
+The head balls can be textured with photographs of real people. Those images are not in this
+repository and are not redistributable, so a checkout has no `public/heads/`. Nothing is missing:
+numbered balls are the default appearance, and the head balls fall back to plain colours when the
+files are absent.
+
+The canonical copy lives in a store outside the repository, so no git operation inside it can put
+them back into history. `$POOL_HEADS_DIR` overrides the default location (`~/.pool-heads`).
+
+```sh
+npm run heads:status    # what is in the store and in the working tree
+npm run heads:stash     # working tree -> store, first-time setup
+npm run heads:restore   # store -> working tree, before a private build
+npm run heads:clear     # remove them from the working tree
+```
+
+A restored working tree builds and deploys exactly like any other, because Vite copies `public/`
+into `dist/` either way. `heads:clear` refuses to run while the store is empty, so it cannot destroy
+the only copy.
+
+**Deploying with them.** `npm run deploy:private` restores the textures and deploys to the separate
+Worker in `wrangler.private.jsonc` — its own hostname and its own Durable Object namespace, so the
+public site never receives them. That hostname is unlisted, not protected; put Cloudflare Access in
+front of it if the textures should not be reachable by anyone who guesses the name.
+
+The public `npm run deploy` runs `heads:guard` first and refuses to build while any texture is in
+the working tree, which is what stops a deploy right after a private one from publishing them. CI
+runs the same guard before deploying to pool.darrinm.com.
+
+**Before making this repository public**, run `npm run check:publishable`. Untracking the textures
+does not remove them from earlier commits, and a public repository publishes its whole history. The
+check fails until the blobs are unreachable from every ref, and prints the `git filter-repo` recipe.
+
+## License
+
+Code is [MIT](LICENSE).
+
+The art and audio assets are **not** covered by that grant, and are included only so the
+game runs from a checkout:
+
+- `public/environments/` — generated panoramas and Blender-modelled furniture.
+- `public/sfx/` — sound takes generated with ElevenLabs Sound Effects; their reuse follows
+  ElevenLabs' terms, not this repository's.
+- `public/heads/` — optional head textures of real, identifiable people. All rights reserved:
+  they are not licensed for redistribution, modification, or any use beyond running this game.
+  The game does not need them — numbered balls are the default, and if the files are absent the
+  head balls fall back to plain colours.
+
+Third-party runtime dependencies keep their own licenses — [three.js](https://github.com/mrdoob/three.js)
+(MIT), [Rapier](https://github.com/dimforge/rapier) (Apache-2.0), and the
+[Fraunces](https://github.com/undercasetype/Fraunces) typeface (SIL OFL 1.1).
