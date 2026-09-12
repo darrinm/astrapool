@@ -257,8 +257,8 @@ button:disabled { opacity: .45; cursor: default; }
 /* Shown once. The table is the pitch, so it stays visible above the title and
    drifts gently behind it; the scrim only darkens what sits under the words. */
 #welcome { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: 0; color: var(--ink); background: none; }
-/* Light: the room behind is the pitch, and the scrim below carries the words. */
-#welcome::backdrop { background: #0b09084d; }
+/* Keep the demo at normal brightness; the gradient below carries the words. */
+#welcome::backdrop { background: transparent; }
 /* The solo demo needs no scoreboard or playing controls behind the title. */
 body:has(#welcome[open]) #hud { visibility: hidden; }
 .welcome-inner {
