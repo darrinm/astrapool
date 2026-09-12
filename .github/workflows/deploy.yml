@@ -35,7 +35,7 @@ jobs:
         run: npm run build
       - name: Check private online rooms and reconnects
         run: npm run test:online
-      - name: Deploy to pool.darrinm.com
+      - name: Deploy to astrapool.darrinm.com
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

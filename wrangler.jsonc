@@ -12,7 +12,7 @@
   },
   "routes": [
     {
-      "pattern": "pool.darrinm.com",
+      "pattern": "astrapool.darrinm.com",
       "custom_domain": true
     }
   ],
