@@ -1,6 +1,6 @@
 # Tricky computer style
 
-Tricky plays legal 8-ball for expected arcade points. Select **Game → Vs Computer → Tricky**. It uses the same visible practice paths and ghost cue ball as Hard; previews include intermediate balls and projected points. The arcade-effects toggle changes presentation, not the opponent's objective. The welcome demo uses Tricky in solo mode; Hard remains the default opponent for a player game.
+Tricky is the default computer style and plays legal 8-ball for expected arcade points. Select **Game → Vs Computer → Tricky**. It uses the same visible practice paths and ghost cue ball as Hard; previews include intermediate balls and projected points. The arcade-effects toggle changes presentation, not the opponent's objective. The welcome demo also uses Tricky in solo mode.
 
 Every scoring pot starts at 100. Bonuses are applied before the player's streak multiplier (×1, ×1.5, ×2, ×3):
 

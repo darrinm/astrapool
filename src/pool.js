@@ -63,7 +63,7 @@ let rackMotion = null;
 let computerWait = 0, computerPlan = null, computerWorker = null;
 let attractMode = false, attractWait = 0;
 const COMPUTER_CUE_TIME = 0.18;
-let difficulty = 'hard', onlineShotSeq = null, onlineShooter = null;
+let difficulty = 'tricky', onlineShotSeq = null, onlineShooter = null;
 let overhead = false, hudObserver;
 const online = new OnlineRoom(receiveOnline, text => {
   document.getElementById('online-status').textContent = text;
