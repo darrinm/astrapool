@@ -1,6 +1,6 @@
 # Tricky computer style
 
-Tricky is the default computer style and plays legal 8-ball for expected arcade points. Select **Game → Vs Computer → Tricky**. It uses the same visible practice paths and ghost cue ball as Hard; previews include intermediate balls and projected points. The arcade-effects toggle changes presentation, not the opponent's objective. The welcome demo also uses Tricky in solo mode.
+Tricky is the default computer style. It prefers reliable trick shots in legal 8-ball, then maximizes expected arcade points among those choices. Select **Game → Vs Computer → Tricky**. It uses the same visible practice paths and ghost cue ball as Hard; previews include intermediate balls and projected points. The arcade-effects toggle changes presentation, not the opponent's objective. The welcome demo also uses Tricky in solo mode.
 
 Every scoring pot starts at 100. Bonuses are applied before the player's streak multiplier (×1, ×1.5, ×2, ×3):
 
@@ -30,7 +30,11 @@ The worker shares Hard's Rapier snapshots, timestep, physics and placement helpe
 
 Search families include direct pots, one/two/three-cushion banks and kicks, two/three-ball combinations, bank combinations, caroms and draw variants that can produce double kisses. Geometric candidates are proposals: only the simulated contact evidence earns a bonus. Incidental multi-pots also contribute their actual points. Double kisses are opportunistic; a route label alone never awards one.
 
-Round-robin candidate budgets prevent direct pots from taking every search slot. The best candidates get aim/spin refinements, small aim-and-power perturbations, then one-shot continuation where time permits. The objective combines simulated points and discounted continuation, with penalties for fouls, losing the rack and dropping a built streak. It approximates rack score with bounded lookahead rather than exhaustively solving the rack.
+Round-robin candidate budgets prevent direct pots from taking every search slot. The refinement and final shortlists reserve up to three places for shots that actually earned a bank, kick, combination, carom or double-kiss bonus, plus a fallback. They retain different earned trick types before filling spare places with variations of the same trick. Long pots, thin cuts, multi-pots and rack finishes still earn their normal points, but do not alone qualify for the trick preference. Proposal labels never qualify a shot.
+
+Each finalist gets two margin checks: aim offsets of −0.0007/+0.0007 radians paired with power factors of 0.985/1.015. A reliable trick must settle legally and earn a trick bonus in the original simulation and both checks. Any such finalist takes priority over plain pots, even if a plain pot offers more points. Otherwise, Tricky prefers a shot that scores in all three tests, then shots that stay legal throughout their available tests, then the best penalized fallback if none stay legal. These are consistency checks, not calibrated success probabilities. Incomplete checks never earn the reliable-trick preference. Breaks retain their point-based ranking.
+
+Within each selection tier, rank combines average simulated points and discounted continuation, with penalties for fouls, losing the rack and dropping a built streak. One-shot continuation tests up to three distinct trick-family representatives and a direct pot, sharing the remaining simulations across finalists. Continuation scores use the actual next streak multiplier and a 50% discount scaled by the finalist's scoring success across its samples. The search remains bounded and does not exhaustively solve the rack.
 
 The default budget is 180 simulations and 4.5 seconds; a simulation already in progress can finish just after the deadline. It runs off the rendering thread and is terminated when the player changes mode or style. A valid geometric fallback remains available if the worker fails.
 
@@ -40,7 +44,7 @@ Run `npm test`, `npm run physics-test`, `npm run build` and `npm run test:online
 
 `npm run benchmark:tricky -- --racks=4 --seed=1234` compares Hard and Tricky on identical seeded solo endgame layouts with equal limits. It reports points, completed/truncated racks, fouls, trick pots, simulations and thinking time. Override `--shots`, `--ms` and `--simulations` to measure a smaller budget. These are endgame layouts, not a claim about full-rack or mobile-device performance.
 
-A development run on September 12, 2026, with seed 2026 and the default budget:
+A development run on September 12, 2026, before the reliable-trick preference was added, with seed 2026 and the default budget:
 
 | Style | Finished endgames | Points / rack | Trick pots | Fouls | Mean search |
 | --- | ---: | ---: | ---: | ---: | ---: |

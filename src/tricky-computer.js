@@ -1,7 +1,7 @@
 import { P } from '../physics/constants.js';
 import { targets } from './eight-ball.js';
 import { canPlace } from './table-state.js';
-import { computerShot, computerPlacement, potOptions } from './computer.js';
+import { computerShot, computerPlacement } from './computer.js';
 import { contactOptions, variation } from './hard-computer.js';
 import { trickShotFamilies } from './trick-shots.js';
 import { practiceTable, simulateShot } from './shot-simulation.js';
@@ -10,11 +10,52 @@ import { newArcade, scoreArcade, commitArcade, multiplierFor, AWARD_NAMES } from
 function receiptFor(result, before, arcade) {
   return scoreArcade({ state: arcade, before, shot: result.report, evidence: result.evidence, result });
 }
+const TRICK_KINDS = new Set(['bank', 'kick', 'combo', 'carom', 'double']);
+const clean = (result, receipt) => result.settled && !receipt.fault &&
+  (result.state.winner === null || result.state.winner === receipt.player);
+const scores = (result, receipt) => clean(result, receipt) && receipt.total > 0;
+export const earnsTrick = (result, receipt) => scores(result, receipt) && receipt.awards.some(a => TRICK_KINDS.has(a.kind));
+const byPoints = (a, b) => b.score - a.score || b.receipt.awards.length - a.receipt.awards.length;
+
+// Reserve room for tricks before reliability testing, even when plain pots have
+// higher scores. Also keep a fallback so fragile tricks cannot force a bad shot.
+export function trickyFinalists(entries) {
+  const ranked = entries.toSorted(byPoints);
+  const tricks = ranked.filter(e => earnsTrick(e.result, e.receipt));
+  const plain = ranked.find(e => !earnsTrick(e.result, e.receipt));
+  const chosen = [], kindsSeen = new Set(), trickSlots = plain ? 3 : 4;
+  // Aim refinements of one lucrative bank must not crowd every kick or combo
+  // out of the margin checks. First compare different earned trick families.
+  for (const entry of tricks) {
+    const kinds = [...new Set(entry.receipt.awards.filter(a => TRICK_KINDS.has(a.kind)).map(a => a.kind))].sort().join('+');
+    if (!kindsSeen.has(kinds) && chosen.length < trickSlots) { chosen.push(entry); kindsSeen.add(kinds); }
+  }
+  for (const entry of tricks) if (chosen.length < trickSlots && !chosen.includes(entry)) chosen.push(entry);
+  if (plain) chosen.push(plain);
+  for (const entry of ranked) if (chosen.length < 4 && !chosen.includes(entry)) chosen.push(entry);
+  return chosen;
+}
+export function chooseTrickyFinalist(finalists) {
+  const reliableTricks = finalists.filter(e => e.samples === 3 && e.tricks === 3);
+  const reliablePots = finalists.filter(e => e.samples === 3 && e.successes === 3);
+  const safe = finalists.filter(e => e.safe === e.samples);
+  const pool = reliableTricks.length ? reliableTricks : reliablePots.length ? reliablePots : safe.length ? safe : finalists;
+  return { best: pool.toSorted(byPoints)[0], selection: reliableTricks.length ? 'reliable-trick' : reliablePots.length ? 'reliable-pot' : 'fallback' };
+}
+
+// One representative from each trick family gives a small lookahead variety.
+// Keep a direct pot as well; generation scores only prioritize what to simulate.
+export function trickyContinuations(balls, state) {
+  const families = trickShotFamilies(balls, targets(state));
+  const direct = families.find(f => f.name === 'Direct pot').shots[0];
+  const tricks = families.filter(f => f.name !== 'Direct pot').map(f => f.shots[0]).filter(Boolean).sort((a, b) => b.score - a.score);
+  return [...tricks.slice(0, 3), ...(direct ? [direct] : [])];
+}
 export function trickyValue(result, receipt, arcade) {
   if (!result.settled) return -100000;
   const multiplier = multiplierFor(arcade.streaks[receipt.player]);
-  // Losing a rack also forfeits its remaining scoring chances. Otherwise the
-  // objective is points, with only a small cost for losing a built-up streak.
+  // Losing a rack also forfeits its remaining scoring chances. Otherwise rank
+  // within each reliability tier by points, with a small streak-loss cost.
   if (result.state.winner !== null && result.state.winner !== receipt.player) return -1200 * multiplier;
   if (receipt.fault) return -300 * multiplier;
   return receipt.total - (receipt.count ? 0 : (multiplier - 1) * 100);
@@ -75,39 +116,46 @@ export function trickyComputerShot(balls, state, liveTable, onPreview, arcade = 
     if (!entries.some(e => e.receipt.total)) {
       for (const shot of contactOptions(placed, legal).slice(0, 6)) evaluate(variation({ ...shot, ...(position && { position }) }));
     }
-    for (const { shot } of entries.toSorted((a, b) => b.score - a.score).slice(0, 4)) {
-      if (performance.now() > started + maxMs * 0.8) break;
+    const canRefine = () => available() && simulations < maxSimulations - 8 && performance.now() < started + maxMs * 0.8;
+    for (const { shot } of trickyFinalists(entries)) {
       const angles = table.blackHoleGravity ? [-0.08, -0.04, -0.02, -0.006, -0.0025, 0.0025, 0.006, 0.02, 0.04, 0.08] : [-0.006, -0.0025, 0.0025, 0.006];
-      for (const angle of angles) evaluate(variation(shot, angle));
-      for (const spin of [{ x: 0, y: -0.35 }, { x: 0, y: 0.35 }]) evaluate(variation(shot, 0, 1, spin));
+      for (const angle of angles) { if (!canRefine()) break; evaluate(variation(shot, angle)); }
+      for (const spin of [{ x: 0, y: -0.35 }, { x: 0, y: 0.35 }]) { if (!canRefine()) break; evaluate(variation(shot, 0, 1, spin)); }
     }
   }
-  const finalists = entries.toSorted((a, b) => b.score - a.score).slice(0, 4);
-  for (const entry of finalists) Object.assign(entry, { sum: entry.score, samples: 1, successes: Number(entry.receipt.total > 0) });
+  const finalists = state.breaking ? entries.toSorted(byPoints).slice(0, 4) : trickyFinalists(entries);
+  for (const entry of finalists) Object.assign(entry, { sum: entry.score, samples: 1,
+    successes: Number(scores(entry.result, entry.receipt)), safe: Number(clean(entry.result, entry.receipt)), tricks: Number(earnsTrick(entry.result, entry.receipt)) });
   // Give every finalist its margin check before spending the remaining budget
   // on a leave. Slow devices still compare shots on the same evidence.
   for (const [angle, power] of [[-0.0007, 0.985], [0.0007, 1.015]]) for (const entry of finalists) {
     if (!available()) break;
     const result = simulate(table, state, variation(entry.shot, angle, power)), receipt = receiptFor(result, state, arcade);
-    entry.sum += trickyValue(result, receipt, arcade); entry.samples++; entry.successes += Number(receipt.total > 0);
+    entry.sum += trickyValue(result, receipt, arcade); entry.samples++;
+    entry.successes += Number(scores(result, receipt)); entry.safe += Number(clean(result, receipt)); entry.tricks += Number(earnsTrick(result, receipt));
   }
+  const leaves = [], continuationFamilies = new Set();
   for (const entry of finalists) {
     entry.score = entry.sum / entry.samples;
     const { result } = entry;
-    if (available() && entry.receipt.total && result.state.turn === state.turn && result.state.winner === null && !result.respot.length) {
+    if (available() && scores(result, entry.receipt) && result.state.turn === state.turn && result.state.winner === null && !result.respot.length) {
       const nextArcade = commitArcade(arcade, entry.receipt), nextTable = practiceTable(result.balls, table);
-      const nextOptions = potOptions(result.balls, targets(result.state)).slice(0, 3);
-      let continuation = 0;
-      for (const next of nextOptions) {
-        if (!available()) break;
-        const attempt = simulate(nextTable, result.state, variation(next));
-        continuation = Math.max(continuation, trickyValue(attempt, receiptFor(attempt, result.state, nextArcade), nextArcade));
-      }
-      entry.score += continuation * 0.5 * entry.successes / entry.samples;
+      leaves.push({ entry, nextArcade, nextTable, options: trickyContinuations(result.balls, result.state), continuation: 0 });
     }
   }
-  const best = finalists.sort((a, b) => b.score - a.score || b.receipt.awards.length - a.receipt.awards.length)[0];
+  // Share the remaining simulations across finalists before deepening any leave.
+  for (let i = 0; i < 4; i++) for (const leave of leaves) {
+    const next = leave.options[i]; if (!next || !available()) continue;
+    const { entry, nextTable, nextArcade } = leave;
+    continuationFamilies.add(next.family);
+    const attempt = simulate(nextTable, entry.result.state, variation(next));
+    leave.continuation = Math.max(leave.continuation, trickyValue(attempt, receiptFor(attempt, entry.result.state, nextArcade), nextArcade));
+  }
+  for (const { entry, continuation } of leaves) entry.score += continuation * 0.5 * entry.successes / entry.samples;
+  const { best, selection } = state.breaking ? { best: finalists.toSorted(byPoints)[0], selection: 'break' } : chooseTrickyFinalist(finalists);
   return { ...best.shot, label: projectedLabel(best.receipt, 'Aha!'), evaluated: simulations,
-    search: { families: [...familiesTried], milliseconds: performance.now() - started },
+    search: { families: [...familiesTried], milliseconds: performance.now() - started, selection,
+      samples: best.samples, scoringSamples: best.successes, trickSamples: best.tricks,
+      continuationFamilies: [...continuationFamilies] },
     expected: { pocketed: best.result.report.pocketed, foul: !!best.receipt.fault, points: best.receipt.total, awards: best.receipt.awards } };
 }
