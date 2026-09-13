@@ -38,5 +38,23 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 0.1
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "GAME_ANALYTICS",
+      "database_name": "astrapool-analytics",
+      "database_id": "4c86756c-d7a0-4309-888c-026a5156ec08",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "ANALYTICS_RATE_LIMIT",
+      "namespace_id": "1087",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    }
+  ]
 }

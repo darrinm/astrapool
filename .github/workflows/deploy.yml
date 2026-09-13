@@ -45,4 +45,5 @@ jobs:
             exit 1
           fi
           npm run heads:guard
+          npm run analytics:migrate
           npx --no-install wrangler deploy

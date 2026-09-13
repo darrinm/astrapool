@@ -122,6 +122,7 @@ Node 24, from `.nvmrc`. Scale is 1 unit = 26 mm, g = 377.
 Pushing to `main` runs the tests and the build, then deploys. Pull requests never deploy. The
 repository needs the Actions secret `CLOUDFLARE_API_TOKEN`, from Cloudflare's "Edit Cloudflare
 Workers" template, scoped to the account in `wrangler.jsonc` and the `darrinm.com` zone.
+The token also needs **Account → D1 → Edit** so deployment can apply analytics migrations.
 
 `npm run deploy` publishes local files, including uncommitted ones. If your shell exports
 credentials for another account, prefix it with
@@ -132,6 +133,17 @@ Worker with its own Durable Object namespace and orphans every live room, and th
 binding and its migration tag go with it. Renaming the `pool.*` and `playful.*` localStorage keys
 resets every player's saved room, collection and preferences. Routes are independent of the
 Worker's name, which is how the site changed hostname without disturbing the rooms.
+
+## Gameplay analytics
+
+Anonymous rack statistics live in Cloudflare D1: games started and finished, completion rate,
+game modes, outcomes, shots, duration, arcade score, and starting/current settings. Attract mode
+is excluded; a game starts on its first shot. Online rooms count once across both players.
+
+Run `npm run analytics` for the last seven days, or `npm run analytics -- --days 30 --mode computer`.
+Use `--json` for exports. The same data is available in the Cloudflare dashboard under
+**Storage & databases → D1 → astrapool-analytics → Console**.
+See [analytics definitions, queries, and setup](docs/analytics.md).
 
 ## Head textures
 

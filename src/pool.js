@@ -21,6 +21,7 @@ import { trackShadowChanges } from './shadow-updates.js';
 import { buildEnvironment, environmentById, readEnvironment } from './environments.js';
 import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
+import { GameplayAnalytics, sendGameAnalytics } from './game-analytics.js';
 import { groupLabel, playerName, playerText } from './match-copy.js';
 import { setOverheadCamera, withinCueTarget } from './table-view.js';
 import { rackPositions, canPlace } from './table-state.js';
@@ -611,6 +612,22 @@ const arcade = new PoolArcade({ scene, camera, feltZ: FELT_Z, audio, spatial, re
 const computerThoughts = new ComputerThoughts({ scene, camera, feltZ: FELT_Z, settings: () => arcade.hud });
 const replay = new ShotReplay();
 const replayView = new ReplayView({ scene, exit: () => stopReplay(true) });
+function analyticsSettingsNow() {
+  return { difficulty: gameMode === 'computer' ? difficulty : 'none', room: environmentId, balls: ballStyle,
+    arcade: arcade.hud.enabled ? 'on' : 'off', effects: arcade.hud.reduced ? 'reduced' : 'full',
+    sound: window.playful?.mute ? 'off' : 'on', input: interactionMode,
+    device: matchMedia('(pointer: coarse)').matches ? 'mobile' : 'desktop' };
+}
+const gameplayAnalytics = new GameplayAnalytics({ send: sendGameAnalytics, settings: analyticsSettingsNow, enabled: import.meta.env.PROD });
+online.analyticsSettings = analyticsSettingsNow;
+let analyticsTimer;
+function analyticsPageHide(event) {
+  if (event.persisted) { gameplayAnalytics.checkpoint(); gameplayAnalytics.flush(true, true); }
+  else gameplayAnalytics.end('page_exit', true);
+}
+function analyticsVisibility() {
+  if (document.hidden) { gameplayAnalytics.checkpoint(); gameplayAnalytics.flush(true, true); }
+}
 
 function readReplayPoses() {
   return allBalls().flatMap(ball => {
@@ -786,6 +803,7 @@ function endDrag(fling = false) {
   if (fling && onTable(ball) && Math.hypot(velocity.x, velocity.y) > 0.3) {
     beginReplayRecording('fling');
     arcade.time = physicsTime; arcade.begin('fling', numberOf(ball), ball.body.translation()); shots++;
+    gameplayAnalytics.shot();
   } else if (fling) arcade.effects.ring(ball.body.translation(), undefined, 1.6, 0.25);
   dragging = null; controls.enabled = true; updateGestureControls();
 }
@@ -849,6 +867,7 @@ function showGameControls(show) {
     });
     document.querySelectorAll('#difficulty button').forEach(b => b.addEventListener('click', () => {
       difficulty = b.dataset.difficulty;
+      gameplayAnalytics.settingsChanged();
       arcade.modeChanged();
       document.querySelectorAll('#difficulty button').forEach(o => o.setAttribute('aria-pressed', String(o.dataset.difficulty === difficulty)));
       if (computerTurn() && !activeShot) { cancelComputerSearch(); computerPlan = null; computerWait = 0; endAim(); }
@@ -1002,6 +1021,7 @@ function syncPocketCall() {
 }
 
 function updateScore() {
+  gameplayAnalytics.settingsChanged();
   updateGestureControls();
   document.getElementById('pocketed-count').textContent = pocketed;
   document.getElementById('shot-count').textContent = shots;
@@ -1082,6 +1102,7 @@ function fitOverhead() {
   });
 }
 function setAttract(active) {
+  if (active) gameplayAnalytics.select(null);
   if (attractMode && !active) camera.clearViewOffset();
   attractMode = active; attractWait = 0;
   // DOM labels must live in the dialog's top layer while the demo is showing.
@@ -1092,6 +1113,7 @@ function setAttract(active) {
 }
 function startGame(mode, roomId = null) {
   if (!attractMode && !roomId && shots && (gameMode === 'free' || match.winner === null) && !window.confirm('Start a new game and clear this rack?')) return false;
+  gameplayAnalytics.select(mode);
   setAttract(false);
   stopReplay(); replay.reset();
   online.leave(); history.replaceState(null, '', location.pathname);
@@ -1109,6 +1131,7 @@ function joinInvite() {
 function restart() {
   if (gameMode === 'online') { if (match.winner !== null) online.send('rematch'); return; }
   if (gameMode !== 'free' && match.winner === null && shots && !window.confirm('Restart this rack?')) return;
+  gameplayAnalytics.end('restart'); gameplayAnalytics.select(gameMode);
   match = newMatch(match.winner === null ? match.breaker : 1 - match.breaker, match.wins); layout();
 }
 function validPlacement(p, ball = cue) {
@@ -1170,6 +1193,10 @@ function settleShot(dt) {
   // Both clients animate the shot; only the shooter prepares a result for the server.
   if (gameMode === 'online' && online.seat !== onlineShooter) { updateScore(); return; }
   if (gameMode !== 'online') match = result.state;
+  if (!attractMode && gameMode !== 'online' && match.winner !== null) {
+    const outcome = gameMode === 'computer' ? (match.winner === 0 ? 'player' : 'computer') : `player${match.winner + 1}`;
+    gameplayAnalytics.finish(outcome, arcade.state?.totals.reduce((sum, n) => sum + n, 0) || 0);
+  }
   if (result.rerack) {
     if (gameMode === 'online') { sendOnlineResult(completed); updateScore(); return; }
     layout(); return;
@@ -1208,6 +1235,7 @@ function takeShot(dir, speed, shotSpin = { x: 0, y: 0 }, fromRoom = false) {
   arcade.time = physicsTime; arcade.begin('cue', 0, c);
   strike(cue.body, dir, speed, shotSpin);
   shots++;
+  if (!attractMode && gameMode !== 'online') gameplayAnalytics.shot();
   const at = spatial(c); audio.cueTip(speed / MAX_SPEED, at.pan, at.dist);
   return true;
 }
@@ -1364,6 +1392,9 @@ export default {
   // at 480 Hz a 0.95 ball reads 0.91-0.95 across the speed range instead of 0.68-0.94 at 120 Hz.
   stepRate: 480,
   enter() {
+    analyticsTimer = setInterval(() => { gameplayAnalytics.checkpoint(); gameplayAnalytics.flush(); }, 30000);
+    window.addEventListener('pagehide', analyticsPageHide);
+    document.addEventListener('visibilitychange', analyticsVisibility);
     setHeadRadius(R); world.gravity = { x: 0, y: 0, z: -G };
     RectAreaLightUniformsLib.init();
     const initialEnvironment = environmentId;
@@ -1379,6 +1410,9 @@ export default {
     return ready;
   },
   exit() {
+    gameplayAnalytics.end('page_exit', true); clearInterval(analyticsTimer);
+    window.removeEventListener('pagehide', analyticsPageHide);
+    document.removeEventListener('visibilitychange', analyticsVisibility);
     setAttract(false);
     stopReplay(); replay.reset();
     finishRack(false);
@@ -1501,6 +1535,7 @@ export default {
     settleShot(world.timestep);
     if (arcade.active?.free) {
       arcade.settleFree(tableStill(), belowSince.size, dragging, world.timestep);
+      if (pocketed === 15 && !arcade.active) gameplayAnalytics.finish('cleared', arcade.state?.totals[0] || 0);
       if (!arcade.active) { replay.finish(physicsTime, readReplayPoses); syncReplayButton(); }
     }
     // The next solver step's incoming velocities are needed to distinguish a

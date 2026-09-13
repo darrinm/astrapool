@@ -97,7 +97,8 @@ export class OnlineRoom {
   send(type, payload = {}) {
     if (this.socket?.readyState !== WebSocket.OPEN || this.seat === null) return false;
     this.error = null; this.errorResync = false; this.showStatus();
-    this.waiting = true; this.socket.send(JSON.stringify({ type, seq: this.seq, ...payload })); return true;
+    this.waiting = true; this.socket.send(JSON.stringify({ type, seq: this.seq, ...payload,
+      ...(type === 'shoot' && this.analyticsSettings ? { settings: this.analyticsSettings() } : {}) })); return true;
   }
   sendAim(aim, now = performance.now()) {
     if (!this.synced || this.socket?.readyState !== WebSocket.OPEN || this.seat === null) return false;

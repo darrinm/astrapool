@@ -1,5 +1,5 @@
 // Real Workers runtime / WebSocket lifecycle test. Run after npm run build.
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { before, after, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,8 +9,14 @@ import { ArcadeEvents, EVENT as E } from '../src/arcade-events.js';
 const base = 'http://127.0.0.1:8789';
 let runtime, output = '';
 const clients = [];
+const persist = '/tmp/pool-room-tests-' + process.pid;
+function analyticsSQL(sql) {
+  return JSON.parse(execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'execute', 'GAME_ANALYTICS',
+    '--local', '--persist-to', persist, '--json', '--command', sql], { encoding: 'utf8', env: { ...process.env, CLOUDFLARE_SEND_METRICS: 'false' } }))[0].results;
+}
 before(async () => {
-  runtime = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'dev', '--port', '8789', '--ip', '127.0.0.1', '--persist-to', '/tmp/pool-room-tests-' + process.pid], { env: { ...process.env, CLOUDFLARE_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'migrations', 'apply', 'GAME_ANALYTICS', '--local', '--persist-to', persist], { stdio: 'pipe', env: { ...process.env, CLOUDFLARE_SEND_METRICS: 'false' } });
+  runtime = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'dev', '--port', '8789', '--ip', '127.0.0.1', '--persist-to', persist], { env: { ...process.env, CLOUDFLARE_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
   runtime.stdout.on('data', b => { output += b; }); runtime.stderr.on('data', b => { output += b; });
   for (let i = 0; i < 100; i++) {
     if (output.includes('Ready on')) return;
@@ -79,6 +85,23 @@ test('private room: seats, turn enforcement, results, placement, reconnect, inte
   rejoined.send('rematch'); const rematch = await returned.wait(m => m.type === 'state' && m.seq > vote.seq);
   assert.equal(rematch.snapshot.match.winner, null); assert.equal(rematch.snapshot.match.breaker, 1); assert.deepEqual(rematch.snapshot.match.wins, [0, 1]); assert.equal(rematch.snapshot.balls.length, 16);
   assert.equal(rematch.snapshot.arcade.rack, won.snapshot.arcade.rack + 1); assert.deepEqual(rematch.snapshot.arcade.totals, [0, 0]);
+  // Both peers and several reconnects produced one played rack; voting does not start another.
+  const games = analyticsSQL("SELECT mode, source, outcome, finished_at FROM games");
+  assert.equal(games.length, 1); assert.equal(games[0].mode, 'online'); assert.equal(games[0].source, 'room');
+  assert.equal(games[0].outcome, 'player2'); assert.ok(games[0].finished_at);
+});
+
+test('analytics ingestion persists cumulative records once and exposes no public reporting endpoint', async () => {
+  const { newGameAnalytics } = await import('../src/game-analytics.js');
+  const game = newGameAnalytics('computer', { difficulty: 'tricky', room: 'orbital' }); game.shots = 1;
+  const send = body => fetch(base + '/api/analytics/game', { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await send(game)).status, 204); assert.equal((await send(game)).status, 204);
+  assert.equal((await send({ ...game, mode: 'online' })).status, 400);
+  assert.equal((await fetch(base + '/api/analytics/report')).status, 404);
+  game.version++; game.finishedAt = Date.now(); game.outcome = 'player';
+  assert.equal((await send(game)).status, 204);
+  const rows = analyticsSQL("SELECT COUNT(*) AS n, SUM(finished_at IS NOT NULL) AS finished FROM games WHERE source = 'browser'");
+  assert.deepEqual(rows, [{ n: 1, finished: 1 }]);
 });
 
 test('arcade scores agree across peers, reject duplicates, survive reconnect, and roll back interrupted play', async () => {

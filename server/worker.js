@@ -1,5 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { PROTOCOL_VERSION, initialSnapshot, validateAim, validateShot, placeCue, finishShot } from './protocol.js';
+import { handleAnalytics, writeGame } from './analytics.js';
+import { newGameAnalytics, updateGameAnalytics } from '../src/game-analytics.js';
 const DAY = 24 * 60 * 60 * 1000;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export class PoolRoom extends DurableObject {
@@ -12,6 +14,9 @@ export class PoolRoom extends DurableObject {
   #save(room) {
     this.ctx.storage.sql.exec('INSERT INTO room (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data=excluded.data', JSON.stringify(room));
     this.room = room;
+  }
+  #analytics(game = this.room?.analytics) {
+    if (game) void writeGame(this.env, game, 'room').catch(() => console.warn('Gameplay analytics write failed'));
   }
   async create() {
     if (this.room) return false;
@@ -80,6 +85,7 @@ export class PoolRoom extends DurableObject {
         this.#save({ ...this.room, seats });
         connection.seat = seat; connection.version = PROTOCOL_VERSION; ws.serializeAttachment(connection);
         this.#state(ws); this.#broadcast({ type: 'presence', connected: this.#connected() });
+        this.#analytics();
         return;
       }
       const seat = connection.seat;
@@ -89,20 +95,36 @@ export class PoolRoom extends DurableObject {
       if (message.type === 'rematch') {
         if (room.snapshot.match.winner === null || room.pending) throw new Error('Finish this rack before requesting a rematch.');
         room.votes = [...new Set([...room.votes, seat])];
-        if (room.votes.length === 2) { room.snapshot = initialSnapshot(1 - room.snapshot.match.breaker, room.snapshot.match.wins, (room.snapshot.arcade?.rack || 0) + 1); room.votes = []; }
+        if (room.votes.length === 2) {
+          this.#analytics();
+          room.snapshot = initialSnapshot(1 - room.snapshot.match.breaker, room.snapshot.match.wins, (room.snapshot.arcade?.rack || 0) + 1);
+          room.votes = []; room.analytics = null;
+        }
       } else {
         if (seat !== room.snapshot.match.turn) throw new Error('It is your friend’s turn.');
         if (message.type === 'result') {
           if (!room.pending || room.pending.seat !== seat) throw new Error('No shot is in progress.');
           room.snapshot = finishShot(room.snapshot, room.pending, message.report, message.balls); room.pending = null;
+          if (room.analytics && room.snapshot.match.winner !== null) {
+            room.analytics = structuredClone(room.analytics);
+            updateGameAnalytics(room.analytics, room.analytics.settings);
+            room.analytics.finishedAt = Date.now(); room.analytics.outcome = `player${room.snapshot.match.winner + 1}`;
+            room.analytics.score = Math.round(room.snapshot.arcade?.totals.reduce((sum, n) => sum + n, 0) || 0);
+          }
         } else {
           if (room.pending) throw new Error('Wait for the balls to settle.');
           if (!this.#connected().every(Boolean)) throw new Error('Wait for your friend to reconnect.');
           if (message.type === 'place') room.snapshot = placeCue(room.snapshot, message.position);
-          else room.pending = { seat, action: validateShot(room.snapshot, message.action), started: Date.now() };
+          else {
+            room.pending = { seat, action: validateShot(room.snapshot, message.action), started: Date.now() };
+            room.analytics = room.analytics ? structuredClone(room.analytics) : newGameAnalytics('online', message.settings);
+            updateGameAnalytics(room.analytics, message.settings);
+            room.analytics.shots++;
+          }
         }
       }
       room.seq++; this.#save(room);
+      this.#analytics();
       await this.ctx.storage.setAlarm(room.pending ? Date.now() + 90000 : Date.now() + DAY);
       if (message.type === 'shoot') this.#broadcast({ type: 'shot', ...this.#public() });
       else this.#broadcastState();
@@ -130,6 +152,15 @@ export class PoolRoom extends DurableObject {
       this.#broadcastState();
       await this.ctx.storage.setAlarm(this.room.updated + DAY);
     } else if (Date.now() - this.room.updated >= DAY) {
+      if (this.room.analytics) {
+        const game = structuredClone(this.room.analytics);
+        if (!game.finishedAt && !game.endedAt) {
+          updateGameAnalytics(game, game.settings, this.room.updated);
+          game.endedAt = this.room.updated; game.endReason = 'room_expired'; this.#save({ ...this.room, analytics: game });
+        }
+        try { await writeGame(this.env, game, 'room'); }
+        catch { await this.ctx.storage.setAlarm(Date.now() + 60000); return; }
+      }
       for (const ws of this.ctx.getWebSockets()) ws.close(4002, 'Room expired');
       await this.ctx.storage.deleteAll(); this.room = null;
     } else await this.ctx.storage.setAlarm(this.room.updated + DAY);
@@ -138,6 +169,7 @@ export class PoolRoom extends DurableObject {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/api/analytics/')) return handleAnalytics(request, env);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
     if (request.headers.get('Origin') !== url.origin) return new Response('Origin not allowed', { status: 403 });
     if (url.pathname === '/api/rooms' && request.method === 'POST') {
