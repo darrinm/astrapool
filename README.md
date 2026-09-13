@@ -103,6 +103,17 @@ voids them. **Reduced effects** keeps the scores readable with calmer motion. Tu
 never changes the rules or the outcome. `V` replays the last shot from recorded ball positions,
 with scrubbing and quarter speed.
 
+Finished racks show a results card with the winner, arcade totals, each player's longest
+scoring streak, and the highest-scoring legal shot. **Replay best shot** preserves that shot
+even when it happened earlier in the rack; return to the results and **Rematch** to switch
+the break. Clearing Free Play shows the same card with **Play again**.
+
+Completed-rack personal bests for score, shot points, and streak stay on this device, separated
+by mode, computer style, Free Play input, and gravity setting. Changing those during play
+excludes the rack from personal records. Attract mode never records results. Online highlights
+use confirmed shots observed on this device; after joining late or missing shots, the card
+labels the incomplete history and skips personal records. Replay recordings stay in memory.
+
 ## Development
 
 ```sh

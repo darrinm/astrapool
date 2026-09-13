@@ -73,7 +73,19 @@
       <div class="bottom-hud">
         <div id="shot-result" class="shot-result" hidden><span class="eyebrow">Last shot</span><p id="shot-result-text" role="status"></p><p id="arcade-receipt" role="status" hidden></p><p id="arcade-pending" hidden></p></div>
         <div class="guidance"><div id="status" role="status"></div><p id="pocket-call-status" role="status" hidden></p><p id="hint"></p></div>
-        <button id="rematch" class="primary-button" hidden>Rematch</button>
+        <section id="rack-results" class="rack-results" aria-labelledby="results-title" hidden>
+          <p id="results-context" class="eyebrow">Rack complete</p>
+          <h2 id="results-title" tabindex="-1"></h2>
+          <p id="results-outcome" class="results-outcome"></p>
+          <p id="results-score-label" class="eyebrow">Arcade score</p>
+          <div id="results-scores" class="results-scores"></div>
+          <div class="results-highlight"><span class="eyebrow">Best shot</span><p id="results-highlight"></p></div>
+          <p id="results-records" class="results-records" hidden></p>
+          <div class="results-actions">
+            <button id="rematch" class="primary-button" hidden>Rematch</button>
+            <button id="replay-best" class="quiet-button" hidden>Replay best shot</button>
+          </div>
+        </section>
         <button id="open-pockets" class="primary-button" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Call the 8-ball pocket</button>
         <nav class="compact-actions" aria-label="Table controls">
           <button id="open-settings" aria-haspopup="dialog" aria-controls="hud-sheet">Game</button>

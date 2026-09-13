@@ -120,6 +120,23 @@ button:disabled { opacity: .45; cursor: default; }
 .shot-result .eyebrow { margin-bottom: var(--s1); }
 .shot-result p { margin: 0; color: var(--ink-dim); font-size: var(--t-body); }
 
+.rack-finished .bottom-hud > .guidance, .rack-finished .bottom-hud > .shot-result { display: none; }
+.rack-results { grid-area: 1 / 1 / 4 / -1; width: min(480px, calc(100vw - 24px)); max-height: calc(100dvh - 190px); overflow: auto; pointer-events: auto; padding: var(--s5); border: 1px solid var(--edge-strong); border-radius: var(--r-md); background: var(--panel-solid); box-shadow: var(--shadow); text-align: center; }
+.rack-results p { margin: 0; }
+.rack-results h2 { margin: var(--s2) 0 var(--s4); font: 400 var(--t-display)/1.15 var(--display); }
+.rack-results h2:focus { outline: none; }
+.rack-results .results-outcome { margin: 0 0 var(--s4); color: var(--ink-dim); font-size: var(--t-body); }
+.results-scores { display: flex; gap: var(--s3); margin: var(--s2) 0 var(--s4); }
+.results-player { flex: 1; min-width: 0; display: grid; gap: var(--s1); padding: var(--s2); border-radius: var(--r-sm); background: var(--raise); }
+.results-player > strong { font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.results-winner > strong { color: var(--accent); }
+.results-streak { font-size: var(--t-micro); color: var(--ink-dim); }
+.results-highlight { padding-block: var(--s3); border-top: 1px solid var(--edge); }
+.results-highlight p { margin-top: var(--s1); }
+.rack-results .results-records { margin-bottom: var(--s3); font-size: var(--t-micro); color: var(--accent); }
+.results-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s2); }
+.results-actions button { min-height: 44px; flex: 1 1 auto; }
+
 /* One bar. Everything you touch during play lives in it. */
 .compact-actions { grid-area: 4 / 2; display: flex; align-items: center; gap: var(--s1); padding: var(--s1); border: 1px solid var(--edge); border-radius: var(--r-pill); background: var(--panel); box-shadow: var(--shadow); backdrop-filter: blur(20px); }
 .compact-actions button { display: inline-flex; align-items: center; gap: var(--s2); min-height: 40px; padding: 0 var(--s4); border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ink-dim); font-size: var(--t-body); white-space: nowrap; transition: background .15s, color .15s; }
@@ -380,10 +397,12 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: cent
 }
 /* Short landscape: the bar and the guidance keep to the right of the table. */
 @media (orientation: landscape) and (max-height: 600px) {
+  .rack-results { width: 100%; max-height: calc(100dvh - 150px); padding: var(--s3); }
   #replay-controls { width: 100%; padding: var(--s3); }
   .bottom-hud { grid-template-columns: 1fr; justify-items: end; justify-self: end; width: min(310px, 42vw); }
   .compact-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
   .guidance, .shot-result, .compact-actions, .primary-button { grid-column: 1; justify-self: end; text-align: right; }
+  .results-actions .primary-button { text-align: center; }
   .bottom-hud::before { display: none; }
   .guidance { padding: var(--s2) var(--s3); border-radius: var(--r-sm); background: var(--panel); }
 }
