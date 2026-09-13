@@ -7,7 +7,7 @@ export function connectBackdropDismiss(dialog, close) {
 
 // Each panel lives in this sheet permanently, without nested dialogs.
 const PANELS = {
-  match: { title: 'Match details', id: 'panel-match' },
+  match: { title: 'Shot details', id: 'panel-match' },
   settings: { title: 'Game', id: 'panel-settings' },
   spin: { title: 'Cue spin', id: 'panel-spin' },
 };

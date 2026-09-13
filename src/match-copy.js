@@ -49,21 +49,14 @@ export function turnStatus({ match, mode, seat = null, racking = false, shooting
   pending = false, waiting = false, connection = '', canCall = false, pocketName = '' }) {
   const quiet = title => ({ title, detail: '', active: false });
   if (connection) return quiet(connection);
-  if (racking) return quiet('Racking…');
-  if (shooting) return quiet('Shot in progress');
-  if (pending) return quiet('Confirming shot…');
-  if (waiting) return quiet('Updating…');
-  if (match.winner !== null) return quiet(playerText(`Player ${match.winner + 1} wins the rack!`, mode, seat));
+  if (racking || shooting || pending || waiting || match.winner !== null) return quiet('');
   const name = playerName(match.turn, mode, seat);
   const active = mode === 'local' || name === 'You';
-  const title = name === 'You' ? 'Your turn' : `${name}’s turn`;
+  const title = active ? (name === 'You' ? 'Your turn' : `${name}’s turn`) : '';
   let detail = '';
   if (active) {
     if (match.ballInHand) detail = 'Place the cue ball';
     else if (canCall) detail = pocketName ? `Called: ${pocketName}` : '8-ball · tap a highlighted pocket';
-    else if (match.breaking) detail = 'Break';
-    else if (match.groups[match.turn]) detail = groupLabel(match.groups[match.turn], match.down);
-    else detail = 'Open table';
   }
   return { title, detail, active };
 }
