@@ -24,6 +24,14 @@ test('shipped room models leave the table clear and release all their graphics r
     for (const theme of ENVIRONMENTS) {
       const room = buildEnvironment(theme, -30, {
         panorama: async () => new Texture(),
+        shadow: async url => {
+          const png = await readFile(new URL(`../public${url}`, import.meta.url));
+          assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+          const mobile = url.includes('-mobile');
+          assert.equal(png.readUInt32BE(16), mobile ? 1024 : 2048);
+          assert.equal(png.readUInt32BE(20), mobile ? 512 : 1024);
+          return new Texture();
+        },
         furniture: async url => {
           const file = await readFile(new URL(`../public${url}`, import.meta.url));
           const loader = new GLTFLoader().register(parser => {
@@ -55,6 +63,7 @@ test('shipped room models leave the table clear and release all their graphics r
         },
       });
       await room.ready; scene.add(room.group);
+      if (theme.id !== 'minimal') assert.ok(room.group.getObjectByName('furniture-floor-shadow'), `${theme.id} should use its baked furniture silhouette`);
       const resources = new Set();
       room.group.traverse(mesh => {
         if (mesh.geometry) resources.add(mesh.geometry);
@@ -79,17 +88,18 @@ test('shipped room models leave the table clear and release all their graphics r
 });
 
 function delayedAssets() {
-  const image = new Texture(), model = new Group();
+  const image = new Texture(), shadow = new Texture(), model = new Group();
   model.add(new Mesh(new BoxGeometry(), new MeshStandardMaterial()));
-  const resources = [image, model.children[0].geometry, model.children[0].material];
+  const resources = [image, model.children[0].geometry, model.children[0].material, shadow];
   const released = new Set();
   resources.forEach(resource => resource.addEventListener('dispose', () => released.add(resource)));
-  let imageResolve, imageReject, modelResolve;
+  let imageResolve, imageReject, modelResolve, shadowResolve, shadowReject;
   const loaders = {
     panorama: () => new Promise((resolve, reject) => { imageResolve = resolve; imageReject = reject; }),
     furniture: () => new Promise(resolve => { modelResolve = resolve; }),
+    shadow: () => new Promise((resolve, reject) => { shadowResolve = resolve; shadowReject = reject; }),
   };
-  return { loaders, resources, released, finish() { imageResolve(image); modelResolve(model); }, fail() { imageReject(new Error('offline')); modelResolve(model); } };
+  return { loaders, resources, released, finish() { imageResolve(image); modelResolve(model); shadowResolve(shadow); }, fail() { imageReject(new Error('offline')); modelResolve(model); shadowResolve(shadow); }, failShadow() { imageResolve(image); modelResolve(model); shadowReject(new Error('offline')); } };
 }
 
 test('cancelling a room before its downloads finish disposes late assets without mounting them', async () => {
@@ -105,6 +115,23 @@ test('a failed room download releases its successfully downloaded companion mode
   const pending = delayedAssets();
   const room = buildEnvironment(environmentById('tokyo'), -30, pending.loaders);
   pending.fail(); await assert.rejects(room.ready, /offline/);
-  assert.equal(pending.released.size, 2);
+  assert.equal(pending.released.size, 3);
   assert.equal(room.group.children.length, 0);
+});
+
+
+test('a failed shadow download keeps the room usable with fallback contact patches', async () => {
+  const original = globalThis.document;
+  const paint = new Proxy({}, { get: (_, key) => key === 'createRadialGradient' ? () => ({ addColorStop() {} }) : () => {} });
+  globalThis.document = { createElement: () => ({ getContext: () => paint }) };
+  try {
+    const pending = delayedAssets();
+    const room = buildEnvironment(environmentById('orbital'), -30, pending.loaders);
+    pending.failShadow(); await room.ready;
+    assert.ok(room.environmentMap);
+    assert.ok(room.group.getObjectByName('table-floor-shadow'));
+    assert.equal(room.group.getObjectByName('furniture-floor-shadow'), undefined);
+    room.dispose();
+    assert.equal(pending.released.size, 3);
+  } finally { globalThis.document = original; }
 });

@@ -76,7 +76,11 @@ button:disabled { opacity: .45; cursor: default; }
 .topbar { grid-row: 1; position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: var(--s5); }
 .brand { display: flex; align-items: center; gap: var(--s2); font: 500 var(--t-lead)/1 var(--display); letter-spacing: .02em; }
 .brand-ball { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #17130f; font: 700 10px/1 var(--ui); }
-.utilities { display: flex; justify-self: end; gap: var(--s1); }
+#open-settings {
+  position: fixed; z-index: 4;
+  top: max(var(--s5), env(safe-area-inset-top)); right: max(var(--s5), env(safe-area-inset-right));
+  width: 44px; min-height: 44px;
+}
 
 /* The full score header remains visible; tap it for the last shot details. */
 .scoreboard, .match-score { justify-self: center; }
@@ -190,8 +194,6 @@ button:disabled { opacity: .45; cursor: default; }
 .quiet-button:hover { background: var(--raise-hover); border-color: var(--edge-strong); }
 .icon-button { width: 40px; min-height: 40px; padding: 0; border-radius: 50%; }
 .icon-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-[data-sound-toggle][aria-pressed="false"] .wave { opacity: .25; }
-[data-sound-toggle].icon-button[aria-pressed="true"] { color: var(--accent); }
 .text-button { padding: var(--s1) var(--s2); border: 0; background: transparent; color: var(--accent); font-size: var(--t-body); }
 .text-button:hover { color: var(--ink); }
 [data-sound-state] { color: var(--accent); }
@@ -310,7 +312,7 @@ button:disabled { opacity: .45; cursor: default; }
 .welcome-camera { position: absolute; inset: 0; }
 /* The solo demo needs no scoreboard or playing controls behind the title. */
 body:has(#welcome[open]) #hud { visibility: hidden; }
-.welcome-heading { position: absolute; inset: 0 0 auto; z-index: 3; padding: max(var(--s5), env(safe-area-inset-top)) var(--s4) var(--s6); text-align: center; background: linear-gradient(#0b090899, #0b090800); pointer-events: none; }
+.welcome-heading { position: absolute; inset: 0 0 auto; z-index: 3; padding: max(var(--s5), env(safe-area-inset-top)) max(64px, env(safe-area-inset-right)) var(--s6) max(64px, env(safe-area-inset-left)); text-align: center; background: linear-gradient(#0b090899, #0b090800); pointer-events: none; }
 .welcome-inner {
   z-index: 3;
   position: absolute; inset: auto 0 0 0; display: grid; justify-items: center; gap: var(--s3);
@@ -415,12 +417,14 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: cent
 @media (max-width: 900px), (max-height: 600px) {
   #hud { padding: max(var(--s3), env(safe-area-inset-top)) max(var(--s3), env(safe-area-inset-right))
                  max(var(--s3), env(safe-area-inset-bottom)) max(var(--s3), env(safe-area-inset-left)); }
-  .brand, .utilities { display: none; }
-  .topbar { grid-template-columns: minmax(0, 1fr); }
+  .brand { display: none; }
+  #open-settings { top: max(var(--s3), env(safe-area-inset-top)); right: max(var(--s3), env(safe-area-inset-right)); }
+  .topbar { grid-template-columns: minmax(0, 1fr); padding-right: 56px; }
   .play-status { grid-column: 1; width: min(420px, 100%); }
   .match-score, .scoreboard { grid-column: 1; width: 100%; max-width: 420px; }
   .match-score { gap: var(--s3); }
   .player-card { min-width: 0; }
+  .player-heading { flex-wrap: wrap; column-gap: var(--s1); row-gap: var(--s1); }
   .compact-actions button { padding: 0 var(--s3); }
   #hud-sheet { width: 100%; max-width: none; margin: auto auto 0; border-radius: var(--r-md) var(--r-md) 0 0; border-bottom: 0; max-height: calc(100dvh - var(--s6)); }
   #sheet-content { padding: var(--s4); padding-bottom: calc(var(--s4) + env(safe-area-inset-bottom)); gap: var(--s5); }
