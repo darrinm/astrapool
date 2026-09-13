@@ -411,5 +411,32 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: cent
   .bottom-hud::before { display: none; }
   .guidance { padding: var(--s2) var(--s3); border-radius: var(--r-sm); background: var(--panel); }
 }
+/* Keep shot feedback above the table, clear of the finger pulling back the cue. */
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  #hud.aiming .bottom-hud {
+    grid-row: 2; align-self: start; justify-self: center;
+    grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto;
+    width: min(420px, 100%); margin-top: var(--s3); gap: var(--s3);
+    padding: var(--s2) var(--s3); border: 1px solid var(--edge);
+    border-radius: var(--r-md); background: var(--panel); box-shadow: var(--shadow);
+  }
+  #hud.aiming .bottom-hud::before,
+  #hud.aiming .bottom-hud > :not(.guidance):not(.compact-actions),
+  #hud.aiming #hint { display: none; }
+  #hud.aiming .guidance {
+    grid-area: 1 / 1; align-self: center; justify-self: stretch; text-align: left;
+    padding: 0; background: none;
+  }
+  #hud.aiming .compact-actions {
+    grid-area: 1 / 2; align-self: center; justify-self: end;
+    padding: 0; border: 0; background: none; box-shadow: none; backdrop-filter: none;
+  }
+  #hud.aiming #cancel-gesture { min-height: 44px; background: var(--raise); }
+  @media (orientation: landscape) and (max-height: 600px) {
+    /* Use the scoreboard's row while aiming so the controls do not cover the far rail. */
+    #hud.aiming .topbar { grid-column: 1; visibility: hidden; }
+    #hud.aiming .bottom-hud { grid-area: 1 / 1; margin-top: 0; }
+  }
+}
 @media (hover: none) { .shortcuts { display: none; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } .room-photo { transition: none; } }
