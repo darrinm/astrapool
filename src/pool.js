@@ -957,8 +957,9 @@ function aimVector() {
   return { c, dir: d.lengthSq() ? d.clone().normalize() : new THREE.Vector2(1, 0), pull: Math.min(d.length(), MAX_PULL) };
 }
 const ballShape = new RAPIER.Ball(R);
-function updateGuide() {
-  const { c, dir, pull } = aimVector();
+// Both players project the same guide from the shared table and aim direction.
+// Rendering a remote preview must not send it back or change the spectator's HUD.
+function updateGuide(c, dir) {
   // Cast a ball along the aim line. The felt is excluded: the resting ball already touches it, and its triangle
   // edges otherwise register as hits in the middle of the table.
   const hit = world.castShape({ x: c.x, y: c.y, z: c.z }, { x: 0, y: 0, z: 0, w: 1 }, { x: dir.x, y: dir.y, z: 0 }, ballShape, 0, 200, false,
@@ -982,6 +983,10 @@ function updateGuide() {
       }
     }
   }
+}
+function updateAim() {
+  const { c, dir, pull } = aimVector();
+  updateGuide(c, dir);
   updateCueStick(c, dir, pull, spin);
   if (gameMode === 'online') online.sendAim({ dir: { x: dir.x, y: dir.y }, pull, spin });
   const txt = `Power ${Math.round((pull / MAX_PULL) * 100)}%${spin.x || spin.y ? ' · spin applied' : ''}`;
@@ -1635,12 +1640,16 @@ export default {
       scene.fog.near = 140 + retreat; scene.fog.far = 330 + retreat;
     }
     if (replayView.active) { replayView.frame(); guide.visible = false; cueStick.visible = false; }
-    else if (aiming) updateGuide();
+    else if (aiming) updateAim();
     else {
       const aim = gameMode === 'online' && match.turn !== online.seat && !activeShot &&
         !match.ballInHand && match.winner === null && onTable(cue) && online.remoteAim;
-      cueStick.visible = !!aim;
-      if (aim) updateCueStick(cue.body.translation(), aim.dir, aim.pull, aim.spin);
+      guide.visible = cueStick.visible = !!aim;
+      if (aim) {
+        const c = cue.body.translation();
+        updateGuide(c, aim.dir);
+        updateCueStick(c, aim.dir, aim.pull, aim.spin);
+      }
     }
     audio.setMuted(!!window.playful?.mute || document.hidden || replayView.active);
     const fade = THREE.MathUtils.clamp((fixtureFade[1] - camera.position.z) / (fixtureFade[1] - fixtureFade[0]), 0, 1);   // lamp fixture fades as the camera climbs to it
