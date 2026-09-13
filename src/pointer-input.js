@@ -49,7 +49,10 @@ export function connectPointerInput(canvas, scene = null, controls = null) {
     }
   }, { capture: true, passive: false });
   listen(canvas, 'pointermove', (e) => {
-    if (!captured) body.style.cursor = scene?.pointermove(e) ? 'grab' : 'default';
+    if (!captured) {
+      const hover = scene?.pointermove(e);
+      body.style.cursor = typeof hover === 'string' ? hover : hover ? 'grab' : 'default';
+    }
     else if (e.pointerId === captured.pointerId) {
       // A mouse release can also disappear while switching windows.
       if (e.pointerType === 'mouse' && e.buttons === 0) finish(e, false);
