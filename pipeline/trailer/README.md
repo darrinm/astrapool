@@ -1,6 +1,6 @@
 # Astra Pool — Your Shot
 
-The final action trailer is **49 seconds, 1920×1080, 30 fps**, with stereo AAC sound and H.264 video. It includes quick cuts, macro and tracking cameras, the Tricky computer's actual search paths and scoring shots, portrait and landscape mobile play, and Black Hole Gravity. The final cards introduce the play modes and link to the free, open-source game.
+The final action trailer is **49 seconds, 1920×1080, 30 fps**, with stereo AAC sound and H.264 video. It includes quick cuts, macro and tracking cameras, the Tricky computer's actual search paths and scoring shots, portrait and landscape mobile play, and Black Hole Gravity. The final cards introduce the play modes and link to the free, open-source game. The game’s cue stick appears during setup and follow-through, and an Astra Pool wordmark stays in the lower-right corner from the first frame to the last.
 
 [![Watch the Astra Pool trailer](poster.jpg)](astra-pool-trailer.mp4?raw=true)
 
@@ -16,6 +16,7 @@ The final action trailer is **49 seconds, 1920×1080, 30 fps**, with stereo AAC 
 | `action/capture-manifest.json` | The final edit timeline, computer searches, shot receipts, and synchronized sound events |
 | `action/compose.py` | Editable titles, original synthesized score, sound mix, color grade, and MP4 export |
 | `action/capture.js` | Shot order, camera moves, slow motion, and phone compositions |
+| `action/breaks.js` | Seven distinct break recipes: cue placement, contact point, power, spin, and rack order |
 | `action/engine.js` | Frame-by-frame rendering, physics, responsive HUD capture, and sound logging |
 | `action/search-worker.js` | Runs the actual Tricky algorithm against the live table snapshot |
 | `action/prepare.mjs` | Generates capture pages, layouts, and a capture-only pool module from the game source |
@@ -35,7 +36,7 @@ python3 -m venv .venv
 .venv/bin/python pipeline/trailer/action/compose.py
 ```
 
-The default command reads the committed footage and matching manifest, synthesizes the score and pool sounds, and writes **`pipeline/trailer/action/render/astra-pool-trailer.mp4`**. It leaves the approved trailer intact. Change the `title(...)` calls and audio sections in `compose.py` to edit the film. Intermediate WAV and ASS subtitle files are also written to `action/render/` for use in other editors.
+The default command reads the committed footage and matching manifest, synthesizes the score and pool sounds, and writes **`pipeline/trailer/action/render/astra-pool-trailer.mp4`**. It leaves the approved trailer intact. Change the `title(...)` calls and audio sections in `compose.py` to edit the film. Intermediate WAV and ASS subtitle files (including the persistent corner wordmark in `brand.ass`) are also written to `action/render/` for use in other editors.
 
 For a different output location:
 
@@ -92,13 +93,15 @@ ffmpeg -framerate 30 -i pipeline/trailer/action/render/frames/%05d.jpg \
 
 Generated pages, the temporary pool module, JPEG frames, and render outputs are ignored by Git. The receiver overwrites frames in that render directory during a capture; keep a copy elsewhere before making an alternate take. Allow roughly 1 GB of free disk space for a full capture and export.
 
-`prepare.mjs` derives the HTML from `index.html` and adds two inspection hooks to a temporary copy of `src/pool.js`. It does not edit production source or add capture tools/media to the site's Vite build. Re-run preparation after game changes.
+`prepare.mjs` derives the HTML from `index.html` and adds snapshot and cue-pose hooks to a temporary copy of `src/pool.js`. It does not edit production source or add capture tools/media to the site's Vite build. Re-run preparation after game changes.
 
-The capture code contains all camera and timing choices. If you change section lengths, update the title times, music transitions, and end-card timing in `compose.py` too. An optional `?retake=bank` capture-page query replaces frames 210–479 and the corresponding metadata after a full capture; it assumes the original 49-second timeline.
+The capture code contains all camera and timing choices. Each break uses its own repeatable recipe in `breaks.js`; the opening, two mobile views, three room cuts, and finale have different starting positions and shot directions. The rack keeps the 8 ball centered and a solid/stripe in the rear corners. The manifest records each break’s initial positions and positions at 0.25 and 0.5 simulated seconds for checking that the resulting ball paths differ. `stroke` / `strokeStart` animate a windup within a cut, while `film.shoot(plan, windupSeconds)` can delay the strike for a short setup. Cue poses reuse the game’s geometry and rail-clearance calculation; follow-through stays anchored at the original strike point and disappears after 0.24 simulated seconds. The corner wordmark is applied after the picture fades so it remains visible throughout.
+
+If you change section lengths, update the title times, music transitions, and end-card timing in `compose.py` too. An optional `?retake=bank` capture-page query replaces frames 210–479 and the corresponding metadata after a full capture; it assumes the original 49-second timeline.
 
 ## Capture provenance
 
-The approved footage was produced from the game revision containing the Black Hole Gravity feature (PR #19). Shots are staged in Free Play using the game's renderer and physics. The computer candidates and selected shots come from the real Tricky search on the live table; the search previews are replayed at an editorial cadence. The recorded live receipts include a bank worth 250 points, a combination/double kiss worth 750, and a kick/bank worth 525. This is cinematic footage, not a recording of a competitive multiplayer match.
+This revised footage was produced from game revision `3b48ee7` (PR #20), with the cue choreography and persistent corner branding added in the trailer tools. Shots are staged in Free Play using the game's renderer and physics. The computer candidates and selected shots come from the real Tricky search on the live table; the search previews are replayed at an editorial cadence. The recorded live receipts include a bank worth 250 points, a combination/double kiss worth 750, and a kick/bank worth 525. This is cinematic footage, not a recording of a competitive multiplayer match.
 
 Mobile footage uses actual 390×844 and 844×390 iframe viewports at 2× pixel density. The responsive HUD is rasterized from its DOM and computed CSS before the phone frame is added.
 

@@ -12,7 +12,7 @@ import {
 import pool, {
   ballNumber,
   captureSnapshot,
-  capturePreparePlan,
+  captureCuePose,
 } from "./pool-capture.js";
 import { stepPhysics } from "/src/physics-step.js";
 import { connectHud } from "/src/hud.js";
@@ -23,6 +23,15 @@ export const retake = new URLSearchParams(location.search).has("retake");
 let time = 20000,
   videoTime = 0;
 const sounds = [];
+let filmedCue = null;
+let queuedShot = null;
+const shotLogs = [];
+let shotLog = null;
+const positionsNow = () =>
+  pool
+    .balls()
+    .filter((b) => b.mesh.visible && b.body.isEnabled())
+    .map((b) => ({ number: number(b), ...b.body.translation() }));
 Object.defineProperty(performance, "now", { value: () => time });
 window.playful = { mute: true };
 world.timestep = 1 / 480;
@@ -79,6 +88,15 @@ function step(n = 16) {
     time += 1000 / 480;
     snapshotPoses();
     stepPhysics(pool, world, eventQueue);
+    if (shotLog && shotLog.samples.length < 2) {
+      shotLog.elapsed += 1 / 480;
+      if (shotLog.elapsed + 1e-8 >= (shotLog.samples.length + 1) * 0.25) {
+        shotLog.samples.push({
+          time: (shotLog.samples.length + 1) * 0.25,
+          balls: positionsNow(),
+        });
+      }
+    }
   }
   syncMeshes(1);
 }
@@ -95,6 +113,9 @@ async function setup({
   gravity = false,
 } = {}) {
   thoughts.clear();
+  filmedCue = null;
+  queuedShot = null;
+  shotLog = null;
   pool.key("r");
   time += 4000;
   pool.frame();
@@ -120,7 +141,29 @@ async function setup({
   pool.frame();
   hudImage = null;
 }
-function shoot(shot) {
+function aim(plan, progress = 0) {
+  // A short backswing, then acceleration into the cue ball.
+  const power = Math.min(10, plan.speed / 30);
+  const pull =
+    progress < 0.6
+      ? power * (0.35 + 0.65 * Math.sin(((progress / 0.6) * Math.PI) / 2))
+      : power * (1 - ((progress - 0.6) / 0.4) ** 2);
+  filmedCue = { plan, pull, position: { ...ball(0).body.translation() } };
+}
+function shoot(shot, windup = 0) {
+  if (windup) {
+    queuedShot = { plan: shot, duration: windup, start: null };
+    return;
+  }
+  queuedShot = null;
+  filmedCue = {
+    plan: shot,
+    position: { ...ball(0).body.translation() },
+    elapsed: 0,
+    followThrough: true,
+  };
+  shotLog = { plan: shot, initial: positionsNow(), elapsed: 0, samples: [] };
+  shotLogs.push(shotLog);
   thoughts.clear();
   pool.debugShot(shot.dir, shot.speed, shot.spin || { x: 0, y: 0 });
 }
@@ -194,8 +237,25 @@ async function render({
   ui = false,
 } = {}) {
   videoTime = at;
+  if (queuedShot) {
+    queuedShot.start ??= at;
+    const progress = (at - queuedShot.start) / queuedShot.duration;
+    if (progress >= 1) shoot(queuedShot.plan);
+    else {
+      aim(queuedShot.plan, progress);
+      steps = 0;
+    }
+  }
   step(steps);
   pool.frame();
+  if (filmedCue?.followThrough) {
+    filmedCue.elapsed += steps / 480;
+    if (filmedCue.elapsed > 0.24) filmedCue = null;
+    else filmedCue.pull = -0.6 * Math.sin((Math.PI * filmedCue.elapsed) / 0.24);
+  }
+  // Apply after pool.frame(), which normally hides the cue once a shot starts.
+  // The stroke stays anchored to the strike point, never to a moving ball.
+  captureCuePose(filmedCue?.plan, filmedCue?.pull, filmedCue?.position);
   if (search) preview(search, chosen);
   thoughts.frame();
   renderer.render(scene, camera);
@@ -268,7 +328,7 @@ async function search(state) {
 }
 export const film = {
   search,
-  capturePreparePlan,
+  aim,
   pool,
   ball,
   number,
@@ -281,6 +341,7 @@ export const film = {
   output,
   ctx,
   sounds,
+  shotLogs,
   preview,
   thoughts,
   stats: () => pool.arcadeState(),

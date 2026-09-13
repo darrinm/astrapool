@@ -1,5 +1,6 @@
 import { film, retake } from "./engine.js";
 import { rackPositions } from "/src/table-state.js";
+import { trailerBreak } from "./breaks.js";
 const searches = await (await fetch("./searches.json")).json();
 const status = document.getElementById("capture-status"),
   button = document.getElementById("capture-start");
@@ -33,13 +34,23 @@ async function shot(
   name,
   duration,
   camera,
-  { steps = 16, search, ui = false, engine = film, draw } = {},
+  {
+    steps = 16,
+    search,
+    ui = false,
+    engine = film,
+    draw,
+    stroke,
+    strokeStart = 0,
+  } = {},
 ) {
   manifest.cuts.push({ name, start: frame / 30, duration });
   for (let i = 0; i < duration * 30; i++) {
     const t = i / (duration * 30 - 1),
       pos = camera(t, i / 30);
     engine.pose(pos.from, pos.target, pos.fov || 48);
+    if (stroke && t >= strokeStart)
+      engine.aim(stroke, (t - strokeStart) / (1 - strokeStart));
     const canvas = await engine.render({
       steps,
       at: frame / 30,
@@ -81,7 +92,8 @@ button.onclick = async () => {
   button.disabled = true;
   try {
     if (!retake) {
-      await film.setup();
+      const opening = trailerBreak("opening");
+      await film.setup({ positions: opening.positions });
       const eight = film.ball(8).mesh.position;
       await shot(
         "black-hole-macro",
@@ -101,9 +113,10 @@ button.onclick = async () => {
       await shot(
         "rack-sweep",
         0.8,
-        camera([9, -19, 13], [18, -15, 9], [23, 0, -0.5], 42),
+        camera([-40, -26, 17], [-31, -23, 13], [-22, 0, -0.5], 48),
+        { steps: 0, stroke: opening.shot },
       );
-      film.shoot({ dir: { x: 1, y: 0 }, speed: 310 });
+      film.shoot(opening.shot);
       await shot(
         "break-impact",
         0.6,
@@ -170,7 +183,6 @@ button.onclick = async () => {
           ],
       },
     );
-    film.capturePreparePlan(bank.shot);
     const chosen = {
       target: bank.shot.target,
       pocket: bank.shot.pocket,
@@ -181,7 +193,7 @@ button.onclick = async () => {
       "computer-chosen",
       0.5,
       camera([8, -34, 60], [10, -33, 58], [0, 0, -1], 50),
-      { steps: 0, search: () => chosen },
+      { steps: 0, search: () => chosen, stroke: bank.shot },
     );
     film.shoot(bank.shot);
     await shot(
@@ -238,13 +250,21 @@ button.onclick = async () => {
       camera([9, -37, 66], [-6, -33, 62], [0, 0, -1], 52),
       {
         steps: 0,
+        stroke: carom.shot,
+        strokeStart: 0.65,
         search: (t) =>
-          carom.previews[
-            Math.min(
-              carom.previews.length - 1,
-              Math.floor(t * carom.previews.length),
-            )
-          ],
+          t >= 0.65
+            ? {
+                target: carom.shot.target,
+                label: carom.shot.label,
+                paths: carom.result.paths,
+              }
+            : carom.previews[
+                Math.min(
+                  carom.previews.length - 1,
+                  Math.floor(t * carom.previews.length),
+                )
+              ],
       },
     );
     film.shoot(carom.shot);
@@ -282,13 +302,21 @@ button.onclick = async () => {
       camera([-9, -35, 66], [3, -35, 63], [0, 0, -1], 50),
       {
         steps: 0,
+        stroke: kick.shot,
+        strokeStart: 0.5,
         search: (t) =>
-          kick.previews[
-            Math.min(
-              kick.previews.length - 1,
-              Math.floor(t * kick.previews.length),
-            )
-          ],
+          t >= 0.5
+            ? {
+                target: kick.shot.target,
+                label: kick.shot.label,
+                paths: kick.result.paths,
+              }
+            : kick.previews[
+                Math.min(
+                  kick.previews.length - 1,
+                  Math.floor(t * kick.previews.length),
+                )
+              ],
       },
     );
     film.shoot(kick.shot);
@@ -335,8 +363,13 @@ button.onclick = async () => {
       iframe.src = "./mobile.html?mobile";
     });
     const m = iframe.contentWindow.film;
-    await m.setup({ env: "orbital", style: "planets" });
-    m.shoot({ dir: { x: 1, y: 0 }, speed: 285 });
+    const portrait = trailerBreak("portrait");
+    await m.setup({
+      env: "orbital",
+      style: "planets",
+      positions: portrait.positions,
+    });
+    m.shoot(portrait.shot, 0.45);
     const phoneDraw = async (canvas, t) => {
       ctx.fillStyle = "#030b16";
       ctx.fillRect(0, 0, 1920, 1080);
@@ -387,8 +420,13 @@ button.onclick = async () => {
     iframe.style.height = "390px";
     await new Promise((r) => setTimeout(r, 100));
     m.size(844, 390, 2);
-    await m.setup({ env: "coast", style: "balls" });
-    m.shoot({ dir: { x: 1, y: 0 }, speed: 300 });
+    const landscape = trailerBreak("landscape");
+    await m.setup({
+      env: "coast",
+      style: "balls",
+      positions: landscape.positions,
+    });
+    m.shoot(landscape.shot, 0.45);
     await shot(
       "mobile-landscape",
       3,
@@ -425,8 +463,9 @@ button.onclick = async () => {
       ["riad", [-75, -57, 32], [-61, -64, 36]],
       ["glasshouse", [-72, -58, 30], [-58, -64, 36]],
     ]) {
-      await film.setup({ env, style: "balls" });
-      film.shoot({ dir: { x: 1, y: 0 }, speed: 290 });
+      const roomBreak = trailerBreak(env);
+      await film.setup({ env, style: "balls", positions: roomBreak.positions });
+      film.shoot(roomBreak.shot, 0.25);
       await shot(`room-${env}`, 1, camera(from, to, [0, 0, -4], 50));
     }
     const grav = rackPositions().map((p, i) =>
@@ -442,15 +481,16 @@ button.onclick = async () => {
       positions: grav,
       gravity: true,
     });
-    film.shoot({ dir: { x: 1, y: 0 }, speed: 21 });
+    film.shoot({ dir: { x: 1, y: 0 }, speed: 21 }, 0.45);
     await shot(
       "gravity-orbit",
       2,
       camera([-6, -25, 29], [6, -26, 26], [0, 0, -0.55], 47),
     );
     await shot("gravity-close", 2, follow(0, [-10, -17, 11], [1, -17, 14], 48));
-    await film.setup();
-    film.shoot({ dir: { x: 1, y: 0 }, speed: 330 });
+    const finale = trailerBreak("finale");
+    await film.setup({ positions: finale.positions });
+    film.shoot(finale.shot, 0.3);
     await shot(
       "final-break",
       0.6,
@@ -473,6 +513,9 @@ button.onclick = async () => {
       camera([-68, -38, 32], [-79, -52, 37], [0, 0, -3], 48),
     );
     manifest.sounds.push(...film.sounds);
+    manifest.breaks = [...film.shotLogs, ...m.shotLogs].filter((s) =>
+      s.plan.name?.startsWith("break-"),
+    );
     manifest.frames = frame;
     manifest.duration = frame / 30;
     await complete(manifest);
