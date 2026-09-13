@@ -77,7 +77,8 @@ export function trickyComputerShot(balls, state, liveTable, onPreview, arcade = 
     }
     for (const { shot } of entries.toSorted((a, b) => b.score - a.score).slice(0, 4)) {
       if (performance.now() > started + maxMs * 0.8) break;
-      for (const angle of [-0.006, -0.0025, 0.0025, 0.006]) evaluate(variation(shot, angle));
+      const angles = table.blackHoleGravity ? [-0.08, -0.04, -0.02, -0.006, -0.0025, 0.0025, 0.006, 0.02, 0.04, 0.08] : [-0.006, -0.0025, 0.0025, 0.006];
+      for (const angle of angles) evaluate(variation(shot, angle));
       for (const spin of [{ x: 0, y: -0.35 }, { x: 0, y: 0.35 }]) evaluate(variation(shot, 0, 1, spin));
     }
   }
@@ -94,7 +95,7 @@ export function trickyComputerShot(balls, state, liveTable, onPreview, arcade = 
     entry.score = entry.sum / entry.samples;
     const { result } = entry;
     if (available() && entry.receipt.total && result.state.turn === state.turn && result.state.winner === null && !result.respot.length) {
-      const nextArcade = commitArcade(arcade, entry.receipt), nextTable = practiceTable(result.balls);
+      const nextArcade = commitArcade(arcade, entry.receipt), nextTable = practiceTable(result.balls, table);
       const nextOptions = potOptions(result.balls, targets(result.state)).slice(0, 3);
       let continuation = 0;
       for (const next of nextOptions) {

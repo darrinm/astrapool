@@ -58,6 +58,10 @@ export function computerShot(balls, state, difficulty = 'medium', random = Math.
     const pocket = pockets.reduce((best, p, i) => distance(target, p) < distance(target, pockets[best]) ? i : best, 0);
     choice = { dir: { x: (aim.x - cue.x) / length, y: (aim.y - cue.y) / length }, speed: 90, pocket, target: target.number };
   }
+  return executionError(choice, difficulty, random);
+}
+
+export function executionError(choice, difficulty, random = Math.random) {
   // Short, straight pots are forgiving at every level; distance and cut expose weaker technique.
   // 'hard' is the geometric fallback/baseline. The actual Hard opponent uses its physics worker.
   const profile = difficulty === 'easy' ? { aim: 0.014, power: 0.12 } :
