@@ -67,6 +67,7 @@ test('private room: seats, turn enforcement, results, placement, reconnect, inte
   two.send('result', { report: { first: null, rails: [], pocketed: [], offTable: [] }, balls: initial.snapshot.balls });
   const foul = await one.wait(m => m.type === 'state' && m.seq > second.seq); await two.wait(m => m.type === 'state' && m.seq === foul.seq);
   assert.equal(foul.snapshot.match.ballInHand, true);
+  assert.deepEqual(foul.snapshot.match.lastFoul, { kind: 'no-contact', player: 1, ball: 0 });
   one.send('place', { position: { x: 19.5, y: 0 } }); assert.match((await one.wait(m => m.type === 'error')).message, /clear spot/);
   one.send('place', { position: { x: -12, y: 4 } }); const placed = await one.wait(m => m.type === 'state' && m.seq > foul.seq); await two.wait(m => m.type === 'state' && m.seq === placed.seq);
   assert.equal(placed.snapshot.match.ballInHand, false);

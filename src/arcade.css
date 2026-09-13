@@ -12,6 +12,9 @@ body:has(#hud-sheet[open]) #arcade-effects { visibility: hidden; }
 .arcade-player[data-player='1'] { color: #a8e8be; }
 .arcade-player > strong, #arcade-free > strong { font: 750 17px/1.2 ui-rounded, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
 .arcade-multiplier { border-radius: 8px; padding: 1px 5px; color: #ffe08a; background: #ffe08a17; font: 700 11px/1.4 ui-rounded, system-ui, sans-serif; }
+.arcade-multiplier { display: inline-flex; align-items: center; gap: 3px; position: relative; }
+.streak-break { display: none; width: 14px; height: 14px; }
+.arcade-multiplier[data-reset] .streak-break { display: block; }
 #arcade-free { display: grid; justify-items: center; align-content: start; gap: 6px; color: #ffe08a; }
 #arcade-pending { color: #ffe08a; font: 650 12px/1.4 ui-rounded, system-ui, sans-serif; margin: 5px 0 0; }
 #arcade-receipt { color: #e9d9b7; font-size: 12px; margin-top: 5px; }
