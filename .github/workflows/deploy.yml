@@ -45,4 +45,5 @@ jobs:
             exit 1
           fi
           npm run heads:guard
+          npm run analytics:migrate || echo "::warning::D1 migrations did not apply; deploying gameplay anyway. Analytics may be unavailable."
           npx --no-install wrangler deploy

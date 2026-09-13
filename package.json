@@ -8,12 +8,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test physics/*.test.mjs src/*.test.mjs server/protocol.test.mjs tools/*.test.mjs",
+    "test": "node --test physics/*.test.mjs src/*.test.mjs server/*.test.mjs tools/*.test.mjs",
     "benchmark:tricky": "node physics/benchmark-tricky.mjs",
     "benchmark:computer": "node physics/benchmark-computer.mjs",
     "physics-test": "node physics/validate.mjs",
-    "deploy": "npm run heads:guard && npm run build && wrangler deploy",
-    "dev:online": "npm run build && wrangler dev --port 8787",
+    "deploy": "npm run heads:guard && npm run build && (npm run analytics:migrate || echo 'Warning: D1 migrations failed; deploying gameplay anyway. Analytics may be unavailable.') && wrangler deploy",
+    "dev:online": "npm run build && wrangler d1 migrations apply GAME_ANALYTICS --local && wrangler dev --port 8787",
     "test:online": "node --test server/room.integration.mjs",
     "heads:status": "node tools/heads.mjs status",
     "heads:stash": "node tools/heads.mjs stash",
@@ -21,7 +21,9 @@
     "heads:clear": "node tools/heads.mjs clear",
     "check:publishable": "node tools/check-publishable.mjs",
     "deploy:private": "npm run heads:restore && npm run build && wrangler deploy --config wrangler.private.jsonc",
-    "heads:guard": "node tools/heads.mjs guard"
+    "heads:guard": "node tools/heads.mjs guard",
+    "analytics": "node tools/analytics.mjs",
+    "analytics:migrate": "wrangler d1 migrations apply GAME_ANALYTICS --remote"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",

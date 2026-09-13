@@ -1,5 +1,5 @@
 // Real Workers runtime / WebSocket lifecycle test. Run after npm run build.
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { before, after, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,8 +9,16 @@ import { ArcadeEvents, EVENT as E } from '../src/arcade-events.js';
 const base = 'http://127.0.0.1:8789';
 let runtime, output = '';
 const clients = [];
+const persist = '/tmp/pool-room-tests-' + process.pid;
+function analyticsSQL(sql) {
+  return JSON.parse(execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'execute', 'GAME_ANALYTICS',
+    '--local', '--persist-to', persist, '--json', '--command', sql], { encoding: 'utf8', env: { ...process.env, CLOUDFLARE_SEND_METRICS: 'false' } }))[0].results;
+}
 before(async () => {
-  runtime = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'dev', '--port', '8789', '--ip', '127.0.0.1', '--persist-to', '/tmp/pool-room-tests-' + process.pid], { env: { ...process.env, CLOUDFLARE_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'migrations', 'apply', 'GAME_ANALYTICS', '--local', '--persist-to', persist], { stdio: 'pipe', env: { ...process.env, CLOUDFLARE_SEND_METRICS: 'false' } });
+  // BEFORE INSERT counts attempted upserts, even when their conflict guard updates zero rows.
+  analyticsSQL('CREATE TABLE analytics_attempts (id TEXT); CREATE TRIGGER count_analytics_attempt BEFORE INSERT ON games BEGIN INSERT INTO analytics_attempts VALUES (NEW.id); END;');
+  runtime = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'dev', '--port', '8789', '--ip', '127.0.0.1', '--persist-to', persist], { env: { ...process.env, CLOUDFLARE_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'pipe'] });
   runtime.stdout.on('data', b => { output += b; }); runtime.stderr.on('data', b => { output += b; });
   for (let i = 0; i < 100; i++) {
     if (output.includes('Ready on')) return;
@@ -48,13 +56,14 @@ test('private room: seats, turn enforcement, results, placement, reconnect, inte
   await one.wait(m => m.type === 'presence' && m.connected.every(Boolean));
   const third = await connect(id); assert.match((await third.wait(m => m.type === 'error')).message, /two players/);
   const action = { dir: { x: 1, y: 0 }, speed: 100, spin: { x: 0, y: 0 }, calledPocket: null };
+  const desktop = { room: 'orbital', device: 'desktop' }, mobile = { room: 'tokyo', device: 'mobile' };
   two.send('shoot', { action }); assert.match((await two.wait(m => m.type === 'error')).message, /friend/);
-  one.send('shoot', { action }); const shot = await one.wait(m => m.type === 'shot'); await two.wait(m => m.type === 'shot');
+  one.send('shoot', { action, settings: desktop }); const shot = await one.wait(m => m.type === 'shot'); await two.wait(m => m.type === 'shot');
   assert.equal(shot.pending.seat, 0);
   one.send('result', { report: { first: 1, rails: [1, 2, 3, 4], pocketed: [], offTable: [] }, balls: initial.snapshot.balls });
   const finished = await one.wait(m => m.type === 'state' && m.seq > shot.seq); await two.wait(m => m.type === 'state' && m.seq === finished.seq);
   assert.equal(finished.snapshot.match.turn, 1);
-  two.send('shoot', { action }); const second = await two.wait(m => m.type === 'shot'); await one.wait(m => m.type === 'shot');
+  two.send('shoot', { action, settings: mobile }); const second = await two.wait(m => m.type === 'shot'); await one.wait(m => m.type === 'shot');
   two.send('result', { report: { first: null, rails: [], pocketed: [], offTable: [] }, balls: initial.snapshot.balls });
   const foul = await one.wait(m => m.type === 'state' && m.seq > second.seq); await two.wait(m => m.type === 'state' && m.seq === foul.seq);
   assert.equal(foul.snapshot.match.ballInHand, true);
@@ -66,12 +75,12 @@ test('private room: seats, turn enforcement, results, placement, reconnect, inte
   const rejoined = await connect(id, two.token); const restored = await rejoined.wait(m => m.type === 'state');
   assert.equal(restored.seat, 1); assert.deepEqual(restored.snapshot, placed.snapshot);
   await one.wait(m => m.type === 'presence' && m.connected.every(Boolean));
-  one.send('shoot', { action }); const interrupted = await one.wait(m => m.type === 'shot'); await rejoined.wait(m => m.type === 'shot');
+  one.send('shoot', { action, settings: desktop }); const interrupted = await one.wait(m => m.type === 'shot'); await rejoined.wait(m => m.type === 'shot');
   one.ws.close(); await once(one.ws, 'close');
   const rollback = await rejoined.wait(m => m.type === 'state' && m.seq > interrupted.seq); assert.deepEqual(rollback.snapshot, placed.snapshot); assert.equal(rollback.pending, null);
   const returned = await connect(id, one.token); await returned.wait(m => m.type === 'state');
   await rejoined.wait(m => m.type === 'presence' && m.connected.every(Boolean));
-  returned.send('shoot', { action }); const last = await returned.wait(m => m.type === 'shot'); await rejoined.wait(m => m.type === 'shot');
+  returned.send('shoot', { action, settings: desktop }); const last = await returned.wait(m => m.type === 'shot'); await rejoined.wait(m => m.type === 'shot');
   returned.send('result', { report: { first: 1, rails: [], pocketed: [{ number: 8, pocket: 0 }], offTable: [] }, balls: placed.snapshot.balls.filter(b => b.number !== 8) });
   const won = await returned.wait(m => m.type === 'state' && m.seq > last.seq); await rejoined.wait(m => m.type === 'state' && m.seq === won.seq); assert.equal(won.snapshot.match.winner, 1);
   returned.send('rematch'); const vote = await returned.wait(m => m.type === 'state' && m.seq > won.seq); await rejoined.wait(m => m.type === 'state' && m.seq === vote.seq);
@@ -79,6 +88,24 @@ test('private room: seats, turn enforcement, results, placement, reconnect, inte
   rejoined.send('rematch'); const rematch = await returned.wait(m => m.type === 'state' && m.seq > vote.seq);
   assert.equal(rematch.snapshot.match.winner, null); assert.equal(rematch.snapshot.match.breaker, 1); assert.deepEqual(rematch.snapshot.match.wins, [0, 1]); assert.equal(rematch.snapshot.balls.length, 16);
   assert.equal(rematch.snapshot.arcade.rack, won.snapshot.arcade.rack + 1); assert.deepEqual(rematch.snapshot.arcade.totals, [0, 0]);
+  // Both peers and several reconnects produced one played rack; voting does not start another.
+  const games = analyticsSQL("SELECT mode, source, outcome, finished_at, settings_changes, (SELECT COUNT(*) FROM analytics_attempts) AS writes FROM games");
+  assert.equal(games.length, 1); assert.equal(games[0].mode, 'online'); assert.equal(games[0].source, 'room');
+  assert.equal(games[0].outcome, 'player2'); assert.ok(games[0].finished_at);
+  assert.equal(games[0].settings_changes, 0); assert.equal(games[0].writes, 5); // Four shots and one finish only.
+});
+
+test('analytics ingestion persists cumulative records once and exposes no public reporting endpoint', async () => {
+  const { newGameAnalytics } = await import('../src/game-analytics.js');
+  const game = newGameAnalytics('computer', { difficulty: 'tricky', room: 'orbital' }); game.shots = 1;
+  const send = body => fetch(base + '/api/analytics/game', { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await send(game)).status, 204); assert.equal((await send(game)).status, 204);
+  assert.equal((await send({ ...game, mode: 'online' })).status, 400);
+  assert.equal((await fetch(base + '/api/analytics/report')).status, 404);
+  game.version++; game.finishedAt = Date.now(); game.outcome = 'player';
+  assert.equal((await send(game)).status, 204);
+  const rows = analyticsSQL("SELECT COUNT(*) AS n, SUM(finished_at IS NOT NULL) AS finished FROM games WHERE source = 'browser'");
+  assert.deepEqual(rows, [{ n: 1, finished: 1 }]);
 });
 
 test('arcade scores agree across peers, reject duplicates, survive reconnect, and roll back interrupted play', async () => {
