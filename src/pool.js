@@ -553,7 +553,11 @@ function resetView() {
   if (attractMode) frameAttract();
 }
 function frameAttract() {
-  // Lift the orbit above the choices without changing its distance or pivot.
+  // Desktop has room to center the orbit; only mobile needs a lift above the choices.
+  if (!matchMedia('(max-width: 600px), (hover: none) and (pointer: coarse)').matches) {
+    camera.clearViewOffset();
+    return;
+  }
   // Keep the offset smaller in landscape, where vertical room is limited.
   const choices = document.querySelector('.welcome-inner').getBoundingClientRect();
   const lift = Math.min(choices.height / 2, innerHeight * (innerHeight > innerWidth ? 0.16 : 0.08));
