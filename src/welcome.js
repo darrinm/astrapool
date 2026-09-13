@@ -10,8 +10,19 @@ export function connectWelcome(game) {
   const settings = document.getElementById('open-settings');
   const settingsHome = settings.parentElement;
   welcome.append(settings);
-  const openSettings = () => dismiss(null);
-  settings.addEventListener('click', openSettings, { capture: true });
+  // Settings opens above the welcome dialog. Changing the room or appearance
+  // must leave the demo running; game choices use the welcome transition below.
+  const sheet = document.getElementById('hud-sheet');
+  const gameModes = document.getElementById('game-mode');
+  const chooseGame = event => {
+    const button = event.target.closest('[data-game]');
+    if (!button) return;
+    // The welcome transition owns this choice. Do not let the normal settings
+    // handler start the same game a second time after dismiss() starts it.
+    event.stopImmediatePropagation();
+    dismiss(button.dataset.game);
+  };
+  gameModes.addEventListener('click', chooseGame, { capture: true });
 
   const controls = game.controls();
   const canvas = controls?.domElement;
@@ -44,7 +55,7 @@ export function connectWelcome(game) {
   function dismiss(mode) {
     if (done) return;                       // close() re-enters through the close event
     done = true;
-    settings.removeEventListener('click', openSettings, true);
+    gameModes.removeEventListener('click', chooseGame, true);
     settingsHome.append(settings);
     clearTimeout(resumeOrbit);
     if (controls) {
@@ -56,6 +67,7 @@ export function connectWelcome(game) {
       controls.removeEventListener('end', scheduleOrbit);
       controls.connect(canvas);
     }
+    if (sheet.open) sheet.close();
     if (welcome.open) welcome.close();
     welcome.hidden = true;
     game.setGame(mode || game.matchState().mode);
