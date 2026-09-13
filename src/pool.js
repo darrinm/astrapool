@@ -15,6 +15,7 @@ import { bakeCap, authenticBall, chooseBallMap, loadedHead, BALL_COLORS } from '
 import { ballSetById, nextBallSet, planetForBall } from './ball-sets.js';
 import { createPlanetSet, updatePlanetOrbits, updatePlanetCaps } from './planet-balls.js';
 import { updateSunLight } from './sun.js';
+import { TargetRings } from './target-rings.js';
 import { buildBallSetPicker, updateBallSetPicker } from './ball-set-picker.js';
 import { PoolAudio } from './sounds.js';
 import { trackShadowChanges } from './shadow-updates.js';
@@ -45,7 +46,7 @@ const MAX_PULL = 24, MAX_SPEED = 24 * 0.44704 / 0.026;   // 24 mph in game units
 const SPEED_PER_PULL = MAX_SPEED / MAX_PULL;
 const FELT_Z = -DEPTH, BALL_Z = FELT_Z + R;
 const RAIL_W = 3.2, WELL_DEPTH = P.WELL_DEPTH;
-let sunLight;
+let sunLight, targetRings;
 let cue, aiming = null, pockets = [], guide, cueStick, marker, pocketed = 0, shots = 0, spin = { x: 0, y: 0 }, spinEl, controls;
 let lastViewport = { w: innerWidth, h: innerHeight }, refitPending = false;
 // The three framings resetView() knows about. A change of shape needs a fresh camera, not just a
@@ -186,6 +187,7 @@ async function setEnvironment(id, applyBallDefault = true) {
 
 // ---------- table ----------
 function build() {
+  targetRings?.dispose();
   clearProps();
   const registerCollider = (c) => registerProp(c);
   const rules = { friction: RAPIER.CoefficientCombineRule.Max, restitution: RAPIER.CoefficientCombineRule.Min };
@@ -349,6 +351,7 @@ function build() {
   // Cue-ball indicator: a steady ring on the felt around the cue ball whenever a shot can be taken.
   marker = addMesh(new THREE.Mesh(new THREE.RingGeometry(R * 1.3, R * 1.65, 48), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, depthWrite: false })));
   marker.visible = false;
+  targetRings = addMesh(new TargetRings({ radius: R, feltZ: FELT_Z, numberOf }));
   pocketMarker = addMesh(new THREE.Mesh(new THREE.TorusGeometry(POCKET_R + 0.3, 0.12, 8, 48), new THREE.MeshBasicMaterial({ color: '#ffd27a', depthTest: false })));
   pocketMarker.visible = false;
 }
@@ -1496,6 +1499,7 @@ export default {
     planetSet?.dispose(); planetSet = null;
     sunLight?.dispose(); sunLight = null;
     for (const ball of extras) classicMaterials.delete(ball);
+    targetRings?.dispose();
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     hudObserver?.disconnect(); hudObserver = null;
     shotFeedback.clear();
@@ -1679,8 +1683,10 @@ export default {
     for (const m of fixture) { m.visible = fade > 0; m.material.opacity = fade; }
     if (capsOn && capsPending()) applyCaps();
     const balls = replayView.active ? replayView.balls : allBalls();
+    const playerAiming = !!aiming && !computerTurn() && !remoteTurn() && !replayView.active;
+    targetRings.update(balls, match, { aiming: playerAiming, free: gameMode === 'free' });
     if (ballStyle === 'planets') {
-      updatePlanetCaps(balls, !!aiming && !computerTurn() && !remoteTurn() && !replayView.active);
+      updatePlanetCaps(balls, playerAiming);
       const seconds = replayView.active ? (replayView.clip.metadata.planetTime ?? 0) + replayView.time : performance.now() / 1000;
       planetSet?.setTime(seconds);
       updatePlanetOrbits(balls, seconds);
