@@ -10,6 +10,7 @@ release. Rack the planets, a standard set, or faces.
 - **Four ways to play:** local two-player 8-ball, computer opponents, private online games by link, and Free Play.
 - **Four computer styles:** Easy, Medium, Hard, and Tricky, which hunts for high-scoring trick shots with visible thinking previews.
 - **Real pool physics:** control power, follow, draw, and sidespin on a full 3D table.
+- **Black Hole Gravity:** an optional 8-ball gravity field bends nearby moving balls; all four computer styles account for the pull.
 - **Arcade scoring and effects:** earn bonuses for banks, kicks, combinations, and more; replay your last shot.
 - **Planets and places:** rack the solar system or classic balls in nine rooms, from a corner bar to an orbital lounge.
 - **Desktop and mobile:** orbit and zoom with mouse or touch; no install or account required.
@@ -50,6 +51,15 @@ in-game Help includes the expanded bonus table; [Tricky mode](docs/tricky-mode.m
 the scoring evidence and search limits.
 
 **Free Play** adds **Fling**: grab any ball and throw it across the felt.
+
+**Game → Black Hole Gravity** is off by default. Toggle it when the balls are at rest to let
+the 8-ball curve all other moving balls toward it, in any ball collection.
+The range is 36 game units from the 8-ball’s center (about 94 cm / 37 inches,
+or 16 ball diameters). The pull fades with distance and as the
+balls settle, and stops when the 8 drops below the felt.
+All four computer styles rehearse with the same gravity; Easy and Medium retain
+their usual aim and power errors. Available in Local 8-ball, Vs Computer, and Free Play; online
+rooms and the welcome-screen attract demo use standard physics.
 
 ## Balls and rooms
 

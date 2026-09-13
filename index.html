@@ -40,6 +40,7 @@
     </div>
     <div id="vignette" hidden></div>
     <dialog id="welcome" aria-labelledby="welcome-title" hidden>
+      <div class="welcome-camera" aria-hidden="true"></div>
       <header class="welcome-heading"><h1 id="welcome-title">Astra Pool</h1></header>
       <div class="welcome-inner">
         <p class="welcome-lede">Choose your game.</p>
@@ -109,6 +110,12 @@
             <p class="arcade-description">Big little celebrations. Skill points, lucky shots, and glorious mistakes.</p>
             <div id="arcade-intensity" class="segmented" role="group" aria-label="Arcade effects"><button data-effects="full" aria-pressed="true">Full effects</button><button data-effects="reduced" aria-pressed="false">Reduced effects</button></div>
             <p id="arcade-best" hidden></p>
+          </div>
+
+          <div class="field arcade-setting">
+            <button id="black-hole-gravity-toggle" class="switch" aria-pressed="false" aria-describedby="black-hole-gravity-description"><span>Black Hole Gravity</span><span class="switch-track" aria-hidden="true"></span></button>
+            <p id="black-hole-gravity-description" class="arcade-description">The 8-ball pulls nearby moving balls toward it within about 16 ball diameters. The computer adjusts its aim. Toggle when the balls are at rest.</p>
+            <p id="black-hole-gravity-online" class="arcade-description" hidden>Available in local games and Free Play.</p>
           </div>
 
           <div class="field" id="difficulty-group" hidden>

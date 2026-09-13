@@ -33,6 +33,7 @@ import { ComputerThoughts } from './computer-thoughts.js';
 import { setLoadingStage } from './loading.js';
 import { ShotReplay } from './replay.js';
 import { ReplayView } from './replay-view.js';
+import { blackHoleGravity } from '../physics/black-hole-gravity.js';
 import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
 
 const { R, G, MU_SLIDE, MU_BALL, E_BALL, HW, HH, RAIL_H, CUSH, POCKET_R } = P;   // table physics constants live in physics/poolphysics.js
@@ -65,6 +66,8 @@ let computerWait = 0, computerPlan = null, computerWorker = null;
 let attractMode = false, attractWait = 0;
 const COMPUTER_CUE_TIME = 0.18;
 let difficulty = 'tricky', onlineShotSeq = null, onlineShooter = null;
+let gravityEnabled = false;
+const gravityActive = () => !attractMode && gravityEnabled && gameMode !== 'online';
 let overhead = false, hudObserver;
 const online = new OnlineRoom(receiveOnline, text => {
   document.getElementById('online-status').textContent = text;
@@ -131,6 +134,7 @@ async function setEnvironment(id, applyBallDefault = true) {
   environmentId = theme.id;
   endGesture();
   const original = tableFinish.original;
+  tableFinish.legs.forEach(mesh => { mesh.visible = theme.id !== 'orbital'; });
   if (tableFinish.felt.map !== original.felt) tableFinish.felt.map.dispose();
   tableFinish.felt.map = minimal ? original.felt : feltMap(512, 6, theme.felt);
   if (!minimal) tableFinish.felt.map.colorSpace = THREE.SRGBColorSpace;
@@ -261,9 +265,11 @@ function build() {
   const legH = 24, legTop = FELT_Z - 1.2 - apronH;
   const legGeo = new THREE.CylinderGeometry(1.6, 2.4, legH, 4, 1).rotateX(Math.PI / 2).rotateZ(Math.PI / 4);   // square section, wider at the top
   const footGeo = new THREE.BoxGeometry(3.6, 3.6, 1.2);
+  const legs = [];
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
     const l = addMesh(new THREE.Mesh(legGeo, legWood)); l.position.set(sx * (HW - 3), sy * (HH - 1), legTop - legH / 2); l.castShadow = true; l.receiveShadow = true;
     const f = addMesh(new THREE.Mesh(footGeo, mouldMat)); f.position.set(sx * (HW - 3), sy * (HH - 1), legTop - legH + 0.6);
+    legs.push(l, f);
   }
   for (const c of backstopColliders(world, FELT_Z)) registerCollider(c);   // nothing leaves the table area even on a jump
 
@@ -292,7 +298,7 @@ function build() {
   sunLight.shadow.camera.near = R * 1.04; sunLight.shadow.camera.far = 14;
   sunLight.shadow.bias = -0.001; sunLight.shadow.normalBias = 0.025;
 
-  tableFinish = { felt: feltMat, wood: [slabWood, railLong, railShort, apronWood, apronWoodEnd, legWood], trim: mouldMat, shade: shade.material };
+  tableFinish = { felt: feltMat, wood: [slabWood, railLong, railShort, apronWood, apronWoodEnd, legWood], trim: mouldMat, shade: shade.material, legs };
   tableLights = [area, spot];
   tableFinish.original = { felt: feltMat.map, wood: tableFinish.wood.map(material => material.map), lights: tableLights.map(light => light.color.clone()), intensities: tableLights.map(light => light.intensity) };
 
@@ -872,6 +878,12 @@ function showGameControls(show) {
       document.querySelectorAll('#difficulty button').forEach(o => o.setAttribute('aria-pressed', String(o.dataset.difficulty === difficulty)));
       if (computerTurn() && !activeShot) { cancelComputerSearch(); computerPlan = null; computerWait = 0; endAim(); }
     }));
+    document.getElementById('black-hole-gravity-toggle').addEventListener('click', () => {
+      if (!canChangeGravity()) return;
+      gravityEnabled = !gravityEnabled;
+      cancelComputerSearch(); computerPlan = null; computerWait = 0; endGesture();
+      updateScore();
+    });
     document.getElementById('overhead-view').addEventListener('click', overheadView);
     document.getElementById('open-replay').addEventListener('click', startReplay);
     document.getElementById('rematch').addEventListener('click', restart);
@@ -1020,8 +1032,19 @@ function syncPocketCall() {
   if (!available && sheet.open && !document.getElementById('panel-pockets').hidden) sheet.close();
 }
 
+function canChangeGravity() {
+  return gameMode !== 'online' && !rackMotion && !activeShot && !arcade.active &&
+    !replayView.active && !dragging && !placing && tableStill();
+}
+function syncGravityToggle() {
+  const toggle = document.getElementById('black-hole-gravity-toggle');
+  toggle.setAttribute('aria-pressed', String(gravityActive()));
+  toggle.disabled = !canChangeGravity();
+  document.getElementById('black-hole-gravity-online').hidden = gameMode !== 'online';
+}
 function updateScore() {
   gameplayAnalytics.settingsChanged();
+  syncGravityToggle();
   updateGestureControls();
   document.getElementById('pocketed-count').textContent = pocketed;
   document.getElementById('shot-count').textContent = shots;
@@ -1264,7 +1287,7 @@ function updateComputer(dt) {
   if (!computerTurn() || activeShot || !tableStill()) { computerWait = 0; return; }
   if (computerWorker) return;
   if (!computerPlan) {
-    if (attractMode || difficulty === 'hard' || difficulty === 'tricky') {
+    if (attractMode || gravityActive() || difficulty === 'hard' || difficulty === 'tricky') {
       const worker = new Worker(new URL('./computer-worker.js', import.meta.url), { type: 'module' });
       computerWorker = worker;
       const fallback = () => {
@@ -1284,7 +1307,7 @@ function updateComputer(dt) {
       };
       worker.onerror = fallback;
       worker.postMessage({ difficulty: attractMode ? 'tricky' : difficulty, solo: attractMode, arcade: structuredClone(arcade.state), balls: tablePositions(), state: structuredClone(match), previews: arcade.hud.enabled, table: {
-        snapshot: world.takeSnapshot(), feltZ: FELT_Z, cushions: [...cushionHandles],
+        snapshot: world.takeSnapshot(), feltZ: FELT_Z, cushions: [...cushionHandles], blackHoleGravity: gravityActive(),
         handles: allBalls().filter(b => !pocketedSet.has(b)).map(b => ({ number: numberOf(b), handle: b.body.handle })),
       } });
       updateScore(); return;
@@ -1352,7 +1375,11 @@ function receiveOnline(data) {
 }
 
 // ---------- per-step physics extras ----------
-function rollingResistance(dt) { feltExtras(allBalls().filter((h) => h.mesh.visible).map((h) => h.body), dt, BALL_Z); }
+function rollingResistance(dt) {
+  const balls = allBalls().filter(h => h.mesh.visible), bodies = balls.map(h => h.body);
+  feltExtras(bodies, dt, BALL_Z);
+  if (gravityActive()) blackHoleGravity(bodies, balls.find(b => numberOf(b) === 8)?.body, dt, BALL_Z);
+}
 // A ball that has been below the felt for a moment is pocketed, whatever it is still doing down in the well
 // (a ball can roll around the well for a long time, and a wedged ball never settles). A ball resting beyond the
 // cushion line (it jumped the cushion and sits under the rail) counts the same: off the table. Object balls are
@@ -1567,6 +1594,7 @@ export default {
         kind === 'scratch' || kind === 'early' ? 'NO POINTS THIS SHOT' : 'BANK SHOT!', { down: kind === 'scratch' || kind === 'early', color: kind === 'early' ? '#bd8bce' : kind === 'scratch' ? '#f28c78' : '#ffe08a', pending: kind === 'bank' });
     } } : {}),
   frame() {
+    if (document.getElementById('hud-sheet').open) syncGravityToggle();
     controls?.update();
     animateRack();
     if (scene.fog && controls) {
