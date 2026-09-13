@@ -13,6 +13,13 @@ export function withinCueTarget(pointer, center, radius, touch = false) {
   return Math.hypot(pointer.x - center.x, pointer.y - center.y) <= Math.max(radius + 6, touch ? 24 : 16);
 }
 
+export function setGuideLine(line, start, end) {
+  line.geometry.setFromPoints([start, end]);
+  // Vertex updates leave Three's cached bounds unchanged. Refresh them so a previous
+  // shot's offscreen position cannot cull the current aiming or deflection line.
+  line.geometry.computeBoundingSphere();
+}
+
 // Snap using OrbitControls' public API so leftover orbit/pan damping cannot
 // turn a portrait fit sideways or move it away from the available space.
 export function setOverheadCamera(camera, controls, { width, height, halfWidth, halfHeight, surfaceZ, top, bottom, left, right }) {

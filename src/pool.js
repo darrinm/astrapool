@@ -23,7 +23,7 @@ import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
 import { GameplayAnalytics, sendGameAnalytics } from './game-analytics.js';
 import { groupLabel, playerName, playerText } from './match-copy.js';
-import { setOverheadCamera, withinCueTarget } from './table-view.js';
+import { setOverheadCamera, withinCueTarget, setGuideLine } from './table-view.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
 import { newMatch, targets, groupBalls, shotRecord, resolveShot, resolveSoloShot } from './eight-ball.js';
@@ -965,19 +965,19 @@ function updateGuide() {
     undefined, undefined, feltCol, cue.body);
   const dist = hit ? hit.time_of_impact : 200;
   const end = new THREE.Vector3(c.x + dir.x * dist, c.y + dir.y * dist, c.z);
-  guide.line.geometry.setFromPoints([new THREE.Vector3(c.x, c.y, c.z), end]);
+  setGuideLine(guide.line, new THREE.Vector3(c.x, c.y, c.z), end);
   guide.ghost.position.copy(end); guide.ghost.visible = !!hit;
   guide.objLine.visible = false; guide.cueLine.visible = false;
   if (hit) {
     const other = allBalls().find((h) => h.mesh.visible && h.body.collider(0).handle === hit.collider.handle);
     if (other) {   // object ball leaves along the line of centres; a stunned cue ball leaves along the tangent
       const o = other.body.translation(), n = new THREE.Vector3(o.x - end.x, o.y - end.y, 0).normalize();
-      guide.objLine.geometry.setFromPoints([new THREE.Vector3(o.x, o.y, o.z), new THREE.Vector3(o.x + n.x * 12, o.y + n.y * 12, o.z)]);
+      setGuideLine(guide.objLine, new THREE.Vector3(o.x, o.y, o.z), new THREE.Vector3(o.x + n.x * 12, o.y + n.y * 12, o.z));
       guide.objLine.visible = true;
       const d3 = new THREE.Vector3(dir.x, dir.y, 0), tangent = d3.clone().sub(n.clone().multiplyScalar(d3.dot(n)));
       if (tangent.length() > 0.05) {
         tangent.normalize();
-        guide.cueLine.geometry.setFromPoints([end.clone(), end.clone().add(tangent.multiplyScalar(7))]);
+        setGuideLine(guide.cueLine, end, end.clone().add(tangent.multiplyScalar(7)));
         guide.cueLine.visible = true;
       }
     }
