@@ -22,7 +22,7 @@ import { buildEnvironment, environmentById, readEnvironment } from './environmen
 import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
 import { GameplayAnalytics, sendGameAnalytics } from './game-analytics.js';
-import { groupLabel, playerName, playerText } from './match-copy.js';
+import { groupLabel, playerName, playerText, turnStatus } from './match-copy.js';
 import { setOverheadCamera, withinCueTarget, setGuideLine } from './table-view.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
@@ -77,6 +77,7 @@ const online = new OnlineRoom(receiveOnline, text => {
   invite.value = online.id ? `${location.origin}/#room=${online.id}` : '';
   document.querySelector('.online-row').hidden = !online.id;
   document.getElementById('online-retry').hidden = !!online.id && online.connected.every(Boolean);
+  if (gameMode === 'online') updateTurnStatus();
 });
 const remoteTurn = () => gameMode === 'online' && (!online.canAct || match.turn !== online.seat);
 const computerTurn = () => (attractMode || gameMode === 'computer' && match.turn === 1) && match.winner === null;
@@ -846,6 +847,7 @@ function endDrag(fling = false) {
 }
 function updateGestureControls() {
   document.getElementById('hud').classList.toggle('aiming', !!aiming && !computerTurn());
+  document.querySelector('.guidance').setAttribute('aria-live', aiming && !computerTurn() ? 'off' : 'polite');
   document.getElementById('cancel-gesture').hidden = !(placing || dragging || (aiming && !computerTurn()));
   syncReplayButton();
 }
@@ -991,7 +993,7 @@ function updateAim() {
   updateCueStick(c, dir, pull, spin);
   if (gameMode === 'online') online.sendAim({ dir: { x: dir.x, y: dir.y }, pull, spin });
   const txt = `Power ${Math.round((pull / MAX_PULL) * 100)}%${spin.x || spin.y ? ' · spin applied' : ''}`;
-  if (txt !== lastStatus) { lastStatus = txt; ui.status(txt); }
+  if (!computerTurn() && txt !== lastStatus) { lastStatus = txt; ui.status(txt); }
 }
 function updateCueStick(c, dir, pull, spin) {
   // cue stick behind the ball, pulled back with the power, slightly elevated
@@ -1054,7 +1056,7 @@ function syncPocketCall() {
   const map = document.getElementById('pocket-map'), button = document.getElementById('open-pockets');
   const name = chosen ? map.querySelector(`[data-pocket="${calledPocket}"]`)?.getAttribute('aria-label') : null;
   button.hidden = !available;
-  button.textContent = chosen ? 'Change pocket' : 'Call the 8-ball pocket';
+  button.textContent = chosen ? 'Change pocket' : 'Call pocket';
   button.dataset.called = String(chosen);
   button.title = chosen ? `Called: ${name}. Change before shooting.` : 'Choose the pocket before shooting the 8-ball';
   const status = document.getElementById('pocket-call-status');
@@ -1124,26 +1126,44 @@ function updateScore() {
   document.getElementById('shot-result').hidden = !lastShot && !arcadeVisible;
   const resultText = document.getElementById('shot-result-text');
   if (resultText.textContent !== lastShot) resultText.textContent = lastShot;
-  lastStatus = '';
-  const nextAction = match.winner !== null ? `Player ${match.winner + 1} wins the rack!` :
-    match.ballInHand ? `Player ${match.turn + 1}: place the cue ball.` :
-    canCallPocket() && calledPocket === null ? `Player ${match.turn + 1}: call a pocket for the 8-ball.` :
-    match.breaking ? `Player ${match.turn + 1} to break.` :
-    `Player ${match.turn + 1}’s turn${match.groups[match.turn] ? ` · ${match.groups[match.turn]}` : ''}.`;
-  ui.status(rackMotion ? 'Racking the balls…' : free ? (pocketed === 15 ? `Table cleared in ${shots} shots. Ready for another rack?` : '') :
-    activeShot ? playerText(`Player ${match.turn + 1} shooting…`, gameMode, online.seat) : gameMode === 'online' && online.pending ? 'Waiting for the shot result…' : playerText(nextAction, gameMode, online.seat));
-  ui.hint(rackMotion ? 'Getting the table ready.' : free ? (interactionMode === 'fling' ? 'Grab any ball. Release to fling. Hold still to place.' : cueLearned ? '' : 'Pull back from the cue ball. Release to shoot.') :
-    match.winner !== null ? 'A rack well played. Rematch to switch the break.' :
-    activeShot ? 'Waiting for the balls to settle.' :
-    gameMode === 'online' && online.pending ? 'The next turn begins when the result is confirmed.' :
-    computerTurn() ? (computerWorker ? 'The computer is studying the table.' : 'The computer is lining up its shot.') :
-    remoteTurn() ? (online.connected.every(Boolean) ? 'Your friend is lining up a shot.' : 'Share the invite link. Play begins when both players are connected.') :
-    match.ballInHand ? 'Ball in hand: click an empty spot on the felt, or drag the cue ball into place.' :
-    onEight() && calledPocket === null ? 'Choose where the 8-ball will go before you shoot.' :
-    onEight() ? (cueLearned ? 'You can change your pocket call before shooting.' : 'Pull back from the cue ball to shoot, or change your pocket call.') :
-    !match.groups[match.turn] && !match.breaking ? 'Pocket a solid or stripe on a legal shot to claim your group.' :
-    cueLearned ? '' : 'Pull back from the cue ball. Release to shoot.');
+  const summary = document.getElementById('open-match');
+  const scoreText = free ? `${pocketed} / 15 · ${shots} shots` :
+    [0, 1].map(i => `${playerName(i, gameMode, online.seat)} ${match.wins[i]}`).join(' · ');
+  document.getElementById('match-summary-text').textContent = scoreText;
+  summary.setAttribute('aria-label', `${free ? 'Game' : 'Match'} details: ${scoreText}`);
+  updateTurnStatus();
   if (overhead && !aiming) fitOverhead();
+}
+function updateTurnStatus() {
+  const free = gameMode === 'free';
+  const roomUnavailable = gameMode === 'online' && (!online.synced || !online.connected.every(Boolean));
+  let connection = '';
+  if (roomUnavailable) {
+    const text = document.getElementById('online-status').textContent;
+    connection = online.synced ? 'Waiting for your friend' :
+      /^(Creating|Joining)/.test(text) ? 'Connecting…' : 'Connection interrupted';
+  }
+  const pocketName = calledPocket === null ? '' :
+    document.querySelector(`#pocket-map [data-pocket="${calledPocket}"]`)?.getAttribute('aria-label');
+  const state = free ? {
+    title: rackMotion ? 'Racking…' : pocketed === 15 ? 'Table cleared!' : 'Free Play',
+    detail: rackMotion || pocketed === 15 ? '' : interactionMode === 'fling' ? 'Drag a ball to fling or place it' :
+      cueLearned ? '' : 'Pull back from the cue ball. Release to shoot.',
+    active: false,
+  } : turnStatus({ match, mode: gameMode, seat: online.seat, racking: !!rackMotion,
+    shooting: !!activeShot, pending: gameMode === 'online' && online.pending,
+    waiting: gameMode === 'online' && online.waiting,
+    connection, canCall: canCallPocket(), pocketName });
+  const panel = document.querySelector('.turn-controls');
+  panel.dataset.active = String(state.active);
+  const room = document.getElementById('open-room');
+  room.hidden = gameMode !== 'online' || (!roomUnavailable && !online.error);
+  room.textContent = online.synced && !online.connected.every(Boolean) ? 'Invite' : 'Room';
+  // Aiming power is local feedback. Presence and score updates must not replace it.
+  if (aiming && !computerTurn()) { lastStatus = ''; updateAim(); return; }
+  lastStatus = '';
+  if (document.getElementById('status').textContent !== state.title) ui.status(state.title);
+  if (document.getElementById('hint').textContent !== state.detail) ui.hint(state.detail);
 }
 function overheadView() {
   endGesture(); overhead = true; fitOverhead();
@@ -1230,9 +1250,9 @@ function movePlacement(e) {
 }
 function finishPlacement() {
   if (!placing) return;
-  if (!placing.valid) { cancelPlacement(); ui.status('Choose a clear spot inside the cushions.'); return; }
+  if (!placing.valid) { cancelPlacement(); ui.hint('Choose a clear spot inside the cushions'); return; }
   const p = placing.target;
-  if (gameMode === 'online') { cancelPlacement(); online.send('place', { position: { x: p.x, y: p.y } }); return; }
+  if (gameMode === 'online') { cancelPlacement(); online.send('place', { position: { x: p.x, y: p.y } }); updateTurnStatus(); return; }
   placing = null;
   cue.body.setEnabled(true); spot(cue, p.x, p.y, IDENTITY); controls.enabled = true;
   arcade.effects.ring(p, undefined, 2.2, 0.3);

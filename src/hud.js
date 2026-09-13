@@ -5,9 +5,9 @@ export function connectBackdropDismiss(dialog, close) {
   dialog.addEventListener('click', event => { if (backdropDown && event.target === dialog) close(); });
 }
 
-// One sheet, three panels. The controls live in it permanently: nothing is
-// borrowed from the HUD and nothing opens a second dialog on top of this one.
+// Each panel lives in this sheet permanently, without nested dialogs.
 const PANELS = {
+  match: { title: 'Match details', id: 'panel-match' },
   settings: { title: 'Game', id: 'panel-settings' },
   spin: { title: 'Cue spin', id: 'panel-spin' },
   pockets: { title: 'Call the 8-ball pocket', id: 'panel-pockets' },
@@ -30,6 +30,13 @@ export function connectHud(game) {
   }
   const close = () => sheet.close();
 
+  document.getElementById('open-match').addEventListener('click', () => open('match'));
+  document.getElementById('open-room').addEventListener('click', () => {
+    open('settings');
+    document.getElementById('online-panel').scrollIntoView({ block: 'center' });
+    const invite = document.getElementById('invite-link');
+    (invite.value ? document.getElementById('copy-invite') : document.getElementById('online-retry')).focus();
+  });
   document.getElementById('open-settings').addEventListener('click', () => open('settings'));
   document.getElementById('open-spin').addEventListener('click', () => open('spin'));
   document.getElementById('open-pockets').addEventListener('click', () => open('pockets'));
