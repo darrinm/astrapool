@@ -130,6 +130,7 @@ async function setEnvironment(id, applyBallDefault = true) {
   environmentId = theme.id;
   endGesture();
   const original = tableFinish.original;
+  tableFinish.legs.forEach(mesh => { mesh.visible = theme.id !== 'orbital'; });
   if (tableFinish.felt.map !== original.felt) tableFinish.felt.map.dispose();
   tableFinish.felt.map = minimal ? original.felt : feltMap(512, 6, theme.felt);
   if (!minimal) tableFinish.felt.map.colorSpace = THREE.SRGBColorSpace;
@@ -260,9 +261,11 @@ function build() {
   const legH = 24, legTop = FELT_Z - 1.2 - apronH;
   const legGeo = new THREE.CylinderGeometry(1.6, 2.4, legH, 4, 1).rotateX(Math.PI / 2).rotateZ(Math.PI / 4);   // square section, wider at the top
   const footGeo = new THREE.BoxGeometry(3.6, 3.6, 1.2);
+  const legs = [];
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
     const l = addMesh(new THREE.Mesh(legGeo, legWood)); l.position.set(sx * (HW - 3), sy * (HH - 1), legTop - legH / 2); l.castShadow = true; l.receiveShadow = true;
     const f = addMesh(new THREE.Mesh(footGeo, mouldMat)); f.position.set(sx * (HW - 3), sy * (HH - 1), legTop - legH + 0.6);
+    legs.push(l, f);
   }
   for (const c of backstopColliders(world, FELT_Z)) registerCollider(c);   // nothing leaves the table area even on a jump
 
@@ -291,7 +294,7 @@ function build() {
   sunLight.shadow.camera.near = R * 1.04; sunLight.shadow.camera.far = 14;
   sunLight.shadow.bias = -0.001; sunLight.shadow.normalBias = 0.025;
 
-  tableFinish = { felt: feltMat, wood: [slabWood, railLong, railShort, apronWood, apronWoodEnd, legWood], trim: mouldMat, shade: shade.material };
+  tableFinish = { felt: feltMat, wood: [slabWood, railLong, railShort, apronWood, apronWoodEnd, legWood], trim: mouldMat, shade: shade.material, legs };
   tableLights = [area, spot];
   tableFinish.original = { felt: feltMat.map, wood: tableFinish.wood.map(material => material.map), lights: tableLights.map(light => light.color.clone()), intensities: tableLights.map(light => light.intensity) };
 
