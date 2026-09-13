@@ -175,7 +175,30 @@ button:disabled { opacity: .45; cursor: default; }
 .replay-actions { flex-wrap: wrap; }
 .replay-heading { justify-content: space-between; }
 .replay-heading strong { color: var(--accent); font-size: var(--t-body); }
-#replay-seek { display: block; width: 100%; height: 32px; margin: var(--s2) 0; accent-color: var(--accent); }
+#replay-seek {
+  --seek-thumb: 32px; --seek-padding: 6px;
+  display: block; width: 100%; height: 48px; margin: var(--s2) 0; padding: 0;
+  appearance: none; -webkit-appearance: none; background: transparent;
+  touch-action: none; cursor: ew-resize; accent-color: var(--accent);
+}
+#replay-seek::-webkit-slider-runnable-track { height: 8px; border-radius: var(--r-pill); background: #ffffff40; }
+#replay-seek::-moz-range-track { height: 8px; border-radius: var(--r-pill); background: #ffffff40; }
+/* The transparent border is part of the draggable thumb: a generous hit area
+   around the visible grip, without covering the timeline with a giant knob. */
+#replay-seek::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none; box-sizing: border-box;
+  width: var(--seek-thumb); height: var(--seek-thumb); margin-top: calc((8px - var(--seek-thumb)) / 2);
+  border: var(--seek-padding) solid transparent; border-radius: 50%;
+  background: var(--accent); background-clip: padding-box;
+}
+#replay-seek::-moz-range-thumb {
+  box-sizing: border-box; width: var(--seek-thumb); height: var(--seek-thumb);
+  border: var(--seek-padding) solid transparent; border-radius: 50%;
+  background: var(--accent); background-clip: padding-box;
+}
+@media (max-width: 900px), (pointer: coarse) {
+  #replay-seek { --seek-thumb: 44px; --seek-padding: 8px; height: 56px; }
+}
 #replay-speed { padding: var(--s2); border: 1px solid var(--edge); border-radius: var(--r-sm); background: var(--panel-solid); color: var(--ink); }
 #replay-clock { margin-left: auto; color: var(--ink-dim); font-size: var(--t-micro); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .replaying .bottom-hud > :not(#replay-controls) { display: none !important; }
