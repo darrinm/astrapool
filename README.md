@@ -7,19 +7,14 @@ release. Rack the planets, a standard set, or faces.
 
 ![A pool table in an orbital lounge, racked with the planets and broken with a glowing Sun for a cue ball.](public/og.jpg)
 
-[three.js](https://threejs.org) and [Rapier](https://rapier.rs), served from a Cloudflare Worker.
-
-The table steps at 480 Hz; `RATE=120 npm run physics-test` shows the losses at coarser steps that
-led to that rate. The felt is a triangle mesh with six real holes and wells underneath, so a ball
-drops into a pocket instead of vanishing at the lip. `physics/validate.mjs` checks 26 results
-against closed-form answers, including the 90° and 30° rules, cushion rebound, tunnelling and
-determinism. One known deviation: heavy topspin into a rail rebounds livelier than on a real table.
-
-The Hard opponent does not fudge its aim. It searches a copy of the live physics world and plays
-under the same spin and 24 mph power limits you do.
-
-It works on a phone. Portrait turns the table lengthwise and starts overhead, with the controls
-off the felt.
+- **Four ways to play:** local two-player 8-ball, computer opponents, private online games by link, and Free Play.
+- **Four computer styles:** Easy, Medium, Hard, and Tricky, which hunts for high-scoring trick shots with visible thinking previews.
+- **Real pool physics:** control power, follow, draw, and sidespin on a full 3D table.
+- **Arcade scoring and effects:** earn bonuses for banks, kicks, combinations, and more; replay your last shot.
+- **Planets and places:** rack the solar system or classic balls in nine rooms, from a corner bar to an orbital lounge.
+- **Desktop and mobile:** orbit and zoom with mouse or touch; no install or account required.
+- **Attract mode:** watch Tricky play solo while the camera circles the table.
+- **Stack:** [three.js](https://threejs.org), [Rapier](https://rapier.rs), and Vite, hosted on Cloudflare Workers.
 
 ## Playing
 
