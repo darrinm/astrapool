@@ -1,3 +1,5 @@
+import { rememberGameChoice } from './room-navigation.js';
+
 const VERSION = 2;
 const AIM_SEND_INTERVAL = 25, AIM_BLEND_TIME = 40;
 export function roomToken() {
@@ -29,6 +31,7 @@ export class OnlineRoom {
   join(id) {
     this.leave(); this.id = id; this.retry = 0;
     history.replaceState(null, '', `#room=${id}`);
+    rememberGameChoice('online', id);
     const key = `pool.room.${id}`;
     this.token = sessionStorage.getItem(key) || roomToken(); sessionStorage.setItem(key, this.token);
     this.connect();
