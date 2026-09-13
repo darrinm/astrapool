@@ -6,6 +6,13 @@ export function connectWelcome(game) {
   // Every fresh local startup gets the demo, including returning visitors.
   if (game.matchState().mode === 'online') return;
 
+  // Keep the same settings button interactive inside the modal's top layer.
+  const settings = document.getElementById('open-settings');
+  const settingsHome = settings.parentElement;
+  welcome.append(settings);
+  const openSettings = () => dismiss(null);
+  settings.addEventListener('click', openSettings, { capture: true });
+
   const controls = game.controls();
   const canvas = controls?.domElement;
   const surface = welcome.querySelector('.welcome-camera');
@@ -37,6 +44,8 @@ export function connectWelcome(game) {
   function dismiss(mode) {
     if (done) return;                       // close() re-enters through the close event
     done = true;
+    settings.removeEventListener('click', openSettings, true);
+    settingsHome.append(settings);
     clearTimeout(resumeOrbit);
     if (controls) {
       // Escape can close the dialog during a drag. Finish those pointers before

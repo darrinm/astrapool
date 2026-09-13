@@ -92,6 +92,25 @@ export function radialShadow(size = 128) {
   return new THREE.CanvasTexture(c);
 }
 
+// A softly blurred rectangular silhouette, baked once instead of rendering an
+// extra shadow pass. The plane needs four blur widths of padding on each side.
+export function softBoxShadow(width, height, blur, size = 512) {
+  const data = new Uint8Array(size * size * 4);
+  const profile = length => Float32Array.from({ length: size }, (_, i) => {
+    const p = ((i + 0.5) / size - 0.5) * (length + blur * 8);
+    // Smooth approximation to the integrated Gaussian across the silhouette.
+    return 0.5 * (Math.tanh((p + length / 2) / blur) - Math.tanh((p - length / 2) / blur));
+  });
+  const x = profile(width), y = profile(height);
+  for (let row = 0; row < size; row++) for (let col = 0; col < size; col++) {
+    data[(row * size + col) * 4 + 3] = Math.round(255 * x[col] * y[row]);
+  }
+  const map = new THREE.DataTexture(data, size, size);
+  map.magFilter = THREE.LinearFilter; map.minFilter = THREE.LinearMipmapLinearFilter;
+  map.generateMipmaps = true; map.anisotropy = 8; map.needsUpdate = true;
+  return map;
+}
+
 // One-directional dark-to-clear gradient (alpha), for occlusion strips where rails meet the felt.
 export function gradientStrip(size = 64) {
   const c = document.createElement('canvas'); c.width = size; c.height = 4;

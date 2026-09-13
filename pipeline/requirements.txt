@@ -1,3 +1,4 @@
 fal-client
 httpx
 numpy
+Pillow

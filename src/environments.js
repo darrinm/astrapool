@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GroundedSkybox } from 'three/addons/objects/GroundedSkybox.js';
-import { carpetMap, radialShadow } from './textures.js';
+import { carpetMap, radialShadow, softBoxShadow } from './textures.js';
 
 export const ENVIRONMENTS = [
   { id: 'minimal', name: 'Minimal', time: 'ORIGINAL', description: 'Green felt, dark walnut, a quiet room. Just you and the table.', sky: '#0a0a0d', hemi: 0.12, exposure: 0.9 },
@@ -23,6 +23,7 @@ export function readEnvironment(storage) {
 // room visible until ready, then swaps atomically; stale requests can be disposed.
 const assets = {
   panorama: url => new THREE.TextureLoader().loadAsync(url),
+  shadow: url => new THREE.TextureLoader().loadAsync(url),
   furniture: async url => {
     const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
     return (await new GLTFLoader().loadAsync(url)).scene;
@@ -33,6 +34,7 @@ export function buildEnvironment(theme, floorZ, loaders = assets) {
   const group = new THREE.Group(); group.name = `environment-${theme.id}`;
   const materials = new Set(), geometries = new Set(), maps = new Set();
   let disposed = false;
+  const mobile = globalThis.matchMedia?.('(max-width: 600px), (hover: none) and (pointer: coarse)').matches;
   function own(root) {
     root.traverse(object => {
       if (object.geometry) geometries.add(object.geometry);
@@ -47,6 +49,24 @@ export function buildEnvironment(theme, floorZ, loaders = assets) {
     const item = new THREE.Mesh(geometry, material); item.position.set(x, y, z);
     group.add(own(item)); return item;
   }
+  function tableShadows() {
+    const floating = theme.id === 'orbital';
+    const blur = floating ? 6 : 3.5, width = 88, height = 50;
+    const contact = mesh(
+      new THREE.PlaneGeometry(width + blur * 8, height + blur * 8),
+      new THREE.MeshBasicMaterial({ map: softBoxShadow(width, height, blur, mobile ? 256 : 512), transparent: true, opacity: floating ? 0.48 : 0.315, depthWrite: false, toneMapped: false }),
+      0, 0, floorZ + 0.02,
+    );
+    contact.name = 'table-floor-shadow'; contact.renderOrder = -1; contact.raycast = () => {};
+    if (floating) return;
+    // Match the actual foot blocks at (HW - 3, HH - 1), rather than a generic oval.
+    const geometry = new THREE.PlaneGeometry(10, 10);
+    const material = new THREE.MeshBasicMaterial({ map: softBoxShadow(3.6, 3.6, .8, 64), transparent: true, opacity: .465, depthWrite: false, toneMapped: false });
+    for (const x of [-36, 36]) for (const y of [-18.5, 18.5]) {
+      const foot = mesh(geometry, material, x, y, floorZ + .03);
+      foot.name = 'table-foot-shadow'; foot.raycast = () => {};
+    }
+  }
   function release() {
     geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); maps.forEach(t => t.dispose());
     geometries.clear(); materials.clear(); maps.clear();
@@ -59,6 +79,7 @@ export function buildEnvironment(theme, floorZ, loaders = assets) {
     // Preserve the original room, including its texture and lighting conventions.
     const floor = mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshStandardMaterial({ map: carpetMap(512, 30, '#121014'), roughness: 1 }), 0, 0, floorZ);
     floor.receiveShadow = true;
+    tableShadows();
     const wall = new THREE.MeshStandardMaterial({ color: '#121116', roughness: 1, side: THREE.DoubleSide });
     const base = new THREE.MeshStandardMaterial({ color: '#0d0c0f', roughness: 0.7 });
     const wallGeometry = new THREE.PlaneGeometry(320, 140), baseGeometry = new THREE.BoxGeometry(320, 0.6, 2.2);
@@ -74,9 +95,11 @@ export function buildEnvironment(theme, floorZ, loaders = assets) {
   room.ready = Promise.allSettled([
     loaders.panorama(`/environments/${theme.id}.webp`),
     loaders.furniture(`/environments/${theme.id}-furniture.glb`),
-  ]).then(([image, model]) => {
+    loaders.shadow?.(`/environments/${theme.id}-shadows${mobile ? '-mobile' : ''}.png`),
+  ]).then(([image, model, shadow]) => {
     if (image.status === 'fulfilled') maps.add(image.value);
     if (model.status === 'fulfilled') own(model.value);
+    if (shadow.status === 'fulfilled' && shadow.value) maps.add(shadow.value);
     if (disposed) { release(); return; }
     const failure = [image, model].find(item => item.status === 'rejected');
     if (failure) { room.dispose(); throw failure.reason; }
@@ -93,8 +116,22 @@ export function buildEnvironment(theme, floorZ, loaders = assets) {
     sky.raycast = () => {};
     group.add(sky);
 
-    const contact = mesh(new THREE.PlaneGeometry(118, 74), new THREE.MeshBasicMaterial({ map: radialShadow(), transparent: true, opacity: 0.4, depthWrite: false }), 0, 0, floorZ + 0.02);
-    contact.renderOrder = -1;
+    // The photographic floor cannot receive shadow maps. Overlay the static
+    // silhouettes here while the existing scene lights handle dynamic shadows.
+    tableShadows();
+    if (shadow.status === 'fulfilled' && shadow.value) {
+      shadow.value.anisotropy = 8;
+      // Atlas bounds in meters: [-1.8, .8] to [4, 3.7]; see shadows.py.
+      const floorShadow = mesh(new THREE.PlaneGeometry(5.8 / .026, 2.9 / .026), new THREE.MeshBasicMaterial({ map: shadow.value, transparent: true, opacity: .75, depthWrite: false, toneMapped: false }), 1.1 / .026, 2.25 / .026, floorZ + .025);
+      floorShadow.name = 'furniture-floor-shadow'; floorShadow.renderOrder = -1;
+      floorShadow.raycast = () => {};
+    } else {
+      // A failed cosmetic download must not keep the room from loading.
+      const contactMap = radialShadow();
+      for (const [x, y, w, h] of [[.35, 2.15, 2, .9], [-.95, 2.15, .8, .8], [2.7, 1.75, .85, .85]]) {
+        mesh(new THREE.PlaneGeometry(w / .026, h / .026), new THREE.MeshBasicMaterial({ map: contactMap, transparent: true, opacity: .225, depthWrite: false }), x / .026, y / .026, floorZ + .03);
+      }
+    }
 
     const furniture = model.value;
     furniture.rotation.x = Math.PI / 2; furniture.scale.setScalar(1 / 0.026); furniture.position.z = floorZ;
@@ -112,12 +149,7 @@ export function buildEnvironment(theme, floorZ, loaders = assets) {
     const fill = new THREE.DirectionalLight(theme.id === 'corner' ? '#ffdaad' : theme.lamp, theme.fill ?? (theme.id === 'desert' ? 1.6 : 1.1));
     fill.position.set(-100, -70, floorZ + 160); fill.target.position.set(0, 0, floorZ);
     group.add(fill, fill.target);
-    // Contact under the Blender bench, pedestal and planter; these remain cheap
-    // and stable when the shadow-casting table light does not reach the room edges.
-    const footShadows = theme.id === 'orbital' ? [] : [-.936, .936].flatMap(x => [-.481, .481].map(y => [x, y, .24, .24]));
-    for (const [x, y, w, h] of [[.35, 2.15, 2, .9], [-.95, 2.15, .8, .8], [2.7, 1.75, .85, .85], ...footShadows]) {
-      mesh(new THREE.PlaneGeometry(w / .026, h / .026), new THREE.MeshBasicMaterial({ map: contact.material.map, transparent: true, opacity: .3, depthWrite: false }), x / .026, y / .026, floorZ + .03);
-    }
+
   });
   return room;
 }

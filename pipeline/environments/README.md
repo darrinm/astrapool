@@ -1,7 +1,7 @@
 # Pool room art
 
 The eight optional rooms use production assets rather than runtime canvas illustrations.
-Minimal keeps its original code, textures, lighting, and silence.
+Minimal keeps its original textures and lighting, with shared table and foot contact shadows.
 
 - `prompts.json`: exact prompts used with the built-in image generation tool.
 - `*.blend`: editable furniture scenes for all eight optional rooms.
@@ -96,3 +96,31 @@ existing 3D furniture and palm remain. `glasshouse-floor-seam-edit` records the
 follow-up that softens floor joints to reduce the visible panoramic wrap.
 The edit uses the same Topaz upscale and
 4096 × 2048 / 640 × 320 WebP outputs as the other room assets.
+
+### Floor shadows
+
+`shadows.py` projects the actual shipped furniture triangles onto the floor. Three
+height bands keep feet and bases tight while seats, backs, foliage and taller
+objects cast softer shadows. Each room has its own fill direction and softness;
+photographed scenery retains the shadows already in the panorama. The overlays
+are static, so no extra per-frame shadow rendering is needed.
+
+After rebuilding any furniture, regenerate the overlays from the repository root:
+
+```sh
+python3 -m pip install -r pipeline/requirements.txt
+python3 pipeline/environments/shadows.py
+# Or rebuild selected rooms:
+python3 pipeline/environments/shadows.py orbital coast
+```
+
+This is an entirely local bake; it uses Pillow and NumPy and makes no API calls.
+`*-shadows.png` is 2048 × 1024, with a 1024 × 512 `*-shadows-mobile.png` variant.
+Only the active room's overlay loads, and its texture is disposed with the room.
+Atlas bounds are shared with `src/environments.js`; keep them synchronized if the
+furniture moves outside the current bounds. Missing overlays fall back to the
+old soft contact patches without blocking the room.
+
+The pool table uses a procedural soft rectangular shadow in every room, plus
+four smaller foot shadows for grounded tables. Orbital omits the feet and uses
+a broader, softer silhouette to show the hovering gap.
