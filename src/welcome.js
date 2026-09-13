@@ -1,3 +1,5 @@
+import { connectPointerInput } from './pointer-input.js';
+
 export function connectWelcome(game) {
   const welcome = document.getElementById('welcome');
   // Online startup restores the player's seat and table (or waits for that state).
@@ -7,9 +9,7 @@ export function connectWelcome(game) {
   const controls = game.controls();
   const canvas = controls?.domElement;
   const surface = welcome.querySelector('.welcome-camera');
-  const pointers = new Set();
-  const trackPointer = event => pointers.add(event.pointerId);
-  const releasePointer = event => pointers.delete(event.pointerId);
+  let disconnectInput;
   const drift = !matchMedia('(prefers-reduced-motion: reduce)').matches;
   let done = false;
   let resumeOrbit;
@@ -27,9 +27,7 @@ export function connectWelcome(game) {
     // The modal makes the canvas inert. Receive camera gestures on a sibling
     // of the choices so buttons keep their normal pointer and keyboard behavior.
     controls.connect(surface);
-    surface.addEventListener('pointerdown', trackPointer);
-    surface.addEventListener('pointerup', releasePointer);
-    surface.addEventListener('pointercancel', releasePointer);
+    disconnectInput = connectPointerInput(surface, null, controls);
     controls.autoRotate = drift;
     controls.autoRotateSpeed = 0.35;
     controls.addEventListener('start', pauseOrbit);
@@ -43,10 +41,7 @@ export function connectWelcome(game) {
     if (controls) {
       // Escape can close the dialog during a drag. Finish those pointers before
       // reconnecting so OrbitControls cannot carry a held gesture into the game.
-      for (const pointerId of pointers) surface.dispatchEvent(new PointerEvent('pointercancel', { pointerId }));
-      surface.removeEventListener('pointerdown', trackPointer);
-      surface.removeEventListener('pointerup', releasePointer);
-      surface.removeEventListener('pointercancel', releasePointer);
+      disconnectInput();
       controls.autoRotate = false;
       controls.removeEventListener('start', pauseOrbit);
       controls.removeEventListener('end', scheduleOrbit);
