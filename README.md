@@ -17,6 +17,8 @@ release. Rack the planets, a standard set, or faces.
 - **Attract mode:** watch Tricky play solo while the camera circles the table.
 - **Stack:** [three.js](https://threejs.org), [Rapier](https://rapier.rs), and Vite, hosted on Cloudflare Workers.
 
+**[Watch the 49-second action trailer](pipeline/trailer/astra-pool-trailer.mp4?raw=true)** · [Edit or reproduce it](pipeline/trailer/README.md)
+
 ## Playing
 
 Four modes: **Local 8-ball** (two people, one device), **Vs Computer**, **Play a Friend** (a

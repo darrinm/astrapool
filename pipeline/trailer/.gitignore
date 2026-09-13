@@ -1,0 +1,7 @@
+# Rebuilds and intermediates; the delivered video and clean footage are tracked.
+action/render/
+action/capture.html
+action/mobile.html
+action/pool-capture.js
+action/searches.json
+*.log
