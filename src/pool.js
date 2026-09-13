@@ -845,6 +845,7 @@ function endDrag(fling = false) {
   dragging = null; controls.enabled = true; updateGestureControls();
 }
 function updateGestureControls() {
+  document.getElementById('hud').classList.toggle('aiming', !!aiming && !computerTurn());
   document.getElementById('cancel-gesture').hidden = !(placing || dragging || (aiming && !computerTurn()));
   syncReplayButton();
 }
