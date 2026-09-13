@@ -24,7 +24,17 @@ test('replay controls move only clones and restore live render layers without di
   view.start(clip, [{ number: 0, mesh: live }]);
   assert.equal(live.layers.mask, 0); assert.equal(child.layers.mask, 0);
   assert.equal(view.balls[0].mesh.visible, true, 'a potted ball appears at its recorded position');
-  const seek = elements.get('replay-seek'); seek.value = '.5'; seek.events.input();
+  const seek = elements.get('replay-seek');
+  seek.events.pointerdown({ button: 2, isPrimary: true });
+  assert.equal(view.paused, false, 'right-click does not interrupt playback');
+  seek.events.pointerdown({ button: 0, isPrimary: false });
+  assert.equal(view.paused, false, 'an extra touch does not interrupt playback');
+  seek.events.pointerdown({ button: 0, isPrimary: true });
+  assert.equal(view.paused, true, 'grabbing the slider pauses before any input event');
+  view.lastFrame -= 100; view.frame();
+  assert.equal(view.time, 0, 'the playhead stays still under the finger');
+  assert.equal(elements.get('replay-play').textContent, 'Play');
+  seek.value = '.5'; seek.events.input();
   assert.equal(view.paused, true); assert.equal(view.balls[0].mesh.position.x, 5);
   const writesAtPause = controlWrites;
   for (let i = 0; i < 60; i++) view.frame();

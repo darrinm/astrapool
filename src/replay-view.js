@@ -31,6 +31,12 @@ export class ReplayView {
       if (this.time >= this.clip.duration) this.time = 0;
       this.paused = !this.paused; this.lastFrame = performance.now(); this.update();
     });
+    this.seek.addEventListener('pointerdown', event => {
+      if (!this.active || event.button !== 0 || event.isPrimary === false) return;
+      // Freeze the thumb immediately, before the native range changes value,
+      // so playback cannot move it away from a finger that is trying to grab it.
+      this.paused = true; this.update();
+    });
     this.seek.addEventListener('input', () => {
       this.time = Number(this.seek.value); this.paused = true; this.update();
     });
