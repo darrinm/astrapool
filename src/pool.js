@@ -26,7 +26,7 @@ import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
 import { inviteRoom, startupRoom, rememberGameChoice } from './room-navigation.js';
 import { GameplayAnalytics, sendGameAnalytics } from './game-analytics.js';
-import { groupLabel, playerName, playerText, turnStatus } from './match-copy.js';
+import { groupLabel, playerName, playerText, rackOutcome, turnStatus } from './match-copy.js';
 import { setOverheadCamera, withinCueTarget, setGuideLine } from './table-view.js';
 import { projectPocketTargets, pocketAtPointer, pocketTapMoved, completesPocketTap } from './pocket-call.js';
 import { rackPositions, canPlace } from './table-state.js';
@@ -648,7 +648,7 @@ function syncRackResults() {
   rackResultsView.update({ finished, free, winner: match.winner,
     names: free ? ['You'] : [0, 1].map(p => playerName(p, gameMode, online.seat)), state: arcade.state,
     results: rackResults, arcade: arcade.hud.enabled, replaying: replayView.active,
-    outcome: free ? `Cleared in ${shots} ${shots === 1 ? 'shot' : 'shots'}.` : playerText(match.lastShot || '', gameMode, online.seat) });
+    outcome: free ? `Cleared in ${shots} ${shots === 1 ? 'shot' : 'shots'}.` : playerText(rackOutcome(match), gameMode, online.seat) });
   document.getElementById('rematch').hidden = !finished;
   if (gameMode !== 'online') document.getElementById('rematch').textContent = free ? 'Play again' : 'Rematch';
 }

@@ -19,9 +19,12 @@ export class RackResultsView {
     if (signature === this.signature) return;
     const first = !this.signature;
     this.signature = signature;
-    document.getElementById('results-title').textContent = free ? 'Table cleared!' : names[winner] === 'You' ? 'You won the rack!' : `${names[winner]} wins the rack!`;
-    document.getElementById('results-context').textContent = !state ? 'Rack complete · highlights unavailable' : results.complete ? 'Rack complete' : 'Highlights since joining · earlier shots unavailable';
+    document.getElementById('results-title').textContent = free ? 'Table cleared!' : names[winner] === 'You' ? 'You win!' : `${names[winner]} wins!`;
+    const context = document.getElementById('results-context');
+    context.textContent = !state ? 'Highlights unavailable' : results.complete ? '' : 'Highlights since joining · earlier shots unavailable';
+    context.hidden = !context.textContent;
     document.getElementById('results-outcome').textContent = outcome;
+    document.getElementById('results-outcome').hidden = !outcome;
     const scores = document.getElementById('results-scores');
     scores.hidden = !arcade || !state;
     scores.replaceChildren(...names.slice(0, free ? 1 : 2).map((name, p) => {

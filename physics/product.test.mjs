@@ -3,10 +3,28 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import assert from 'node:assert/strict';
 import { newMatch, resolveShot, shotRecord } from '../src/eight-ball.js';
-import { groupLabel, playerText } from '../src/match-copy.js';
+import { groupLabel, playerText, rackOutcome } from '../src/match-copy.js';
 import { overheadDistance, setOverheadCamera, withinCueTarget } from '../src/table-view.js';
 import { placeCue } from '../server/protocol.js';
 import { rackPositions } from '../src/table-state.js';
+
+test('rack results omit routine wins but retain the cause of an unusual loss', () => {
+  const before = { ...newMatch(), breaking: false, groups: ['solids', 'stripes'], down: [1, 2, 3, 4, 5, 6, 7] };
+  const shot = { ...shotRecord(0), first: 8, pocketed: [{ number: 8, pocket: 0 }] };
+  assert.equal(rackOutcome(resolveShot(before, shot).state), '');
+  assert.equal(rackOutcome(newMatch()), '');
+  for (const [state, attempt, expected] of [
+    [before, { ...shot, pocketed: [...shot.pocketed, { number: 0, pocket: 1 }] }, 'Cue ball scratched or left the table.'],
+    [before, { ...shot, calledPocket: 2 }, '8-ball went into an uncalled pocket.'],
+    [{ ...before, down: [] }, { ...shot, first: 1 }, '8-ball pocketed early.'],
+    [before, { ...shot, first: 9 }, 'Wrong ball hit first.'],
+    [before, { ...shot, pocketed: [], offTable: [8] }, 'Object ball left the table.'],
+  ]) {
+    const text = rackOutcome(resolveShot(state, attempt).state);
+    assert.equal(text, expected);
+    assert.doesNotMatch(text, /wins|Player/);
+  }
+});
 
 test('break feedback explains a pot without implying group assignment or a rack win', () => {
   const state = resolveShot(newMatch(), { ...shotRecord(), first: 6, pocketed: [{ number: 6, pocket: 0 }] }).state;
