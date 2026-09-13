@@ -270,6 +270,7 @@ button:disabled { opacity: .45; cursor: default; }
 #welcome { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: 0; color: var(--ink); background: none; }
 /* Keep the demo at normal brightness; the gradient below carries the words. */
 #welcome::backdrop { background: transparent; }
+.welcome-camera { position: absolute; inset: 0; }
 /* The solo demo needs no scoreboard or playing controls behind the title. */
 body:has(#welcome[open]) #hud { visibility: hidden; }
 .welcome-heading { position: absolute; inset: 0 0 auto; z-index: 3; padding: max(var(--s5), env(safe-area-inset-top)) var(--s4) var(--s6); text-align: center; background: linear-gradient(#0b090899, #0b090800); pointer-events: none; }
