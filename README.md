@@ -46,8 +46,9 @@ escapes, power and spin in a copy of the live world, rejects scratches and early
 next shot against a defensive leave, searches ball-in-hand placements, and calls the 8. It adds no
 random aiming error, and searches in a background worker so the table stays responsive.
 
-Tricky is the default. It plays for arcade points, searching banks, kicks, combinations and caroms, checking the
-margin for error and the next scoring chance. Its practice paths show projected points. The
+Tricky is the default. It prefers reliable trick shots, then maximizes arcade points among them.
+It searches banks, kicks, combinations and caroms, checks the margin for error, and looks ahead
+for its next trick. Simple pots remain a fallback when the tricks are too risky. Its practice paths show projected points. The
 welcome demo uses Tricky to play solo with these same thinking previews. The
 in-game Help includes the expanded bonus table; [Tricky mode](docs/tricky-mode.md) describes
 the scoring evidence and search limits.
