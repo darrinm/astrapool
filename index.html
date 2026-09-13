@@ -56,12 +56,25 @@
       <header class="topbar">
         <div class="brand"><span class="brand-ball" aria-hidden="true">8</span><span>Astra Pool</span></div>
         <div class="play-status">
-          <button id="open-match" class="match-summary" aria-haspopup="dialog" aria-controls="hud-sheet" aria-label="Match details"><span id="match-summary-text"></span><span class="summary-label" aria-hidden="true">Details</span></button>
+          <div class="score-header">
+          <div id="free-score" class="scoreboard" aria-label="Game score">
+            <div><span class="eyebrow">Pocketed</span><span class="score"><b id="pocketed-count">0</b><span> / 15</span></span></div>
+            <div><span class="eyebrow">Shots</span><b id="shot-count" class="score">0</b></div>
+            <div id="arcade-free" hidden><span class="eyebrow">Arcade</span><strong>0</strong><span class="arcade-multiplier">×1</span></div>
+          </div>
+          <div id="match-score" class="match-score" aria-label="Match score">
+            <div id="player-0" class="player-card"><div class="player-heading"><strong class="player-name">Player 1</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
+            <span class="versus"><strong>8-ball</strong><span>Racks won</span></span>
+            <div id="player-1" class="player-card"><div class="player-heading"><strong class="player-name">Player 2</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
+          </div>
+            <button id="open-match" class="score-details" aria-haspopup="dialog" aria-controls="hud-sheet" aria-label="Show shot details" title="Show shot details"></button>
+          </div>
           <div class="turn-controls">
             <div class="guidance" role="status" aria-atomic="true"><div id="status"></div><p id="hint"></p></div>
             <button id="open-room" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Room</button>
             <button id="cancel-gesture" class="quiet-button" hidden>Cancel</button>
           </div>
+          <div id="shot-feedback" class="shot-feedback" role="status" aria-atomic="true" hidden></div>
         </div>
         <div class="utilities">
           <button id="sound" data-sound-toggle class="quiet-button icon-button" aria-pressed="true" aria-label="Sound on" title="Toggle sound (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z"/><path class="wave" d="M15.5 9.2a4 4 0 0 1 0 5.6"/><path class="wave" d="M18.2 6.6a7.7 7.7 0 0 1 0 10.8"/></svg><span data-sound-state hidden>on</span></button>
@@ -104,16 +117,6 @@
       <div id="sheet-content">
 
         <section id="panel-match" hidden>
-          <div id="free-score" class="scoreboard" aria-label="Game score">
-            <div><span class="eyebrow">Pocketed</span><span class="score"><b id="pocketed-count">0</b><span> / 15</span></span></div>
-            <div><span class="eyebrow">Shots</span><b id="shot-count" class="score">0</b></div>
-            <div id="arcade-free" hidden><span class="eyebrow">Arcade</span><strong>0</strong><span class="arcade-multiplier">×1</span></div>
-          </div>
-          <div id="match-score" class="match-score" aria-label="Match score">
-            <div id="player-0" class="player-card"><div class="player-heading"><strong class="player-name">Player 1</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
-            <span class="versus"><strong>8-ball</strong><span>Racks won</span></span>
-            <div id="player-1" class="player-card"><div class="player-heading"><strong class="player-name">Player 2</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
-          </div>
           <div id="shot-result" class="shot-result" hidden><span class="eyebrow">Last shot</span><p id="shot-result-text"></p><p id="arcade-receipt" hidden></p><p id="arcade-pending" hidden></p></div>
         </section>
 

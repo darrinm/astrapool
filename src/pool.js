@@ -36,6 +36,7 @@ import { ShotReplay } from './replay.js';
 import { ReplayView } from './replay-view.js';
 import { RackResults } from './rack-results.js';
 import { RackResultsView } from './rack-results-view.js';
+import { ShotFeedback } from './shot-feedback.js';
 import { blackHoleGravity } from '../physics/black-hole-gravity.js';
 import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
 
@@ -624,6 +625,7 @@ const replay = new ShotReplay();
 const replayView = new ReplayView({ scene, exit: () => stopReplay(true) });
 const rackResults = new RackResults();
 const rackResultsView = new RackResultsView();
+const shotFeedback = new ShotFeedback(document.getElementById('shot-feedback'), document.getElementById('shot-result'));
 let replayingBest = false;
 function syncRackResults() {
   if (!attractMode) rackResults.observe(arcade.state, replay.last);
@@ -1109,13 +1111,9 @@ function updateScore() {
   const lastShot = free ? '' : playerText(match.lastShot || '', gameMode, online.seat);
   const arcadeVisible = arcade.update();
   document.getElementById('shot-result').hidden = !lastShot && !arcadeVisible;
+  document.getElementById('open-match').disabled = !lastShot && !arcadeVisible;
   const resultText = document.getElementById('shot-result-text');
   if (resultText.textContent !== lastShot) resultText.textContent = lastShot;
-  const summary = document.getElementById('open-match');
-  const scoreText = free ? `${pocketed} / 15 · ${shots} shots` :
-    [0, 1].map(i => `${playerName(i, gameMode, online.seat)} ${match.wins[i]}`).join(' · ');
-  document.getElementById('match-summary-text').textContent = scoreText;
-  summary.setAttribute('aria-label', `${free ? 'Game' : 'Match'} details: ${scoreText}`);
   updateTurnStatus();
   if (overhead && !aiming) fitOverhead();
 }
@@ -1131,7 +1129,7 @@ function updateTurnStatus() {
   const pocketName = calledPocket === null ? '' :
     pocketTargets[calledPocket]?.name;
   const state = free ? {
-    title: rackMotion ? 'Racking…' : pocketed === 15 ? 'Table cleared!' : 'Free Play',
+    title: '',
     detail: rackMotion || pocketed === 15 ? '' : interactionMode === 'fling' ? 'Drag a ball to fling or place it' :
       cueLearned ? '' : 'Pull back from the cue ball. Release to shoot.',
     active: false,
@@ -1500,6 +1498,7 @@ export default {
     for (const ball of extras) classicMaterials.delete(ball);
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     hudObserver?.disconnect(); hudObserver = null;
+    shotFeedback.clear();
     controls?.dispose(); controls = null; setLook(false);
     renderer.shadowMap.autoUpdate = true;
   },
@@ -1653,6 +1652,11 @@ export default {
     if (document.getElementById('hud-sheet').open) syncGravityToggle();
     controls?.update();
     animateRack();
+    if (!activeShot && !arcade.active && !(gameMode === 'online' && (online.pending || online.waiting))) {
+      shotFeedback.update(`${gameMode}:${online.id || ''}:${arcade.state?.rack ?? ''}`,
+        gameMode === 'free' ? arcade.state?.lastPlay || 0 : match.shots,
+        attractMode || !!rackMotion || replayView.active || document.hidden || !!document.querySelector('dialog[open]'));
+    }
     if (scene.fog && controls) {
       // A camera pulled back to fit the HUD must not lose the table in the fog.
       const retreat = Math.max(0, camera.position.distanceTo(controls.target) - 120);
