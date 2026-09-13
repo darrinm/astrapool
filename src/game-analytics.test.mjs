@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GameplayAnalytics, analyticsSettings } from './game-analytics.js';
+import { GameplayAnalytics, analyticsSettings, sendGameAnalytics } from './game-analytics.js';
 
 function fixture(send) {
   let time = 1700000000000, settings = { difficulty: 'tricky', room: 'orbital', sound: 'on' };
@@ -96,4 +96,19 @@ test('retired racks retry while no new game is selected and the outage buffer st
   const before = attempts.length; advance(30000); a.flush();
   assert.equal(attempts.length - before, 20);
   assert.ok(attempts.slice(-20).every(record => record.endReason === 'switch'));
+});
+
+test('a queued beacon stays pending until a later fetch confirms delivery', async t => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator'); let beacons = 0, requests = 0;
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { sendBeacon: () => { beacons++; return true; } } });
+  t.after(() => Object.defineProperty(globalThis, 'navigator', descriptor));
+  t.mock.method(globalThis, 'fetch', async () => { requests++; return { ok: true }; });
+  const settle = () => new Promise(resolve => setImmediate(resolve));
+  const { analytics: a, advance } = fixture(sendGameAnalytics);
+  a.select('computer'); a.shot(); await settle();
+  advance(1000); a.checkpoint(); a.flush(true, true); await settle();
+  assert.equal(beacons, 1); assert.equal(requests, 1); assert.equal(a.pending.size, 1);
+  assert.equal(a.dirty, true); // The tab can return from the background and confirm through fetch.
+  advance(30000); a.flush(); await settle();
+  assert.equal(requests, 2); assert.equal(a.pending.size, 0);
 });

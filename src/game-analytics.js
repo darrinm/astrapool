@@ -82,7 +82,7 @@ export class GameplayAnalytics {
     const complete = ok => {
       entry.inFlight = false;
       if (this.pending.get(record.id) !== entry) return; // A newer snapshot superseded this request.
-      if (ok) this.pending.delete(record.id);
+      if (ok === true) this.pending.delete(record.id);
       else if (this.record?.id === record.id) this.dirty = true;
     };
     // Failures stay outside gameplay. A later cumulative snapshot repairs a missed update.
@@ -94,7 +94,8 @@ export class GameplayAnalytics {
 
 export function sendGameAnalytics(record, beacon = false) {
   const body = JSON.stringify(record);
-  if (beacon && navigator.sendBeacon?.('/api/analytics/game', new Blob([body], { type: 'application/json' }))) return true;
+  // Queuing is not a server acknowledgement. A surviving page confirms this snapshot with fetch.
+  if (beacon && navigator.sendBeacon?.('/api/analytics/game', new Blob([body], { type: 'application/json' }))) return 'queued';
   return fetch('/api/analytics/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true })
     .then(response => response.ok).catch(() => false);
 }

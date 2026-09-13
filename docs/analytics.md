@@ -107,19 +107,24 @@ Local/computer/Free Play clients send a same-origin POST on the first shot and t
 plus cumulative updates at most every 30 seconds during play. Hiding or leaving the page flushes
 an update using `sendBeacon`. Unacknowledged updates for the most recent 20 racks remain in
 memory and retry every 30 seconds, including after a switch or restart. They are lost if the
-page is destroyed; a successful beacon only acknowledges browser queuing. Restoring a page from
+page is destroyed. A successful beacon only acknowledges browser queuing, so its record stays
+pending for a normal `fetch` to confirm delivery when the page survives. Restoring a page from
 the browser's back/forward cache preserves its rack. Normal refresh starts a fresh attract screen.
 
 Online records are created by the Durable Object after a validated shot. Changed snapshots are
 saved to a durable outbox before broadcasting, then delivery is explicitly awaited after the
 broadcast so database latency does not delay animation. Acknowledged versions are removed;
-failed records survive reconnects, hibernation and rematches and retry on activity or a one-minute
-alarm. The retry alarm preserves the separate 90-second shot timeout. An expired room is retained
-until all queued records have been delivered. Placements, ordinary results, rematch votes and
+failed records survive reconnects, hibernation and rematches. Failures back off from one minute
+to one hour; room activity and newer snapshots preserve that schedule. Records are discarded
+48 hours after their first-shot timestamp if they still cannot be delivered, with a warning in
+Worker logs. New snapshots cannot restart this deadline. The retry alarm preserves the separate
+90-second shot timeout. An expired room is retained until queued records are delivered or expire,
+then deleted. Placements, ordinary results, rematch votes and
 reconnects do not issue D1 writes unless a previous delivery still needs retrying.
 
 Delivery remains best effort for browser games: blocked requests, offline play or a killed tab
-can leave incomplete records. Database outages delay online records until retry succeeds.
+can leave incomplete records. Database outages delay online records until retry succeeds;
+records that reach their 48-hour delivery deadline can remain incomplete or absent in D1.
 
 A random UUID identifies a rack only. There are no visitor identifiers, analytics cookies,
 player names, room links, reconnect tokens, ball positions, or stored IP addresses. Settings

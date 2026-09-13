@@ -18,7 +18,7 @@ export class PoolRoom extends DurableObject {
     this.room = room;
   }
   #scheduleAlarm() {
-    return this.ctx.storage.setAlarm(roomAlarmTime(this.room, this.analytics.pending));
+    return this.ctx.storage.setAlarm(roomAlarmTime(this.room, this.analytics.nextAttempt));
   }
   async #flushAnalytics() {
     await this.analytics.flush();
