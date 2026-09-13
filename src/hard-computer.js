@@ -1,7 +1,7 @@
 import { P, pocketCenters } from '../physics/constants.js';
 import { targets } from './eight-ball.js';
 import { canPlace } from './table-state.js';
-import { clearPath, potOptions, computerShot } from './computer.js';
+import { clearPath, potOptions, computerShot, computerPlacement, executionError } from './computer.js';
 import { practiceTable, simulateShot } from './shot-simulation.js';
 const pockets = pocketCenters(), MAX_SPEED = 24 * 0.44704 / 0.026;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -118,7 +118,8 @@ export function hardComputerShot(balls, state, liveTable, onPreview, { maxMs = I
     evaluate(variation(fallback));
     const best = evaluated.toSorted((a, b) => b.score - a.score).slice(0, 6);
     for (const { shot } of best) {
-      for (const angle of [-0.012, -0.006, -0.0025, 0.0025, 0.006, 0.012]) evaluate(variation(shot, angle));
+      const angles = table.blackHoleGravity ? [-0.08, -0.04, -0.02, -0.012, -0.006, -0.0025, 0.0025, 0.006, 0.012, 0.02, 0.04, 0.08] : [-0.012, -0.006, -0.0025, 0.0025, 0.006, 0.012];
+      for (const angle of angles) evaluate(variation(shot, angle));
       for (const spin of [{ x: 0, y: -0.35 }, { x: 0, y: 0.35 }, { x: -0.3, y: 0 }, { x: 0.3, y: 0 }]) evaluate(variation(shot, 0, 1, spin));
     }
     if (!evaluated.some(e => e.score >= 4000)) {
@@ -130,7 +131,7 @@ export function hardComputerShot(balls, state, liveTable, onPreview, { maxMs = I
   for (const entry of finalists) {
     const { result, shot } = entry;
     if (available() && entry.score >= 4000 && entry.score < 100000 && !result.respot.length) {
-      const nextTable = practiceTable(result.balls);
+      const nextTable = practiceTable(result.balls, table);
       let continuation = -1000;
       for (const next of potOptions(result.balls, targets(result.state)).slice(0, 5)) {
         if (!available()) break;
@@ -150,4 +151,35 @@ export function hardComputerShot(balls, state, liveTable, onPreview, { maxMs = I
   }
   const best = finalists.sort((a, b) => b.score - a.score)[0];
   return { ...best.shot, evaluated: simulations, expected: { pocketed: best.result.report.pocketed, foul: best.result.state.ballInHand || best.result.rerack } };
+}
+
+// Easy and Medium keep their geometric choice and execution error, but rehearse
+// nearby angles/powers to compensate for gravity. No run-out or trick search.
+export function gravityComputerShot(balls, state, table, difficulty, onPreview, random = Math.random) {
+  let position, placed = balls;
+  if (state.ballInHand) {
+    position = computerPlacement(balls, state, p => canPlace(p, balls));
+    if (!position) for (let x = -P.HW + 2 * P.R; x < P.HW && !position; x += 3 * P.R)
+      for (let y = -P.HH + 2 * P.R; y < P.HH && !position; y += 3 * P.R) if (canPlace({ x, y }, balls)) position = { x, y };
+    if (!position) throw new Error('No legal cue-ball placement');
+    placed = balls.map(b => b.number === 0 ? { ...b, ...position } : b);
+  }
+  const base = { ...computerShot(placed, state, difficulty, () => 0.5), ...(position && { position }) };
+  let best, simulations = 0;
+  const evaluate = shot => {
+    const result = simulateShot(table, state, shot), score = value(result, state, shot);
+    simulations++;
+    if (!best || score > best.score) best = { shot, score };
+  };
+  evaluate(base);
+  for (const angle of [-0.16, -0.12, -0.08, -0.04, -0.02, 0, 0.02, 0.04, 0.08, 0.12, 0.16])
+    for (const power of [0.85, 1, 1.25, 1.5]) evaluate(variation(base, angle, power));
+  const coarse = best.shot;
+  for (const angle of [-0.01, -0.005, 0.005, 0.01]) evaluate(variation(coarse, angle));
+  const shot = executionError(best.shot, difficulty, random);
+  if (onPreview) {
+    const result = simulateShot(table, state, shot, true);
+    onPreview({ target: shot.target, pocket: shot.pocket, paths: result.paths });
+  }
+  return { ...shot, evaluated: simulations };
 }

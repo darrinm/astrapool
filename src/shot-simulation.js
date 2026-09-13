@@ -3,16 +3,17 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { P, pocketCenters, ballBody, feltCollider, cushionColliders, pocketWellColliders, backstopColliders, feltExtras, strike } from '../physics/poolphysics.js';
 import { shotRecord, resolveShot, resolveSoloShot } from './eight-ball.js';
 import { ArcadeEvents, EVENT } from './arcade-events.js';
+import { blackHoleGravity } from '../physics/black-hole-gravity.js';
 const pockets = pocketCenters();
 const zero = { x: 0, y: 0, z: 0 };
-export function practiceTable(balls) {
+export function practiceTable(balls, { blackHoleGravity = false } = {}) {
   const world = new RAPIER.World({ x: 0, y: 0, z: -P.G }); world.timestep = 1 / 480;
   try {
     feltCollider(world, 0); const cushions = cushionColliders(world, 0, true).map(c => c.handle);
     pocketWellColliders(world, 0); backstopColliders(world, 0);
     const handles = balls.map(b => ({ number: b.number, handle: ballBody(world, b.x, b.y, P.R, true).handle }));
     for (let i = 0; i < 120; i++) world.step();
-    return { snapshot: world.takeSnapshot(), handles, cushions, feltZ: 0 };
+    return { snapshot: world.takeSnapshot(), handles, cushions, feltZ: 0, blackHoleGravity };
   } finally { world.free(); }
 }
 export function simulateShot(table, state, shot, trace = false, { arcade = false, solo = false } = {}) {
@@ -77,6 +78,7 @@ export function simulateShot(table, state, shot, trace = false, { arcade = false
         if (body.isEnabled() && p.z >= table.feltZ) tracker.sample(number, p);
       }
       feltExtras(bodies, world.timestep, ballZ);
+      if (table.blackHoleGravity) blackHoleGravity(bodies, byNumber.get(8), world.timestep, ballZ);
       for (const { number, body } of balls) {
         if (!body.isEnabled()) continue;
         const p = body.translation(), down = p.z < table.feltZ - 1.5;
