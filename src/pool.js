@@ -22,6 +22,7 @@ import { trackShadowChanges } from './shadow-updates.js';
 import { buildEnvironment, environmentById, readEnvironment } from './environments.js';
 import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
+import { inviteRoom, startupRoom, rememberGameChoice } from './room-navigation.js';
 import { GameplayAnalytics, sendGameAnalytics } from './game-analytics.js';
 import { groupLabel, playerName, playerText, turnStatus } from './match-copy.js';
 import { setOverheadCamera, withinCueTarget, setGuideLine } from './table-view.js';
@@ -1183,7 +1184,8 @@ function startGame(mode, roomId = null) {
   gameplayAnalytics.select(mode);
   setAttract(false);
   stopReplay(); replay.reset();
-  online.leave(); history.replaceState(null, '', location.pathname);
+  rememberGameChoice(mode, roomId || online.id || inviteRoom(location.hash));
+  online.leave(); history.replaceState(null, '', location.pathname + location.search);
   gameMode = mode;
   arcade.onlineCreating = mode === 'online' && !roomId;
   document.getElementById('rematch').disabled = false; document.getElementById('rematch').textContent = 'Rematch'; match = newMatch(); layout(mode !== 'online' || !roomId);
@@ -1191,8 +1193,15 @@ function startGame(mode, roomId = null) {
   setInteractionMode('cue');
   return true;
 }
-function joinInvite() {
-  const roomId = /^#room=([0-9a-f-]{36})$/.exec(location.hash)?.[1];
+function initialRoom() {
+  return startupRoom(location.hash, {
+    navigationType: performance.getEntriesByType('navigation')[0]?.type,
+    standalone: navigator.standalone === true || matchMedia('(display-mode: standalone)').matches,
+  });
+}
+function joinInvite(event) {
+  const roomId = event ? inviteRoom(location.hash) : initialRoom();
+  if (!roomId && inviteRoom(location.hash)) history.replaceState(null, '', location.pathname + location.search);
   if (roomId && (gameMode !== 'online' || online.id !== roomId)) startGame('online', roomId);
 }
 function restart() {
@@ -1471,7 +1480,7 @@ export default {
     const initialEnvironment = environmentId;
     // Rack orientation must be ready before asynchronous room and map loading.
     rackStyle = initialEnvironment === 'orbital' ? 'planets' : 'balls';
-    build(); applyCaps(); layout(!/^#room=/.test(location.hash)); setupCamera(); setLook(true);
+    build(); applyCaps(); layout(!initialRoom()); setupCamera(); setLook(true);
     showGameControls(true); capsOn = true;
     setLoadingStage(2, 'Loading room…');
     const minimalReady = setEnvironment('minimal', initialEnvironment === 'minimal');
