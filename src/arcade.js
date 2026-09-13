@@ -156,7 +156,9 @@ export class PoolArcade {
     this.hud.record(this.state, this.category, c.mode === 'online' ? c.seat === null ? [] : [c.seat] : c.mode === 'computer' || c.mode === 'free' ? [0] : [0, 1]);
   }
   update() {
-    const visible = this.hud.update({ state: this.state, preview: this.preview, free: this.context().mode === 'free', category: this.category, waiting: !!this.pending, mixed: this.category === null });
+    const context = this.context();
+    const visible = this.hud.update({ state: this.state, preview: this.preview, free: context.mode === 'free', category: this.category, waiting: !!this.pending, mixed: this.category === null,
+      scope: `${context.mode}:${context.room || ''}`, silent: context.attract || !!document.querySelector('dialog[open]') });
     if (visible) document.getElementById('shot-result').hidden = false;
     return visible;
   }

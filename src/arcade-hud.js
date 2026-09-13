@@ -1,5 +1,7 @@
 import { arcadeSummary, multiplierFor } from './arcade-score.js';
 import { ARCADE_VERSION } from './arcade-events.js';
+import { ScoreCounter } from './score-counter.js';
+import { MultiplierBadge } from './multiplier-badge.js';
 
 function read(key, fallback) { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } }
 function write(key, value) { try { localStorage.setItem(key, value); } catch { /* Play works without storage. */ } }
@@ -22,9 +24,11 @@ export class ArcadeHud {
       const label = document.createElement('span'); label.textContent = 'Arcade';
       const total = document.createElement('strong'), streak = document.createElement('span'); streak.className = 'arcade-multiplier';
       row.append(label, total, streak); document.getElementById(`player-${i}`).append(row);
-      this.values.push({ row, total, streak });
+      this.values.push({ row, multiplier: new MultiplierBadge(streak), counter: new ScoreCounter(total) });
     }
     this.free = document.getElementById('arcade-free');
+    this.freeCounter = new ScoreCounter(this.free.querySelector('strong'));
+    this.freeMultiplier = new MultiplierBadge(this.free.querySelector('.arcade-multiplier'));
     this.toggle.addEventListener('click', () => this.setEnabled(!this.enabled));
     this.settings.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
       this.reduced = button.dataset.effects === 'reduced'; write('pool.arcade.effects', this.reduced ? 'reduced' : 'full'); this.changed();
@@ -48,16 +52,20 @@ export class ArcadeHud {
     const before = Number(read(key, '0')) || 0, best = Math.max(before, ...players.map(i => state.totals[i]));
     if (best > before) write(key, String(best));
   }
-  update({ state, preview, free, category, waiting = false, mixed = false }) {
+  update({ state, preview, free, category, waiting = false, mixed = false, scope = '', silent = false }) {
     const enabled = this.enabled;
+    const counterScope = `${scope}:${state?.rack ?? ''}`;
+    const animate = enabled && !this.reduced && !silent && !document.hidden;
     for (let i = 0; i < 2; i++) {
-      const { row, total, streak } = this.values[i]; row.hidden = !enabled || free;
-      setText(total, state ? state.totals[i].toLocaleString() : '—');
-      setText(streak, `×${multiplierFor(state?.streaks[i] || 0)}`);
+      const { row, counter, multiplier } = this.values[i]; row.hidden = !enabled || free;
+      counter.update(state?.totals[i] ?? null, counterScope, state?.lastPlay ?? 0, animate && !free);
+      multiplier.update(multiplierFor(state?.streaks[i] || 0), counterScope, state?.lastPlay ?? 0,
+        { visible: enabled && !free, reduced: this.reduced, silent: silent || document.hidden });
     }
     this.free.hidden = !enabled || !free;
-    setText(this.free.querySelector('strong'), state?.totals[0].toLocaleString() || '0');
-    setText(this.free.querySelector('.arcade-multiplier'), `×${multiplierFor(state?.streaks[0] || 0)}`);
+    this.freeCounter.update(state?.totals[0] ?? 0, counterScope, state?.lastPlay ?? 0, animate && free);
+    this.freeMultiplier.update(multiplierFor(state?.streaks[0] || 0), counterScope, state?.lastPlay ?? 0,
+      { visible: enabled && free, reduced: this.reduced, silent: silent || document.hidden });
     this.receipt.hidden = !enabled || !state?.last;
     setText(this.receipt, arcadeSummary(state?.last));
     this.pending.hidden = !enabled || !preview;

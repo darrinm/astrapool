@@ -16,6 +16,8 @@ import { ballSetById, nextBallSet, planetForBall } from './ball-sets.js';
 import { createPlanetSet, updatePlanetOrbits, updatePlanetCaps } from './planet-balls.js';
 import { updateSunLight } from './sun.js';
 import { TargetRings } from './target-rings.js';
+import { PlacementMarker } from './placement-marker.js';
+import { RuleFeedback } from './rule-feedback.js';
 import { buildBallSetPicker, updateBallSetPicker } from './ball-set-picker.js';
 import { PoolAudio } from './sounds.js';
 import { trackShadowChanges } from './shadow-updates.js';
@@ -38,7 +40,6 @@ import { ShotReplay } from './replay.js';
 import { ReplayView } from './replay-view.js';
 import { RackResults } from './rack-results.js';
 import { RackResultsView } from './rack-results-view.js';
-import { ShotFeedback } from './shot-feedback.js';
 import { blackHoleGravity } from '../physics/black-hole-gravity.js';
 import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
 
@@ -47,7 +48,7 @@ const MAX_PULL = 24, MAX_SPEED = 24 * 0.44704 / 0.026;   // 24 mph in game units
 const SPEED_PER_PULL = MAX_SPEED / MAX_PULL;
 const FELT_Z = -DEPTH, BALL_Z = FELT_Z + R;
 const RAIL_W = 3.2, WELL_DEPTH = P.WELL_DEPTH;
-let sunLight, targetRings;
+let sunLight, targetRings, placementMarker;
 let cue, aiming = null, pockets = [], guide, cueStick, marker, pocketed = 0, shots = 0, spin = { x: 0, y: 0 }, spinEl, controls;
 let lastViewport = { w: innerWidth, h: innerHeight }, refitPending = false;
 // The three framings resetView() knows about. A change of shape needs a fresh camera, not just a
@@ -189,6 +190,7 @@ async function setEnvironment(id, applyBallDefault = true) {
 // ---------- table ----------
 function build() {
   targetRings?.dispose();
+  placementMarker?.dispose();
   clearProps();
   const registerCollider = (c) => registerProp(c);
   const rules = { friction: RAPIER.CoefficientCombineRule.Max, restitution: RAPIER.CoefficientCombineRule.Min };
@@ -353,6 +355,7 @@ function build() {
   marker = addMesh(new THREE.Mesh(new THREE.RingGeometry(R * 1.3, R * 1.65, 48), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, depthWrite: false })));
   marker.visible = false;
   targetRings = addMesh(new TargetRings({ radius: R, feltZ: FELT_Z, numberOf }));
+  placementMarker = addMesh(new PlacementMarker(R, FELT_Z));
   pocketMarker = addMesh(new THREE.Mesh(new THREE.TorusGeometry(POCKET_R + 0.3, 0.12, 8, 48), new THREE.MeshBasicMaterial({ color: '#ffd27a', depthTest: false })));
   pocketMarker.visible = false;
 }
@@ -623,13 +626,13 @@ function lampRoom() {
 // ---------- sound ----------
 const audio = new PoolAudio();
 const arcade = new PoolArcade({ scene, camera, feltZ: FELT_Z, audio, spatial, refresh: updateScore,
-  context: () => ({ mode: gameMode, attract: attractMode, match, input: interactionMode, difficulty, calledPocket, pockets, seat: online.seat }) });
+  context: () => ({ mode: gameMode, room: online.id, attract: attractMode, match, input: interactionMode, difficulty, calledPocket, pockets, seat: online.seat }) });
 const computerThoughts = new ComputerThoughts({ scene, camera, feltZ: FELT_Z, settings: () => arcade.hud });
 const replay = new ShotReplay();
 const replayView = new ReplayView({ scene, exit: () => stopReplay(true) });
 const rackResults = new RackResults();
 const rackResultsView = new RackResultsView();
-const shotFeedback = new ShotFeedback(document.getElementById('shot-feedback'), document.getElementById('shot-result'));
+const ruleFeedback = new RuleFeedback();
 let replayingBest = false;
 function syncRackResults() {
   if (!attractMode) rackResults.observe(arcade.state, replay.last);
@@ -1142,6 +1145,8 @@ function updateTurnStatus() {
     waiting: gameMode === 'online' && online.waiting,
     connection, canCall: canCallPocket(), pocketName });
   const panel = document.querySelector('.turn-controls');
+  // Placement is shown on the ball; retain the spoken action for screen readers.
+  document.getElementById('hint').classList.toggle('visually-hidden', !free && match.ballInHand);
   panel.dataset.active = String(state.active);
   const room = document.getElementById('open-room');
   room.hidden = gameMode !== 'online' || (!roomUnavailable && !online.error);
@@ -1245,7 +1250,7 @@ function movePlacement(e) {
 }
 function finishPlacement() {
   if (!placing) return;
-  if (!placing.valid) { cancelPlacement(); ui.hint('Choose a clear spot inside the cushions'); return; }
+  if (!placing.valid) { cancelPlacement(); return; }
   const p = placing.target;
   if (gameMode === 'online') { cancelPlacement(); online.send('place', { position: { x: p.x, y: p.y } }); updateTurnStatus(); return; }
   placing = null;
@@ -1509,9 +1514,9 @@ export default {
     sunLight?.dispose(); sunLight = null;
     for (const ball of extras) classicMaterials.delete(ball);
     targetRings?.dispose();
+    placementMarker?.dispose();
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     hudObserver?.disconnect(); hudObserver = null;
-    shotFeedback.clear();
     controls?.dispose(); controls = null; setLook(false);
     renderer.shadowMap.autoUpdate = true;
   },
@@ -1665,11 +1670,7 @@ export default {
     if (document.getElementById('hud-sheet').open) syncGravityToggle();
     controls?.update();
     animateRack();
-    if (!activeShot && !arcade.active && !(gameMode === 'online' && (online.pending || online.waiting))) {
-      shotFeedback.update(`${gameMode}:${online.id || ''}:${arcade.state?.rack ?? ''}`,
-        gameMode === 'free' ? arcade.state?.lastPlay || 0 : match.shots,
-        attractMode || !!rackMotion || replayView.active || document.hidden || !!document.querySelector('dialog[open]'));
-    }
+
     if (scene.fog && controls) {
       // A camera pulled back to fit the HUD must not lose the table in the fog.
       const retreat = Math.max(0, camera.position.distanceTo(controls.target) - 120);
@@ -1694,6 +1695,13 @@ export default {
     const balls = replayView.active ? replayView.balls : allBalls();
     const playerAiming = !!aiming && !computerTurn() && !remoteTurn() && !replayView.active;
     targetRings.update(balls, match, { aiming: playerAiming, free: gameMode === 'free' });
+    const rulesHidden = attractMode || gameMode === 'free' || replayView.active || !!activeShot || !!rackMotion ||
+      gameMode === 'online' && (online.pending || online.waiting);
+    ruleFeedback.update(match, { hidden: rulesHidden });
+    placementMarker.update(placing?.target || cue.body.translation(), {
+      visible: !rulesHidden && match.ballInHand && match.winner === null && !computerTurn() && !remoteTurn(),
+      valid: !placing || placing.valid,
+    });
     if (ballStyle === 'planets') {
       updatePlanetCaps(balls, playerAiming);
       const seconds = replayView.active ? (replayView.clip.metadata.planetTime ?? 0) + replayView.time : performance.now() / 1000;
