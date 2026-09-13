@@ -289,9 +289,9 @@ def title(
     )
 
 
-title(0.03, 0.56, "RACK.", x=90, y=800, size=124, fade=35)
-title(0.64, 1.16, "BREAK.", x=90, y=800, size=124, fade=35)
-title(1.24, 1.95, "REPEAT.", x=90, y=800, size=124, fade=35)
+title(0.03, 0.56, "PLAY", x=90, y=800, size=124, fade=35)
+title(0.64, 1.16, "WITH", x=90, y=800, size=124, fade=35)
+title(1.24, 1.95, "OUR SOLAR SYSTEM", x=90, y=800, size=104, fade=35)
 title(3.9, 6.9, "YOU VS. A FRIEND.", x=90, y=825, size=82)
 title(4.05, 6.9, "LOCAL OR ONLINE", style="Small", y=946)
 title(7.12, 10.6, "YOU VS. SHOW-OFF AI.", size=72)
@@ -350,6 +350,11 @@ header = (
 )
 ass = OUT / "titles.ass"
 ass.write_text(header + "\n".join(lines) + "\n")
+brand = OUT / "brand.ass"
+brand.write_text(
+    header
+    + f"Dialogue: 10,{stamp(0)},{stamp(DUR)},Brand,,0,0,0,,{{\\an3\\pos(1850,1032)\\fs48\\bord1.5\\shad2}}Astra Pool\n"
+)
 cmd = [
     "ffmpeg",
     "-hide_banner",
@@ -360,7 +365,7 @@ cmd = [
     "-i",
     str(OUT / "soundtrack.wav"),
     "-vf",
-    f"scale=out_range=tv,eq=contrast=1.04:saturation=1.1:brightness=0.003,drawbox=x=0:y=0:w=iw:h=ih:color=0x030b16@0.5:t=fill:enable='gte(t,45)',ass=titles.ass,fade=t=in:st=0:d=0.08,fade=t=out:st=48.6:d=0.4,format=yuv420p",
+    f"scale=out_range=tv,eq=contrast=1.04:saturation=1.1:brightness=0.003,drawbox=x=0:y=0:w=iw:h=ih:color=0x030b16@0.5:t=fill:enable='gte(t,45)',ass=titles.ass,fade=t=in:st=0:d=0.08,fade=t=out:st=48.6:d=0.4,ass=brand.ass,format=yuv420p",
     "-t",
     str(DUR),
     "-r",

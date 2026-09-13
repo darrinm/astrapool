@@ -26,7 +26,13 @@ export function captureSnapshot() {
       .map(b => ({ number: numberOf(b), handle: b.body.handle })),
   };
 }
-export function capturePreparePlan(plan) { prepareComputerPlan(plan); }
+// Reuse the game's cue geometry and rail-clearance calculation for filmed strokes.
+export function captureCuePose(plan, pull = 0, position = null) {
+  guide.visible = false;
+  cueStick.visible = !!plan;
+  if (plan) updateCueStick(position || cue.body.translation(), plan.dir, pull, plan.spin || { x: 0, y: 0 });
+  renderer.shadowMap.needsUpdate = true;
+}
 `;
 await writeFile(new URL("pool-capture.js", output), source);
 const state = {
