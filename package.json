@@ -15,6 +15,7 @@
     "deploy": "npm run heads:guard && npm run build && (npm run analytics:migrate || echo 'Warning: D1 migrations failed; deploying gameplay anyway. Analytics may be unavailable.') && wrangler deploy",
     "dev:online": "npm run build && wrangler d1 migrations apply GAME_ANALYTICS --local && wrangler dev --port 8787",
     "test:online": "node --test server/room.integration.mjs",
+    "test:load": "node server/room.load.mjs",
     "heads:status": "node tools/heads.mjs status",
     "heads:stash": "node tools/heads.mjs stash",
     "heads:restore": "node tools/heads.mjs restore",

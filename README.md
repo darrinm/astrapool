@@ -122,11 +122,23 @@ npm run dev:online           # adds the Cloudflare runtime, needed for online ro
 npm test                     # rules, computer, pointer behaviour, server protocol
 npm run physics-test         # the 26 physics checks
 npm run test:online          # a real local Worker and two WebSocket clients
+npm run test:load            # 1,000 rooms / 2,000 protocol clients; start dev:online first
 npm run benchmark:computer   # Easy, Medium and Hard over eight fixed endgames
 npm run benchmark:tricky     # Hard and Tricky with equal search limits
 ```
 
 Node 24, from `.nvmrc`. Scale is 1 unit = 26 mm, g = 377.
+
+The load test covers room creation, seats, aiming, synthetic shot results, and
+reconnects. It defaults to the local Worker on port 8787. Use `-- --rooms 10
+--rounds 1 --aim-seconds 1 --peak-seconds 1` for a smoke test, or pass `--base`
+explicitly to test a deployed service. It always creates fresh rooms, closes its
+connections afterward, and lets the server expire its rooms after 24 hours.
+JSON results include latency percentiles and actual throughput; `passed` means
+protocol correctness, not a latency guarantee. Browser rendering, client physics,
+global client locations, and Cloudflare billing are outside the test's scope.
+See the [2,000-player live test report](docs/load-tests/2026-09-13-2000-players.md)
+for measured latency, reconnect behavior, and peak-traffic limitations.
 
 - `src/main.js` — the fixed-step loop, key routing, and the `window.playful` debug handle.
 - `src/pool.js` — the game: table, colliders, aim guide, cue stick, presentation.

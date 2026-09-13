@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Astra Pool — Play with the Solar System</title>
+    <meta name="description" content="Eight-ball on a 7-foot table you can walk around. Real physics, four computer styles, and private rooms you share with a link. No install, no account." />
+    <link rel="canonical" href="https://astrapool.darrinm.com/" />
+    <meta name="theme-color" content="#101014" />
+
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://astrapool.darrinm.com/" />
+    <meta property="og:title" content="Astra Pool — Play with the Solar System" />
+    <meta property="og:description" content="Eight-ball on a 7-foot table you can walk around. Real physics, four computer styles, and private rooms you share with a link. No install, no account." />
+    <meta property="og:image" content="https://astrapool.darrinm.com/og.jpg?v=2" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Astra Pool — Rack the planets. A glowing Sun cue ball faces planetary billiard balls on teal felt, with Earth beyond the orbital lounge windows." />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap">
+    <link rel="stylesheet" href="/src/hud.css" />
+    <link rel="stylesheet" href="/src/arcade.css" />
+  </head>
+  <body>
+    <div id="loading-screen" aria-labelledby="loading-title">
+      <div class="loading-card">
+        <h1 id="loading-title">Astra Pool</h1>
+        <p id="loading-status" role="status">Loading game…</p>
+        <progress id="loading-progress" max="4" aria-label="Loading Astra Pool" aria-describedby="loading-status"></progress>
+        <button id="loading-retry" class="quiet-button" hidden>Try again</button>
+        <noscript>Enable JavaScript to play Astra Pool.</noscript>
+      </div>
+    </div>
+    <div id="vignette" hidden></div>
+    <dialog id="welcome" aria-labelledby="welcome-title" hidden>
+      <div class="welcome-camera" aria-hidden="true"></div>
+      <header class="welcome-heading"><h1 id="welcome-title">Astra Pool</h1></header>
+      <div class="welcome-inner">
+        <p class="welcome-lede">Choose your game.</p>
+        <div class="choices" role="group" aria-label="Choose a game">
+          <button data-game="local"><strong>Local 8-ball</strong><span>Two players, one device</span></button>
+          <button data-game="computer" autofocus><strong>Vs Computer</strong><span>Play the house</span></button>
+          <button data-game="online"><strong>Play a Friend</strong><span>Share a private link</span></button>
+          <button data-game="free"><strong>Free Play</strong><span>No rules, just the table</span></button>
+        </div>
+      </div>
+    </dialog>
+    <div id="hud" hidden inert>
+      <header class="topbar">
+        <div class="brand"><span class="brand-ball" aria-hidden="true">8</span><span>Astra Pool</span></div>
+        <div id="free-score" class="scoreboard" aria-label="Game score">
+          <div><span class="eyebrow">Pocketed</span><span class="score"><b id="pocketed-count">0</b><span> / 15</span></span></div>
+          <div><span class="eyebrow">Shots</span><b id="shot-count" class="score">0</b></div>
+          <div id="arcade-free" hidden><span class="eyebrow">Arcade</span><strong>0</strong><span class="arcade-multiplier">×1</span></div>
+        </div>
+        <div id="match-score" class="match-score" aria-label="Match score">
+          <div id="player-0" class="player-card"><div class="player-heading"><strong class="player-name">Player 1</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
+          <span class="versus"><strong>8-ball</strong><span>Racks won</span></span>
+          <div id="player-1" class="player-card"><div class="player-heading"><strong class="player-name">Player 2</strong><b class="rack-wins">0</b></div><span class="player-group">Groups not assigned</span><div class="remaining-balls"></div></div>
+        </div>
+        <div class="utilities">
+          <button id="sound" data-sound-toggle class="quiet-button icon-button" aria-pressed="true" aria-label="Sound on" title="Toggle sound (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z"/><path class="wave" d="M15.5 9.2a4 4 0 0 1 0 5.6"/><path class="wave" d="M18.2 6.6a7.7 7.7 0 0 1 0 10.8"/></svg><span data-sound-state hidden>on</span></button>
+        </div>
+      </header>
+
+      <div class="bottom-hud">
+        <div id="shot-result" class="shot-result" hidden><span class="eyebrow">Last shot</span><p id="shot-result-text" role="status"></p><p id="arcade-receipt" role="status" hidden></p><p id="arcade-pending" hidden></p></div>
+        <div class="guidance"><div id="status" role="status"></div><p id="pocket-call-status" role="status" hidden></p><p id="hint"></p></div>
+        <button id="rematch" class="primary-button" hidden>Rematch</button>
+        <button id="open-pockets" class="primary-button" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Call the 8-ball pocket</button>
+        <nav class="compact-actions" aria-label="Table controls">
+          <button id="open-settings" aria-haspopup="dialog" aria-controls="hud-sheet">Game</button>
+          <button id="quick-view" title="View the whole table from above">Overhead</button>
+          <button id="open-replay" title="Replay the last completed shot (V)" hidden>Replay</button>
+          <button id="open-spin" aria-haspopup="dialog" aria-controls="hud-sheet">Spin <span class="spin-bead" aria-hidden="true"></span></button>
+          <button id="cancel-gesture" hidden>Cancel</button>
+        </nav>
+        <section id="replay-controls" aria-label="Shot replay" hidden>
+          <div class="replay-heading"><strong id="replay-title">Replay</strong><button id="replay-close" class="text-button">Back to game</button></div>
+          <input id="replay-seek" type="range" min="0" max="1" step="0.01" value="0" aria-label="Replay position">
+          <div class="replay-actions"><button id="replay-play" class="quiet-button">Pause</button><button id="replay-restart" class="text-button">Restart</button><select id="replay-speed" aria-label="Replay speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select><span id="replay-clock">0:00 / 0:00</span></div>
+        </section>
+      </div>
+    </div>
+
+    <dialog id="hud-sheet" aria-labelledby="sheet-title">
+      <header class="sheet-heading"><h2 id="sheet-title">Game</h2><button id="close-sheet" class="text-button" autofocus>Done</button></header>
+      <div id="sheet-content">
+
+        <section id="panel-settings">
+          <div class="field">
+            <span class="eyebrow" id="mode-label">Game</span>
+            <div id="game-mode" class="choices" role="group" aria-labelledby="mode-label">
+              <button data-game="local" aria-pressed="false"><strong>Local 8-ball</strong><span>Two players, one device</span></button>
+              <button data-game="computer" aria-pressed="true"><strong>Vs Computer</strong><span>Play the house</span></button>
+              <button data-game="online" aria-pressed="false"><strong>Play a Friend</strong><span>Share a private link</span></button>
+              <button data-game="free" aria-pressed="false"><strong>Free Play</strong><span>No rules, just the table</span></button>
+            </div>
+          </div>
+
+          <div class="field arcade-setting">
+            <button id="arcade-toggle" class="switch" aria-pressed="true"><span>Arcade</span><span class="switch-track" aria-hidden="true"></span></button>
+            <p class="arcade-description">Big little celebrations. Skill points, lucky shots, and glorious mistakes.</p>
+            <div id="arcade-intensity" class="segmented" role="group" aria-label="Arcade effects"><button data-effects="full" aria-pressed="true">Full effects</button><button data-effects="reduced" aria-pressed="false">Reduced effects</button></div>
+            <p id="arcade-best" hidden></p>
+          </div>
+
+          <div class="field arcade-setting">
+            <button id="black-hole-gravity-toggle" class="switch" aria-pressed="false" aria-describedby="black-hole-gravity-description"><span>Black Hole Gravity</span><span class="switch-track" aria-hidden="true"></span></button>
+            <p id="black-hole-gravity-description" class="arcade-description">The 8-ball pulls nearby moving balls toward it within about 16 ball diameters. The computer adjusts its aim. Toggle when the balls are at rest.</p>
+            <p id="black-hole-gravity-online" class="arcade-description" hidden>Available in local games and Free Play.</p>
+          </div>
+
+          <div class="field" id="difficulty-group" hidden>
+            <span class="eyebrow" id="difficulty-label">Computer style</span>
+            <div id="difficulty" class="segmented" role="group" aria-labelledby="difficulty-label">
+              <button data-difficulty="easy" aria-pressed="false">Easy</button>
+              <button data-difficulty="medium" aria-pressed="false">Medium</button>
+              <button data-difficulty="hard" aria-pressed="false">Hard</button>
+              <button data-difficulty="tricky" aria-pressed="true" title="Plays for points. Loves a bank, kick, or combination.">Tricky</button>
+            </div>
+          </div>
+
+          <section id="online-panel" class="field online-panel" aria-label="Private online room" hidden>
+            <span class="eyebrow">Your room</span>
+            <p id="online-status" role="status">Create a room and invite a friend.</p>
+            <div class="online-row">
+              <input id="invite-link" aria-label="Invite link" readonly>
+              <button id="copy-invite" class="quiet-button">Copy invite</button>
+            </div>
+            <button id="online-retry" class="quiet-button" hidden>Reconnect</button>
+          </section>
+
+          <div class="field">
+            <span class="eyebrow" id="room-label">Room</span>
+            <div id="environment-options" class="rooms" role="group" aria-labelledby="room-label"></div>
+            <p id="room-status" role="status"></p>
+          </div>
+
+          <div class="field" id="interaction-group" hidden>
+            <span class="eyebrow" id="play-label">Play your way</span>
+            <div id="mode" class="segmented" role="group" aria-labelledby="play-label">
+              <button data-mode="cue" aria-pressed="true" title="Shoot with the cue">Cue</button>
+              <button data-mode="fling" aria-pressed="false" title="Grab and throw any ball">Fling</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="eyebrow" id="table-label">Ball collection</span>
+            <div id="style" class="ball-sets" role="group" aria-labelledby="table-label"></div>
+            <p id="ball-set-status" role="status"></p>
+            <div id="planet-options" hidden>
+              <label class="planet-color-label" for="planet-saturation">Color intensity <output id="planet-saturation-value" for="planet-saturation">100%</output></label>
+              <input id="planet-saturation" type="range" min="1" max="1.7" step="0.05" value="1">
+              <div class="planet-range-labels"><span>Natural</span><span>Vivid</span></div>
+              <p>Fifteen different worlds. Eight planets, five moons, Pluto, and a black-hole 8; the Sun is your cue ball. Small companions and rings are enlarged for play. Moons visibly orbit; numbered caps appear while you aim.</p>
+              <details class="planet-guide"><summary>Meet the planets &amp; credits</summary>
+                <p>Cue Sun · 1 Mercury · 2 Venus · 3 Earth · 4 Mars · 5 Jupiter · 6 Saturn · 7 Uranus · 8 Black hole · 9 Neptune · 10 Moon · 11 Io · 12 Europa · 13 Ganymede · 14 Titan · 15 Pluto.</p>
+                <p>Earth has the Moon; Mars has Phobos and Deimos. The outer planets show a selection of major moons, with simplified smaller companions. Pluto has Charon. All four outer planets have rings; faint rings are brightened. Sizes and spacing are arranged for the table. Rings and moons rotate with their world.</p>
+                <p>Maps by <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>, based on NASA imagery. Additional world and moon maps from <a href="https://science.nasa.gov/3d-resources/" target="_blank" rel="noopener">NASA / VTAD</a>, <a href="https://space.jpl.nasa.gov/tmaps/mars.html" target="_blank" rel="noopener">JPL / USGS</a>, and <a href="https://www.usgs.gov/media/images/charon-new-horizons-global-mosaic-300m" target="_blank" rel="noopener">New Horizons / USGS</a>. Pluto, Charon, Titania, Oberon and Triton use AI artistic reconstructions of missing and blurry terrain, based on their credited source maps. The Sun is an artistic solar texture with animated glow. Color adjusted for play; Neptune rebalanced toward blue-green.</p>
+              </details>
+            </div>
+            <button class="switch" data-sound-toggle aria-pressed="true"><span>Sound</span><span class="switch-track" aria-hidden="true"></span><span data-sound-state hidden>on</span></button>
+          </div>
+
+          <div class="sheet-actions">
+            <button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button>
+            <button id="overhead-view" class="quiet-button">Overhead</button>
+            <button id="rerack" class="quiet-button danger-button" title="Re-rack (R)">New rack</button>
+          </div>
+
+          <details class="rules">
+            <summary>How to play &amp; house rules</summary>
+            <div class="help-panel">
+              <p>In Cue mode, pull back from the cue ball and release to shoot. In Free Play’s Fling mode, grab any ball and throw it — hold still to place it.</p>
+              <p>Replay (V) shows the last completed shot in every game, including computer shots and Free Play flings. Pause, scrub, or change speed while orbiting the table. Scores and turns stay intact. Online replay returns to live play when the table updates.</p>
+              <dl><div><dt>Orbit the table</dt><dd>Drag empty space</dd></div><div><dt>Pan</dt><dd>Right-drag / two fingers</dd></div><div><dt>Zoom</dt><dd>Scroll / pinch</dd></div></dl>
+              <dl class="shortcuts"><div><dt>Cancel cue shot</dt><dd><kbd>Esc</kbd></dd></div><div><dt>Switch mode</dt><dd><kbd>F</kbd></dd></div><div><dt>Ball collection</dt><dd><kbd>B</kbd></dd></div><div><dt>Reset view</dt><dd><kbd>C</kbd></dd></div><div><dt>Sound</dt><dd><kbd>M</kbd></dd></div><div><dt>Re-rack</dt><dd><kbd>R</kbd></dd></div></dl>
+              <h3>House rules</h3>
+              <p>Arcade adds playful effects and a separate points score in every game. Pots earn 100; banks, kicks, combinations and multi-pots add bonuses. Consecutive scoring shots build a multiplier up to ×3. Floating points are pending until the shot settles; scratches and fouls void that shot's points. Racks won still decide the match. Choose Reduced effects for calmer motion. Free Play Cue and Fling have separate personal bests; changing modes during a rack makes it mixed practice.</p>
+              <table class="arcade-scoring"><caption>Arcade bonuses · added to each 100-point pot</caption>
+                <thead><tr><th scope="col">Shot</th><th scope="col">Bonus</th></tr></thead>
+                <tbody>
+                  <tr><td>Bank · 1 / 2 / 3+ cushions</td><td>150 / 225 / 300</td></tr>
+                  <tr><td>Kick · 1 / 2 / 3+ cushions before first contact</td><td>200 / 300 / 400</td></tr>
+                  <tr><td>Combination · 2 / 3+ object balls</td><td>200 / 350</td></tr>
+                  <tr><td>Carom · scoring ball deflects off an object ball</td><td>200</td></tr>
+                  <tr><td>Double kiss · repeat contact redirects the scoring ball</td><td>300</td></tr>
+                  <tr><td>Thin cut · 60° or more</td><td>100</td></tr>
+                  <tr><td>Long pot · half the table diagonal travelled</td><td>75</td></tr>
+                  <tr><td>Second / third / later pot in one shot</td><td>200 / 300 / …</td></tr>
+                  <tr><td>Legal called 8-ball finish</td><td>500</td></tr>
+                </tbody>
+              </table>
+              <p>Distinct bonuses stack before the streak multiplier. Each family pays its highest tier; a double kiss replaces the carom bonus for the same ball. Kicks pay once per shot. Only measured, contributing contacts count; cushion chatter and ambiguous collisions earn no trick bonus.</p>
+              <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>
+              <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack.</p>
+              <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed. Tricky plays for arcade points, searching for trick shots while protecting its scoring streak.</p>
+            </div>
+          </details>
+        </section>
+
+        <section id="panel-spin" class="spin-panel" hidden>
+          <div class="spin-heading"><span class="eyebrow">Contact point</span><button id="reset-spin" class="text-button">Centre</button></div>
+          <button id="spin" aria-label="Set cue spin. Click a point or use arrow keys; Home centers." title="Click to set spin · arrow keys adjust · Home centers"><span class="dot"></span></button>
+          <span class="spin-caption">Center ball</span>
+        </section>
+
+        <section id="panel-pockets" class="pocket-call" hidden>
+          <span class="eyebrow">Which pocket for the 8-ball?</span>
+          <div id="pocket-map" class="pocket-map" role="group" aria-label="Pocket for the 8-ball" aria-describedby="pocket-call-help"><button data-pocket="0" aria-pressed="false" aria-label="Top left pocket"></button><button data-pocket="1" aria-pressed="false" aria-label="Top middle pocket"></button><button data-pocket="2" aria-pressed="false" aria-label="Top right pocket"></button><button data-pocket="3" aria-pressed="false" aria-label="Bottom left pocket"></button><button data-pocket="4" aria-pressed="false" aria-label="Bottom middle pocket"></button><button data-pocket="5" aria-pressed="false" aria-label="Bottom right pocket"></button></div>
+          <p id="pocket-call-help">You can change your call until you take the shot.</p>
+        </section>
+
+      </div>
+    </dialog>
+    <style>body>*:not(canvas):not(#capture-panel){display:none!important}body{background:#050b13!important}canvas{width:100vw!important;height:auto!important;position:static!important;display:block}#capture-panel{position:fixed;z-index:10000;bottom:12px;left:16px;background:#071321e8;color:white;padding:12px 18px;border:1px solid #567;font:14px system-ui;border-radius:10px}#capture-start{margin-right:15px;padding:8px 14px} </style><div id="capture-panel"><button id="capture-start" disabled>Render trailer footage</button><span id="capture-status">Loading capture scene…</span></div><script type="module" src="/pipeline/trailer/capture.js"></script>
+  </body>
+</html>
