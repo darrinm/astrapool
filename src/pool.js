@@ -1049,6 +1049,8 @@ function layoutPocketMap() {
     button.setAttribute('aria-label', `${THIRDS.y[top / 50]} ${THIRDS.x[left / 50]} pocket`);
   }
   syncPocketCall();
+  // The selected pocket's screen-relative name is also shown above the table.
+  if (calledPocket !== null) updateTurnStatus();
 }
 
 function syncPocketCall() {
