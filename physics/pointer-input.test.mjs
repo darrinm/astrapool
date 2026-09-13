@@ -78,6 +78,8 @@ test('the cursor shows grabbing during a gesture and the hover state otherwise',
   assert.equal(style.cursor, 'default');
   scene.pointermove = () => true; emit('pointermove');
   assert.equal(style.cursor, 'grab');
+  scene.pointermove = () => 'pointer'; emit('pointermove');
+  assert.equal(style.cursor, 'pointer');
 });
 
 test('touch capture loss cancels without shooting, even with no buttons held', () => {

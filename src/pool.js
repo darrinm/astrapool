@@ -24,6 +24,7 @@ import { OnlineRoom } from './online.js';
 import { GameplayAnalytics, sendGameAnalytics } from './game-analytics.js';
 import { groupLabel, playerName, playerText } from './match-copy.js';
 import { setOverheadCamera, withinCueTarget, setGuideLine } from './table-view.js';
+import { projectPocketTargets, pocketAtPointer, pocketTapMoved, completesPocketTap } from './pocket-call.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
 import { newMatch, targets, groupBalls, shotRecord, resolveShot, resolveSoloShot } from './eight-ball.js';
@@ -62,7 +63,7 @@ const CUE_LEARNED = 'pool.cueLearned';
 let cueLearned = false;
 try { cueLearned = localStorage.getItem(CUE_LEARNED) === '1'; } catch {}
 let gameMode = 'computer', match = newMatch(), activeShot = null, calledPocket = null;
-let settledFor = 0, physicsTime = 0, placing = null, pocketMarker;
+let settledFor = 0, physicsTime = 0, placing = null, calling = null, pocketMarker;
 let rackMotion = null;
 let computerWait = 0, computerPlan = null, computerWorker = null;
 let attractMode = false, attractWait = 0;
@@ -789,7 +790,7 @@ const cueReady = () => !rackMotion && onTable(cue) && tableStill() && !activeSho
   (gameMode === 'free' ? pocketed < 15 : (match.winner === null && !match.ballInHand && (!onEight() || calledPocket !== null)));
 const onEight = () => !match.breaking && targets(match).length === 1 && targets(match)[0] === 8;
 const canCallPocket = () => gameMode !== 'free' && match.winner === null && !match.ballInHand &&
-  !rackMotion && !activeShot && !arcade.active && !computerTurn() && !remoteTurn() && onEight();
+  !rackMotion && !activeShot && !arcade.active && !aiming && !placing && !dragging && !replayView.active && !computerTurn() && !remoteTurn() && onEight();
 function ballUnderPointer(e) {
   const balls = allBalls().filter((h) => h.mesh.visible), mesh = meshUnderPointer(e, balls.map((h) => h.mesh));
   const ball = balls.find((h) => h.mesh === mesh);
@@ -849,7 +850,11 @@ function updateGestureControls() {
   document.getElementById('cancel-gesture').hidden = !(placing || dragging || (aiming && !computerTurn()));
   syncReplayButton();
 }
-function endGesture() { cancelPlacement(); endDrag(); endAim(); if (refitPending) refitView(); }   // the two are exclusive; whichever is in progress stops without a shot or fling
+function endGesture() {
+  if (calling) { calling = null; controls.enabled = true; }
+  cancelPlacement(); endDrag(); endAim();
+  if (refitPending) refitView();
+}
 // Re-frame for a viewport that really changed. Deferred out of gestures by resize(), so it also
 // runs from endGesture(); either way it advances the baseline only once the change is handled.
 function refitView() {
@@ -920,9 +925,8 @@ function showGameControls(show) {
     document.getElementById('open-replay').addEventListener('click', () => startReplay());
     document.getElementById('replay-best').addEventListener('click', () => startReplay(true));
     document.getElementById('rematch').addEventListener('click', restart);
-    document.querySelectorAll('#pocket-map button').forEach(b => b.addEventListener('click', () => {
-      if (!canCallPocket()) return;
-      calledPocket = Number(b.dataset.pocket); updateScore();
+    document.querySelectorAll('#table-pockets button').forEach(b => b.addEventListener('click', () => {
+      selectPocket(Number(b.dataset.pocket));
     }));
   }
   wireOnce(modeEl, (b) => setInteractionMode(b.dataset.mode));
@@ -1010,64 +1014,48 @@ function tableStill() {
     const v = h.body.linvel(); return Math.hypot(v.x, v.y, v.z) < 0.3;
   });
 }
-// Orient the pocket map to the camera: project the real pocket centres, see which way the long rail
-// runs on screen and which end is nearer the top, then place the six targets on a schematic table
-// that matches. No copy has to explain which end is which.
-const THIRDS = { x: ['left', 'middle', 'right'], y: ['Top', 'Middle', 'Bottom'] };
-let pocketMapKey = '', pocketMapEl = null;
-const projected = new THREE.Vector3();   // scratch: this runs every frame, so it must not allocate
-function layoutPocketMap() {
-  const map = pocketMapEl ||= document.getElementById('pocket-map');
-  // Keep the chosen pocket's name aligned with the camera, even with the sheet closed.
-  if (!map || !pockets.length || (!canCallPocket() && calledPocket === null)) return;
-  const at = (i) => { const v = projected.set(pockets[i].x, pockets[i].y, FELT_Z).project(camera); return { x: v.x, y: -v.y }; };
-  const head = at(0), foot = at(2), across = at(3);
-  const long = { x: foot.x - head.x, y: foot.y - head.y };          // table +x, the long rail
-  const short = { x: across.x - head.x, y: across.y - head.y };     // table -y, across the table
-  const vertical = Math.abs(long.y) > Math.abs(long.x);
-  // Along the long rail: 0 = head end, 2 = foot end. Flip when the foot end projects nearer the origin.
-  const longFlip = (vertical ? long.y : long.x) < 0;
-  const shortFlip = (vertical ? short.x : short.y) < 0;
-  const key = `${vertical}|${longFlip}|${shortFlip}`;
-  if (key === pocketMapKey) return;
-  pocketMapKey = key;
-  map.classList.toggle('vertical', vertical);
-  for (const button of map.querySelectorAll('button')) {
-    const i = Number(button.dataset.pocket);
-    const alongIndex = i % 3;                    // 0 head, 1 side, 2 foot
-    const sideIndex = i < 3 ? 0 : 1;             // table +y then -y
-    const a = (longFlip ? 2 - alongIndex : alongIndex) * 50;
-    const b = (shortFlip ? 1 - sideIndex : sideIndex) * 100;
-    // The targets straddle the edge of the felt, where the real pockets are.
-    const left = vertical ? b : a, top = vertical ? a : b;
-    button.style.left = `${left}%`;
-    button.style.top = `${top}%`;
-    // Name it by where it now sits, so the label a screen reader (and the compact button's title)
-    // reads out cannot contradict the map the camera just turned.
-    button.setAttribute('aria-label', `${THIRDS.y[top / 50]} ${THIRDS.x[left / 50]} pocket`);
-  }
-  syncPocketCall();
+let pocketTargets = [], pocketCallView = '';
+function selectPocket(pocket) {
+  if (!canCallPocket()) return;
+  calledPocket = pocket; updateScore();
 }
-
-function syncPocketCall() {
-  const available = canCallPocket(), chosen = calledPocket !== null;
-  const map = document.getElementById('pocket-map'), button = document.getElementById('open-pockets');
-  const name = chosen ? map.querySelector(`[data-pocket="${calledPocket}"]`)?.getAttribute('aria-label') : null;
-  button.hidden = !available;
-  button.textContent = chosen ? 'Change pocket' : 'Call the 8-ball pocket';
-  button.dataset.called = String(chosen);
-  button.title = chosen ? `Called: ${name}. Change before shooting.` : 'Choose the pocket before shooting the 8-ball';
-  const status = document.getElementById('pocket-call-status');
-  status.hidden = gameMode === 'free' || match.winner !== null || !onEight() || !chosen;
-  const text = chosen ? `Called: ${name}` : '';
-  if (status.textContent !== text) status.textContent = text;
-  for (const option of map.querySelectorAll('button')) {
-    option.setAttribute('aria-pressed', String(Number(option.dataset.pocket) === calledPocket));
-    option.disabled = !available;
+function layoutTablePockets() {
+  const available = canCallPocket(), root = document.getElementById('table-pockets');
+  root.hidden = !available;
+  if (!available && calledPocket === null) { pocketTargets = []; return; }
+  pocketTargets = projectPocketTargets(pockets, camera, innerWidth, innerHeight, FELT_Z + RAIL_H, POCKET_R);
+  for (const button of root.querySelectorAll('button')) {
+    const target = pocketTargets[Number(button.dataset.pocket)];
+    button.hidden = !target.visible;
+    button.style.left = `${target.x}px`; button.style.top = `${target.y}px`;
+    button.style.width = button.style.height = `${target.radius * 2}px`;
+    button.setAttribute('aria-label', target.name);
+    button.setAttribute('aria-pressed', String(target.pocket === calledPocket));
+    button.disabled = !available;
   }
-  // Panel visibility belongs to the sheet, independently of whether a call is due.
-  const sheet = document.getElementById('hud-sheet');
-  if (!available && sheet.open && !document.getElementById('panel-pockets').hidden) sheet.close();
+}
+function syncPocketCall() {
+  layoutTablePockets();
+  const available = canCallPocket(), chosen = calledPocket !== null;
+  const status = document.getElementById('pocket-call-status');
+  status.hidden = replayView.active || gameMode === 'free' || match.winner !== null || !onEight() || !(available || chosen);
+  const name = pocketTargets[calledPocket]?.name;
+  const text = chosen ? `Called: ${name}. ${available ? 'Tap another pocket to change.' : ''}`.trim() : 'On the 8-ball — tap a pocket on the table.';
+  if (status.textContent !== text) status.textContent = text;
+  // Fit once when a call becomes due (or the viewport changes), not while the
+  // player deliberately orbits, aims, or changes their selected pocket.
+  if (!onEight() || activeShot || rackMotion || match.winner !== null) pocketCallView = '';
+  const view = `${gameMode}:${match.turn}:${match.shots}:${innerWidth}:${innerHeight}`;
+  if (available && view !== pocketCallView) {
+    pocketCallView = view;
+    const top = document.querySelector('.topbar').getBoundingClientRect().bottom;
+    const bottom = document.querySelector('.bottom-hud').getBoundingClientRect();
+    if (pocketTargets.some(p => !p.visible || p.x - p.radius < 0 || p.x + p.radius > innerWidth ||
+      p.y - p.radius < top || p.y + p.radius > innerHeight ||
+      p.y + p.radius > bottom.top && p.x + p.radius > bottom.left && p.x - p.radius < bottom.right)) {
+      overhead = true; fitOverhead(); layoutTablePockets();
+    }
+  }
 }
 
 function canChangeGravity() {
@@ -1096,7 +1084,6 @@ function updateScore() {
   document.getElementById('interaction-group').hidden = !free;
   document.getElementById('rerack').textContent = free ? 'Re-rack ↻' : 'New rack ↻';
   syncRackResults();
-  layoutPocketMap();
   syncPocketCall();
   document.getElementById('open-spin').hidden = !!rackMotion || interactionMode !== 'cue' || !!activeShot || computerTurn() || remoteTurn() || (free ? pocketed === 15 : match.winner !== null);
   if (!free) for (let i = 0; i < 2; i++) {
@@ -1139,7 +1126,7 @@ function updateScore() {
     computerTurn() ? (computerWorker ? 'The computer is studying the table.' : 'The computer is lining up its shot.') :
     remoteTurn() ? (online.connected.every(Boolean) ? 'Your friend is lining up a shot.' : 'Share the invite link. Play begins when both players are connected.') :
     match.ballInHand ? 'Ball in hand: click an empty spot on the felt, or drag the cue ball into place.' :
-    onEight() && calledPocket === null ? 'Choose where the 8-ball will go before you shoot.' :
+    onEight() && calledPocket === null ? 'Tap one of the highlighted pockets on the table before you shoot.' :
     onEight() ? (cueLearned ? 'You can change your pocket call before shooting.' : 'Pull back from the cue ball to shoot, or change your pocket call.') :
     !match.groups[match.turn] && !match.breaking ? 'Pocket a solid or stripe on a legal shot to claim your group.' :
     cueLearned ? '' : 'Pull back from the cue ball. Release to shoot.');
@@ -1529,6 +1516,14 @@ export default {
       placing = { ball: cue, original: { ...cue.body.translation() }, valid: false };
       cue.body.setEnabled(false); movePlacement(e); updateGestureControls(); return true;
     }
+    if (canCallPocket() && !(calledPocket !== null && ballUnderPointer(e) === cue)) {
+      layoutTablePockets();
+      const pocket = pocketAtPointer(pocketTargets, e);
+      if (pocket !== null) {
+        calling = { pocket, x: e.clientX, y: e.clientY, moved: false };
+        controls.enabled = false; return true;
+      }
+    }
     if (interactionMode === 'fling') {
       const ball = ballUnderPointer(e);
       if (!ball) return false;
@@ -1549,6 +1544,7 @@ export default {
   pointermove(e) {
     if (rackMotion || replayView.active) return false;
     if (computerTurn() || remoteTurn()) return false;
+    if (calling) { calling.moved ||= pocketTapMoved(calling, e); return; }
     if (placing) { movePlacement(e); return; }
     if (dragging) {
       const coalesced = e.getCoalescedEvents?.();
@@ -1557,6 +1553,7 @@ export default {
       return;
     }
     if (aiming) { aiming.to = pointerToPlane(e, BALL_Z).add(aiming.offset); return; }
+    if (canCallPocket() && pocketAtPointer(pocketTargets, e) !== null) return 'pointer';
     if (interactionMode === 'fling') return !!ballUnderPointer(e);
     return cueReady() && cueUnderPointer(e);
   },
@@ -1564,7 +1561,10 @@ export default {
     if (replayView.active) return;
     if (remoteTurn()) { endGesture(); return; }
     if (computerTurn()) return;
-    if (placing) { movePlacement(e); finishPlacement(); }
+    if (calling) {
+      const tap = calling; calling = null; controls.enabled = true;
+      if (canCallPocket() && completesPocketTap(tap, e, pocketAtPointer(pocketTargets, e))) selectPocket(tap.pocket);
+    } else if (placing) { movePlacement(e); finishPlacement(); }
     else if (dragging) { sampleDrag(e); endDrag(true); }
     else if (aiming) { shoot(); endAim(); }
   },
@@ -1682,7 +1682,7 @@ export default {
     }
     renderer.shadowMap.autoUpdate = false;
     if (shadowsChanged(shadowObjects)) renderer.shadowMap.needsUpdate = true;
-    layoutPocketMap();
+    syncPocketCall();
     if (pocketMarker) {
       pocketMarker.visible = !replayView.active && gameMode !== 'free' && calledPocket !== null && match.winner === null;
       if (pocketMarker.visible) { const p = pockets[calledPocket]; pocketMarker.position.set(p.x, p.y, FELT_Z + RAIL_H); }
