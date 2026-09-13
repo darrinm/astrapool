@@ -20,6 +20,14 @@ export function playerName(player, mode, seat = null) {
   return `Player ${player + 1}`;
 }
 
+// A normal win needs only the heading. The referee prefixes unusual endings
+// with their cause; retain that explanation without repeating who won.
+export function rackOutcome(match) {
+  if (match.winner === null) return '';
+  const reason = (match.message || '').split(' — ');
+  return reason.length > 1 ? `${reason[0]}.` : '';
+}
+
 export function playerText(text, mode, seat = null) {
   return text.replace(/Player ([12])(’s| wins| continues| breaks| to break| shooting)?/g, (_, number, suffix = '') => {
     const name = playerName(Number(number) - 1, mode, seat);
