@@ -43,6 +43,11 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0b09; }
 canvas { display: block; touch-action: none; }
+/* Labels overlay the canvas; pointer-events alone does not prevent long-press selection. */
+canvas, #hud, .welcome-camera, .welcome-heading, #spin {
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+#hud input, #hud textarea { -webkit-user-select: text; user-select: text; }
 [hidden] { display: none !important; }
 button, summary, select, input { font: inherit; -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; color: inherit; }

@@ -17,7 +17,7 @@ connectHud(current);
 connectEnvironmentPicker(current);
 
 // ---------- input ----------
-connectPointerInput(renderer.domElement, current);
+connectPointerInput(renderer.domElement, current, current.controls());
 addEventListener('keydown', (e) => {
   if (!document.getElementById('loading-screen').hidden) return;
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.target.closest('input, textarea, select, [contenteditable]')) return;
