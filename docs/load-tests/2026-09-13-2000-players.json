@@ -1,0 +1,358 @@
+{
+  "passed": true,
+  "target": "https://astrapool.darrinm.com",
+  "timestamp": "2026-09-13T05:03:52.473Z",
+  "rooms": 1000,
+  "players": 2000,
+  "workload": {
+    "rounds": 5,
+    "aimSeconds": 5,
+    "peakSeconds": 15,
+    "joinConcurrency": 25,
+    "syntheticResults": true
+  },
+  "seconds": 103.04,
+  "peakConnections": 2000,
+  "counts": {
+    "roomsCreated": 1000,
+    "connections": 4000,
+    "reconnects": 2000,
+    "shots": 6000,
+    "results": 6000,
+    "aimsSent": 900000,
+    "aimsReceived": 900000,
+    "pings": 14000,
+    "pongs": 14000,
+    "unexpectedCloses": 0,
+    "errors": 0
+  },
+  "phases": [
+    {
+      "name": "create-and-join",
+      "seconds": 29.89,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 1000,
+        "connections": 2000,
+        "reconnects": 0,
+        "shots": 0,
+        "results": 0,
+        "aimsSent": 0,
+        "aimsReceived": 0,
+        "pings": 0,
+        "pongs": 0,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "aim-10hz-1",
+      "seconds": 5.08,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 0,
+        "results": 0,
+        "aimsSent": 50000,
+        "aimsReceived": 50000,
+        "pings": 2000,
+        "pongs": 2000,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "shots-1",
+      "seconds": 2.79,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 1000,
+        "results": 1000,
+        "aimsSent": 0,
+        "aimsReceived": 0,
+        "pings": 0,
+        "pongs": 0,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "aim-10hz-2",
+      "seconds": 5.04,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 0,
+        "results": 0,
+        "aimsSent": 50000,
+        "aimsReceived": 50000,
+        "pings": 2000,
+        "pongs": 2000,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "shots-2",
+      "seconds": 1.61,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 1000,
+        "results": 1000,
+        "aimsSent": 0,
+        "aimsReceived": 0,
+        "pings": 0,
+        "pongs": 0,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "aim-10hz-3",
+      "seconds": 5.08,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 0,
+        "results": 0,
+        "aimsSent": 50000,
+        "aimsReceived": 50000,
+        "pings": 2000,
+        "pongs": 2000,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "shots-3",
+      "seconds": 0.79,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 1000,
+        "results": 1000,
+        "aimsSent": 0,
+        "aimsReceived": 0,
+        "pings": 0,
+        "pongs": 0,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "aim-10hz-4",
+      "seconds": 5.09,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 0,
+        "results": 0,
+        "aimsSent": 50000,
+        "aimsReceived": 50000,
+        "pings": 2000,
+        "pongs": 2000,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "shots-4",
+      "seconds": 0.66,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 1000,
+        "results": 1000,
+        "aimsSent": 0,
+        "aimsReceived": 0,
+        "pings": 0,
+        "pongs": 0,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "aim-10hz-5",
+      "seconds": 5.07,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 0,
+        "results": 0,
+        "aimsSent": 50000,
+        "aimsReceived": 50000,
+        "pings": 2000,
+        "pongs": 2000,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "shots-5",
+      "seconds": 1.14,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 1000,
+        "results": 1000,
+        "aimsSent": 0,
+        "aimsReceived": 0,
+        "pings": 0,
+        "pongs": 0,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "peak-aim-40hz",
+      "seconds": 22.48,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 0,
+        "results": 0,
+        "aimsSent": 600000,
+        "aimsReceived": 600000,
+        "pings": 2000,
+        "pongs": 2000,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "reconnect-all",
+      "seconds": 9.88,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 2000,
+        "reconnects": 2000,
+        "shots": 0,
+        "results": 0,
+        "aimsSent": 0,
+        "aimsReceived": 0,
+        "pings": 0,
+        "pongs": 0,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "shots-after-reconnect",
+      "seconds": 3.36,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 1000,
+        "results": 1000,
+        "aimsSent": 0,
+        "aimsReceived": 0,
+        "pings": 0,
+        "pongs": 0,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "aim-after-reconnect",
+      "seconds": 5.06,
+      "open": 2000,
+      "counts": {
+        "roomsCreated": 0,
+        "connections": 0,
+        "reconnects": 0,
+        "shots": 0,
+        "results": 0,
+        "aimsSent": 50000,
+        "aimsReceived": 50000,
+        "pings": 2000,
+        "pongs": 2000,
+        "unexpectedCloses": 0,
+        "errors": 0
+      }
+    }
+  ],
+  "latency": {
+    "createRoom": {
+      "count": 1000,
+      "p50Ms": 436.83,
+      "p95Ms": 733.89,
+      "p99Ms": 883.16,
+      "maxMs": 3119.3
+    },
+    "join": {
+      "count": 4000,
+      "p50Ms": 65.09,
+      "p95Ms": 135.31,
+      "p99Ms": 210.96,
+      "maxMs": 4950.07
+    },
+    "aimRelay": {
+      "count": 900000,
+      "p50Ms": 2349.64,
+      "p95Ms": 7727.68,
+      "p99Ms": 8113.44,
+      "maxMs": 8328.68
+    },
+    "ping": {
+      "count": 14000,
+      "p50Ms": 122.54,
+      "p95Ms": 352.69,
+      "p99Ms": 413.44,
+      "maxMs": 614.3
+    },
+    "shotBroadcast": {
+      "count": 6000,
+      "p50Ms": 150.54,
+      "p95Ms": 204.18,
+      "p99Ms": 261.77,
+      "maxMs": 3294.98
+    },
+    "resultCommit": {
+      "count": 6000,
+      "p50Ms": 61.32,
+      "p95Ms": 78.17,
+      "p99Ms": 134.51,
+      "maxMs": 1011.53
+    },
+    "restoreRoom": {
+      "count": 1000,
+      "p50Ms": 88.17,
+      "p95Ms": 163.02,
+      "p99Ms": 219.97,
+      "maxMs": 4681.35
+    }
+  },
+  "loadGenerator": {
+    "node": "v24.16.0",
+    "rssMB": 1992.2,
+    "eventLoopP99Ms": 22.66,
+    "eventLoopMaxMs": 69.01
+  }
+}
