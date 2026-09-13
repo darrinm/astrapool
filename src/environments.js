@@ -114,7 +114,8 @@ export function buildEnvironment(theme, floorZ, loaders = assets) {
     group.add(fill, fill.target);
     // Contact under the Blender bench, pedestal and planter; these remain cheap
     // and stable when the shadow-casting table light does not reach the room edges.
-    for (const [x, y, w, h] of [[.35, 2.15, 2, .9], [-.95, 2.15, .8, .8], [2.7, 1.75, .85, .85], ...[-.936, .936].flatMap(x => [-.481, .481].map(y => [x, y, .24, .24]))]) {
+    const footShadows = theme.id === 'orbital' ? [] : [-.936, .936].flatMap(x => [-.481, .481].map(y => [x, y, .24, .24]));
+    for (const [x, y, w, h] of [[.35, 2.15, 2, .9], [-.95, 2.15, .8, .8], [2.7, 1.75, .85, .85], ...footShadows]) {
       mesh(new THREE.PlaneGeometry(w / .026, h / .026), new THREE.MeshBasicMaterial({ map: contact.material.map, transparent: true, opacity: .3, depthWrite: false }), x / .026, y / .026, floorZ + .03);
     }
   });
