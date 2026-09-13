@@ -76,10 +76,10 @@ button:disabled { opacity: .45; cursor: default; }
 .topbar { grid-row: 1; position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: var(--s5); }
 .brand { display: flex; align-items: center; gap: var(--s2); font: 500 var(--t-lead)/1 var(--display); letter-spacing: .02em; }
 .brand-ball { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #17130f; font: 700 10px/1 var(--ui); }
-#open-settings {
+#open-settings { width: 44px; min-height: 44px; padding: 0; justify-content: center; flex: none; }
+#welcome > #open-settings {
   position: fixed; z-index: 4;
   top: max(var(--s5), env(safe-area-inset-top)); right: max(var(--s5), env(safe-area-inset-right));
-  width: 44px; min-height: 44px;
 }
 
 /* The full score header remains visible; tap it for the last shot details. */
@@ -441,8 +441,8 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: cent
   #hud { padding: max(var(--s3), env(safe-area-inset-top)) max(var(--s3), env(safe-area-inset-right))
                  max(var(--s3), env(safe-area-inset-bottom)) max(var(--s3), env(safe-area-inset-left)); }
   .brand { display: none; }
-  #open-settings { top: max(var(--s3), env(safe-area-inset-top)); right: max(var(--s3), env(safe-area-inset-right)); }
-  .topbar { grid-template-columns: minmax(0, 1fr); padding-right: 56px; }
+  #welcome > #open-settings { top: max(var(--s3), env(safe-area-inset-top)); right: max(var(--s3), env(safe-area-inset-right)); }
+  .topbar { grid-template-columns: minmax(0, 1fr); }
   .play-status { grid-column: 1; width: min(420px, 100%); }
   .match-score, .scoreboard { grid-column: 1; width: 100%; max-width: 420px; }
   .match-score { gap: var(--s3); }
