@@ -60,7 +60,7 @@ export function turnStatus({ match, mode, seat = null, racking = false, shooting
   let detail = '';
   if (active) {
     if (match.ballInHand) detail = 'Place the cue ball';
-    else if (canCall) detail = pocketName ? `Called: ${pocketName}` : '8-ball · call a pocket';
+    else if (canCall) detail = pocketName ? `Called: ${pocketName}` : '8-ball · tap a highlighted pocket';
     else if (match.breaking) detail = 'Break';
     else if (match.groups[match.turn]) detail = groupLabel(match.groups[match.turn], match.down);
     else detail = 'Open table';

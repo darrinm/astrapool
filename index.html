@@ -60,7 +60,6 @@
           <div class="turn-controls">
             <div class="guidance" role="status" aria-atomic="true"><div id="status"></div><p id="hint"></p></div>
             <button id="open-room" class="quiet-button" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Room</button>
-            <button id="open-pockets" class="primary-button" aria-haspopup="dialog" aria-controls="hud-sheet" hidden>Call pocket</button>
             <button id="cancel-gesture" class="quiet-button" hidden>Cancel</button>
           </div>
         </div>
@@ -69,6 +68,9 @@
         </div>
       </header>
 
+      <div id="table-pockets" role="group" aria-label="Call a pocket for the 8-ball" aria-describedby="hint" hidden>
+        <button data-pocket="0" aria-pressed="false" aria-label="Pocket 1"></button><button data-pocket="1" aria-pressed="false" aria-label="Pocket 2"></button><button data-pocket="2" aria-pressed="false" aria-label="Pocket 3"></button><button data-pocket="3" aria-pressed="false" aria-label="Pocket 4"></button><button data-pocket="4" aria-pressed="false" aria-label="Pocket 5"></button><button data-pocket="5" aria-pressed="false" aria-label="Pocket 6"></button>
+      </div>
       <div class="bottom-hud">
         <section id="rack-results" class="rack-results" aria-labelledby="results-title" hidden>
           <p id="results-context" class="eyebrow">Rack complete</p>
@@ -221,7 +223,7 @@
                 </tbody>
               </table>
               <p>Distinct bonuses stack before the streak multiplier. Each family pays its highest tier; a double kiss replaces the carom bonus for the same ball. Kicks pay once per shot. Only measured, contributing contacts count; cushion chatter and ambiguous collisions earn no trick bonus.</p>
-              <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then call a pocket for the 8-ball.</p>
+              <p>Local 8-ball: take turns on this device. The table stays open after the break. Pocket only one group on a legal shot to claim solids or stripes. Clear your group, then tap a highlighted pocket on the table to call the 8-ball.</p>
               <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack.</p>
               <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed. Tricky prefers reliable banks, kicks, combinations and caroms, then plays for points among those choices. It takes a simple pot when the tricks are too risky and looks ahead for its next trick.</p>
             </div>
@@ -234,12 +236,6 @@
           <span class="spin-caption">Center ball</span>
         </section>
 
-        <section id="panel-pockets" class="pocket-call" hidden>
-          <span class="eyebrow">Which pocket for the 8-ball?</span>
-          <div id="pocket-map" class="pocket-map" role="group" aria-label="Pocket for the 8-ball" aria-describedby="pocket-call-help"><button data-pocket="0" aria-pressed="false" aria-label="Top left pocket"></button><button data-pocket="1" aria-pressed="false" aria-label="Top middle pocket"></button><button data-pocket="2" aria-pressed="false" aria-label="Top right pocket"></button><button data-pocket="3" aria-pressed="false" aria-label="Bottom left pocket"></button><button data-pocket="4" aria-pressed="false" aria-label="Bottom middle pocket"></button><button data-pocket="5" aria-pressed="false" aria-label="Bottom right pocket"></button></div>
-          <p id="pocket-call-status" hidden></p>
-          <p id="pocket-call-help">You can change your call until you take the shot.</p>
-        </section>
 
       </div>
     </dialog>

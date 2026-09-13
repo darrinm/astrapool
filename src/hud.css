@@ -125,9 +125,8 @@ button:disabled { opacity: .45; cursor: default; }
 .turn-controls[data-active="true"] #status, #hud.aiming #status { color: var(--accent); }
 #status:empty, #hint:empty { display: none; }
 #hint { margin: 0; color: var(--ink-dim); font-size: var(--t-body); }
-#pocket-call-status { margin: 0; color: var(--accent); font-size: var(--t-body); }
 .turn-controls > button { flex: none; min-height: 44px; padding-inline: var(--s3); }
-#hud.aiming #hint, #hud.aiming #open-pockets, #hud.aiming #open-room { display: none; }
+#hud.aiming #hint, #hud.aiming #open-room { display: none; }
 #hud.aiming .match-summary { visibility: hidden; }
 #hud:has(#cancel-gesture:not([hidden])) .compact-actions { visibility: hidden; }
 .rack-finished .turn-controls, .replaying .turn-controls { display: none; }
@@ -176,9 +175,6 @@ button:disabled { opacity: .45; cursor: default; }
 .spin-bead::after { content: ''; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: #a4402c; transform: translate(calc(var(--sx, 0) * 5px), calc(var(--sy, 0) * -5px)); }
 
 .primary-button { grid-area: 3 / 2; min-height: 44px; padding: 0 var(--s5); border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font: 500 var(--t-lead)/1 var(--ui); }
-#open-pockets[data-called="true"] { background: var(--panel); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-/* Keep the table's framing steady while the player aims. */
-#hud:has(#cancel-gesture:not([hidden])) #open-pockets { visibility: hidden; pointer-events: none; }
 .primary-button:hover { filter: brightness(1.08); }
 
 /* ------------------------------------------------------------- shared bits */
@@ -340,13 +336,14 @@ body:has(#welcome[open]) #hud { visibility: hidden; }
 }
 
 /* ------------------------------------------------------------ pocket call */
-.pocket-call { display: grid; gap: var(--s3); justify-items: center; }
-#pocket-call-help { margin: var(--s2) 0 0; color: var(--ink-dim); text-align: center; }
-.pocket-map { position: relative; width: min(100%, 240px); aspect-ratio: 2 / 1; margin-block: var(--s3); border-radius: 8px; background: #1e4b36; box-shadow: 0 0 0 7px #6b4a2e, 0 0 0 8px #0006; }
-.pocket-map.vertical { aspect-ratio: 1 / 2; width: min(100%, 128px); }
-.pocket-map button { position: absolute; width: 26px; height: 26px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid #ffffff3d; background: #07110b; translate: -50% -50%; transition: border-color .15s, background .15s; }
-.pocket-map button:hover { border-color: #ffffff96; }
-.pocket-map button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+#table-pockets { position: fixed; inset: 0; }
+/* Canvas owns pointer gestures so a nearby cue ball remains reachable. These
+   same targets are real buttons for keyboard and assistive-technology users. */
+#hud #table-pockets button { position: absolute; translate: -50% -50%; pointer-events: none; padding: 0; border: 2px solid var(--accent); border-radius: 50%; background: #0002; box-shadow: 0 0 14px var(--accent-wash), inset 0 0 8px var(--accent-wash); }
+#table-pockets button::after { content: ''; position: absolute; inset: 5px; border: 1px solid var(--accent); border-radius: 50%; opacity: .4; }
+#table-pockets button[aria-pressed="true"] { border-color: #ffd27a; background: #ffd27a33; box-shadow: 0 0 16px #ffd27a80; }
+#table-pockets button[aria-pressed="true"]::after { content: '✓'; inset: 0; border: 0; display: grid; place-items: center; opacity: 1; color: #fff4d9; font-size: 22px; text-shadow: 0 1px 4px #000; }
+#table-pockets button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
 
 /* ------------------------------------------------------------ spin popover */
 .spin-panel { display: grid; gap: var(--s3); justify-items: center; }
@@ -398,7 +395,6 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: cent
   .choices { grid-template-columns: 1fr; }
   .rooms { grid-template-columns: repeat(2, 1fr); }
   #hud-sheet button, #hud-sheet summary, #hud-sheet select, #hud-sheet input { min-height: 44px; }
-  .pocket-map button { width: 40px; height: 40px; }
 }
 @media (max-width: 360px) {
   .bottom-hud { column-gap: 0; }

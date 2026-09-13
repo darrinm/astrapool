@@ -54,7 +54,7 @@ test('shared-screen names and computer turns remain unambiguous', () => {
 test('breaks, pocket calls, and connection interruptions replace routine guidance', () => {
   const match = newMatch();
   assert.equal(turnStatus({ match, mode: 'computer' }).detail, 'Break');
-  assert.equal(turnStatus({ match: playing(), mode: 'computer', canCall: true }).detail, '8-ball · call a pocket');
+  assert.equal(turnStatus({ match: playing(), mode: 'computer', canCall: true }).detail, '8-ball · tap a highlighted pocket');
   assert.equal(turnStatus({ match: playing(), mode: 'computer', canCall: true, pocketName: 'Top right pocket' }).detail, 'Called: Top right pocket');
   assert.deepEqual(turnStatus({ match, mode: 'online', seat: 0, connection: 'Waiting for your friend' }), {
     title: 'Waiting for your friend', detail: '', active: false,

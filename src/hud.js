@@ -10,7 +10,6 @@ const PANELS = {
   match: { title: 'Match details', id: 'panel-match' },
   settings: { title: 'Game', id: 'panel-settings' },
   spin: { title: 'Cue spin', id: 'panel-spin' },
-  pockets: { title: 'Call the 8-ball pocket', id: 'panel-pockets' },
 };
 
 export function connectHud(game) {
@@ -19,14 +18,9 @@ export function connectHud(game) {
 
   function open(which) {
     game.key('escape');
-    if (which === 'pockets' && document.getElementById('open-pockets').hidden) return;
     for (const [name, panel] of Object.entries(PANELS)) document.getElementById(panel.id).hidden = name !== which;
     title.textContent = PANELS[which].title;
     if (!sheet.open) sheet.showModal();
-    if (which === 'pockets') {
-      const map = document.getElementById('pocket-map');
-      (map.querySelector('[aria-pressed="true"]') || map.querySelector('button')).focus();
-    }
   }
   const close = () => sheet.close();
 
@@ -39,14 +33,13 @@ export function connectHud(game) {
   });
   document.getElementById('open-settings').addEventListener('click', () => open('settings'));
   document.getElementById('open-spin').addEventListener('click', () => open('spin'));
-  document.getElementById('open-pockets').addEventListener('click', () => open('pockets'));
   document.getElementById('close-sheet').addEventListener('click', close);
   document.getElementById('cancel-gesture').addEventListener('pointerdown', e => { e.preventDefault(); game.key('escape'); });
   document.getElementById('cancel-gesture').addEventListener('click', () => game.key('escape'));
   document.getElementById('quick-view').addEventListener('click', () => document.getElementById('overhead-view').click());
-  // Choosing a pocket or a view is the whole errand, so the sheet gets out of the way.
+  // Choosing a view is the whole errand, so the sheet gets out of the way.
   sheet.addEventListener('click', e => {
-    if (e.target.closest('[data-pocket], #overhead-view, #reset-view, #rerack')) close();
+    if (e.target.closest('#overhead-view, #reset-view, #rerack')) close();
   });
   connectBackdropDismiss(sheet, close);
 }
