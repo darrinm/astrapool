@@ -33,6 +33,8 @@ import { ComputerThoughts } from './computer-thoughts.js';
 import { setLoadingStage } from './loading.js';
 import { ShotReplay } from './replay.js';
 import { ReplayView } from './replay-view.js';
+import { RackResults } from './rack-results.js';
+import { RackResultsView } from './rack-results-view.js';
 import { blackHoleGravity } from '../physics/black-hole-gravity.js';
 import { P, ballBody, feltCollider, cushionColliders, cushionPolygons, pocketWellColliders, backstopColliders, pocketCenters, tableShape, strike, feltExtras } from '../physics/poolphysics.js';
 
@@ -459,7 +461,7 @@ function layout(animate = true) {
   }
   pocketed = 0; shots = 0; pocketedSet = new Set(); respotAt = 0; belowSince.clear(); inWell.clear();
   activeShot = null; settledFor = 0; calledPocket = null; computerWait = 0; computerPlan = null; onlineShotSeq = null;
-  beforeMotion.clear(); lastArcadeImpact.clear(); arcade.reset();
+  beforeMotion.clear(); lastArcadeImpact.clear(); arcade.reset(); rackResults.reset();
   if (animate) beginRack(origins);
   updateScore();
 }
@@ -618,6 +620,27 @@ const arcade = new PoolArcade({ scene, camera, feltZ: FELT_Z, audio, spatial, re
 const computerThoughts = new ComputerThoughts({ scene, camera, feltZ: FELT_Z, settings: () => arcade.hud });
 const replay = new ShotReplay();
 const replayView = new ReplayView({ scene, exit: () => stopReplay(true) });
+const rackResults = new RackResults();
+const rackResultsView = new RackResultsView();
+let replayingBest = false;
+function syncRackResults() {
+  if (!attractMode) rackResults.observe(arcade.state, replay.last);
+  const free = gameMode === 'free';
+  const finished = !attractMode && !activeShot && !arcade.active && !arcade.pending &&
+    (free ? pocketed === 15 : match.winner !== null);
+  if (finished) {
+    let storage; try { storage = localStorage; } catch {}
+    const players = gameMode === 'online' ? (online.seat === null ? [] : [online.seat]) :
+      gameMode === 'computer' || free ? [0] : [0, 1];
+    rackResults.finish(arcade.state, players, storage);
+  }
+  rackResultsView.update({ finished, free, winner: match.winner,
+    names: free ? ['You'] : [0, 1].map(p => playerName(p, gameMode, online.seat)), state: arcade.state,
+    results: rackResults, arcade: arcade.hud.enabled, replaying: replayView.active,
+    outcome: free ? `Cleared in ${shots} ${shots === 1 ? 'shot' : 'shots'}.` : playerText(match.lastShot || '', gameMode, online.seat) });
+  document.getElementById('rematch').hidden = !finished;
+  if (gameMode !== 'online') document.getElementById('rematch').textContent = free ? 'Play again' : 'Rematch';
+}
 function analyticsSettingsNow() {
   return { difficulty: gameMode === 'computer' ? difficulty : 'none', room: environmentId, balls: ballStyle,
     arcade: arcade.hud.enabled ? 'on' : 'off', effects: arcade.hud.reduced ? 'reduced' : 'full',
@@ -642,9 +665,11 @@ function readReplayPoses() {
   });
 }
 function beginReplayRecording(input) {
+  if (!attractMode) rackResults.begin(`${arcade.categoryNow()}.${gravityActive() ? 'gravity' : 'standard'}`);
   const label = gameMode === 'free' ? `Free Play · ${input === 'fling' ? 'Fling' : 'Cue'}` :
     `${playerName(match.turn, gameMode, online.seat)} · ${match.breaking ? 'Break' : 'Shot'}`;
   replay.begin(physicsTime, allBalls().map(numberOf), readReplayPoses, { label, planetTime: performance.now() / 1000,
+    rack: arcade.state?.rack, play: (arcade.state?.lastPlay ?? 0) + 1,
     online: gameMode === 'online' ? { seq: onlineShotSeq, rack: arcade.state?.rack ?? null,
       play: arcade.state?.lastPlay, shots: match.shots, breaker: match.breaker } : null });
 }
@@ -657,11 +682,16 @@ function syncReplayButton() {
   button.hidden = !replay.last;
   button.disabled = !canReplay();
 }
-function startReplay() {
+function startReplay(best = false) {
   if (!canReplay() || replayView.active) return;
+  const clip = best ? rackResults.clip : replay.last;
+  if (!clip) return;
+  replayingBest = best;
   if (!computerTurn()) endGesture();
   arcade.effects.clear(); audio.stopArcade(); computerThoughts.clear();
-  replayView.start(replay.last, allBalls().map(ball => ({ number: numberOf(ball), mesh: ball.mesh })));
+  replayView.start(clip, allBalls().map(ball => ({ number: numberOf(ball), mesh: ball.mesh })));
+  if (best) document.getElementById('replay-title').textContent = `Best shot · ${clip.metadata.label}`;
+  document.getElementById('replay-close').textContent = best ? 'Back to results' : 'Back to game';
   guide.visible = false; cueStick.visible = false;
   renderer.shadowMap.needsUpdate = true; updateScore();
 }
@@ -670,7 +700,8 @@ function stopReplay(focus = false) {
   replayView.stop(); renderer.shadowMap.needsUpdate = true;
   audio.setMuted(!!window.playful?.mute || document.hidden);
   updateScore();
-  if (focus) document.getElementById('open-replay').focus();
+  if (focus) document.getElementById(replayingBest ? 'replay-best' : 'open-replay').focus();
+  replayingBest = false;
 }
 // pan and distance of a table position relative to the camera
 function spatial(p) {
@@ -755,7 +786,7 @@ function setInteractionMode(mode) {
 }
 const onTable = (h) => h.mesh.visible && h.body.isEnabled() && !pocketedSet.has(h) && h.body.translation().z > BALL_Z - 0.5;
 const cueReady = () => !rackMotion && onTable(cue) && tableStill() && !activeShot && !arcade.active && !remoteTurn() &&
-  (gameMode === 'free' || (match.winner === null && !match.ballInHand && (!onEight() || calledPocket !== null)));
+  (gameMode === 'free' ? pocketed < 15 : (match.winner === null && !match.ballInHand && (!onEight() || calledPocket !== null)));
 const onEight = () => !match.breaking && targets(match).length === 1 && targets(match)[0] === 8;
 const canCallPocket = () => gameMode !== 'free' && match.winner === null && !match.ballInHand &&
   !rackMotion && !activeShot && !arcade.active && !computerTurn() && !remoteTurn() && onEight();
@@ -885,7 +916,8 @@ function showGameControls(show) {
       updateScore();
     });
     document.getElementById('overhead-view').addEventListener('click', overheadView);
-    document.getElementById('open-replay').addEventListener('click', startReplay);
+    document.getElementById('open-replay').addEventListener('click', () => startReplay());
+    document.getElementById('replay-best').addEventListener('click', () => startReplay(true));
     document.getElementById('rematch').addEventListener('click', restart);
     document.querySelectorAll('#pocket-map button').forEach(b => b.addEventListener('click', () => {
       if (!canCallPocket()) return;
@@ -1057,10 +1089,10 @@ function updateScore() {
   document.getElementById('match-score').hidden = free;
   document.getElementById('interaction-group').hidden = !free;
   document.getElementById('rerack').textContent = free ? 'Re-rack ↻' : 'New rack ↻';
-  document.getElementById('rematch').hidden = free || match.winner === null;
+  syncRackResults();
   layoutPocketMap();
   syncPocketCall();
-  document.getElementById('open-spin').hidden = !!rackMotion || interactionMode !== 'cue' || !!activeShot || computerTurn() || remoteTurn() || (!free && match.winner !== null);
+  document.getElementById('open-spin').hidden = !!rackMotion || interactionMode !== 'cue' || !!activeShot || computerTurn() || remoteTurn() || (free ? pocketed === 15 : match.winner !== null);
   if (!free) for (let i = 0; i < 2; i++) {
     const card = document.getElementById(`player-${i}`);
     card.classList.toggle('active', match.winner === null && match.turn === i);
@@ -1362,7 +1394,7 @@ function receiveOnline(data) {
   // A slower spectator may receive acceptance before its simulation settles.
   // Include the accepted end pose, just as the live table displays it.
   if (replay.recording) replay.finish(physicsTime, readReplayPoses, true);
-  replay.resolveOnline(data); syncReplayButton();
+  replay.resolveOnline(data); syncReplayButton(); syncRackResults();
   if (newRack && !data.pending) { beginRack(origins, data.snapshot.balls); updateScore(); }
   document.getElementById('rematch').disabled = data.votes?.includes(online.seat) ?? false;
   document.getElementById('rematch').textContent = data.votes?.includes(online.seat) ? 'Waiting for your friend…' : data.votes?.length ? 'Accept rematch' : 'Rematch';
@@ -1483,7 +1515,7 @@ export default {
   },
   pointerdown(e) {
     audio.ensure();
-    if (rackMotion || replayView.active) return false;
+    if (rackMotion || replayView.active || gameMode === 'free' && pocketed === 15) return false;
     if (computerTurn() || remoteTurn() || e.button !== 0 || dragging || aiming || placing) return false;
     if (gameMode !== 'free' && match.winner === null && match.ballInHand && !activeShot && tableStill()) {
       if (meshUnderPointer(e, [cue.mesh]) !== cue.mesh && !validPlacement(pointerToPlane(e, BALL_Z))) return false;
@@ -1563,7 +1595,7 @@ export default {
     if (arcade.active?.free) {
       arcade.settleFree(tableStill(), belowSince.size, dragging, world.timestep);
       if (pocketed === 15 && !arcade.active) gameplayAnalytics.finish('cleared', arcade.state?.totals[0] || 0);
-      if (!arcade.active) { replay.finish(physicsTime, readReplayPoses); syncReplayButton(); }
+      if (!arcade.active) { replay.finish(physicsTime, readReplayPoses); syncReplayButton(); syncRackResults(); }
     }
     // The next solver step's incoming velocities are needed to distinguish a
     // struck ball from one that merely deflected a ball already in motion.
