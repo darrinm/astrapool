@@ -38,7 +38,7 @@ else {
   console.log(`Astra Pool · last ${days} days · ${mode} · UTC`);
   console.log(`${started} started · ${finished} finished · ${started ? (100 * finished / started).toFixed(1) : '0.0'}% completed`);
   console.log(`${Number(s.ended || 0)} ended early · ${started - finished - Number(s.ended || 0)} unfinished or still playing`);
-  console.log(`${Number(s.shots || 0)} shots · ${Number(s.avg_seconds || 0)}s average completed rack · ${Number(s.settings_changes || 0)} settings changes`);
+  console.log(`${Number(s.shots || 0)} shots · ${Number(s.avg_seconds || 0)}s average completed rack · ${Number(s.settings_changes || 0)} settings changes (local/computer/free)`);
   for (const [label, rows] of [['Daily starts (and their outcomes)', data.daily], ['Game modes', data.modes], ['Winners', data.outcomes],
     ...Object.entries(data.settings).map(([key, rows]) => [`Starting ${key}`, rows])]) {
     console.log(`\n${label}`); if (rows.length) console.table(rows); else console.log('No games yet.');

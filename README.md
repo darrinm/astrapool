@@ -122,7 +122,8 @@ Node 24, from `.nvmrc`. Scale is 1 unit = 26 mm, g = 377.
 Pushing to `main` runs the tests and the build, then deploys. Pull requests never deploy. The
 repository needs the Actions secret `CLOUDFLARE_API_TOKEN`, from Cloudflare's "Edit Cloudflare
 Workers" template, scoped to the account in `wrangler.jsonc` and the `darrinm.com` zone.
-The token also needs **Account → D1 → Edit** so deployment can apply analytics migrations.
+The token also needs **Account → D1 → Edit** to apply analytics migrations. A migration failure
+emits a warning and allows gameplay deployment to continue; analytics may be unavailable until repaired.
 
 `npm run deploy` publishes local files, including uncommitted ones. If your shell exports
 credentials for another account, prefix it with

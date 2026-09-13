@@ -23,7 +23,7 @@ npm run analytics -- --local                  # local development data only
 Reports include daily counts, modes, winners, and breakdowns by starting difficulty, room,
 ball collection, arcade setting, effects setting, sound, input, and device category. Each
 breakdown includes starts, finishes, early endings, shots, and average completed-rack duration.
-The summary includes completion percentage and the number of observed settings changes.
+The summary includes completion percentage and observed settings changes for local/computer/Free Play.
 
 Time filters use a rolling interval. Daily rows use UTC and group games by **when they started**;
 a game finishing tomorrow updates the completion count for today's start cohort. Completion
@@ -91,9 +91,10 @@ GROUP BY room, balls ORDER BY started DESC;
 
 `initial_settings` preserves the first-shot settings; `settings` holds the latest observed
 values. `settings_changes` counts changes between observed snapshots, not individual clicks.
-For online games these are the first shooter's settings and the most recent shooter's settings;
-players can choose different rooms and presentation, so this is not a per-player preference
-report. Older clients report `unknown` settings. The device category uses coarse-pointer input
+For online games these are the first shooter's settings and the most recent shooter's settings.
+Online `settings_changes` stays zero: alternating players with different preferences must not
+inflate that count. This is not a per-player preference report. Older clients report `unknown`
+settings. The device category uses coarse-pointer input
 as the mobile approximation. Sound records the user's mute choice, not temporary background
 or replay muting. Difficulty is `none` outside computer mode.
 
@@ -104,14 +105,21 @@ in progress at deployment begins tracking at its next accepted shot.
 
 Local/computer/Free Play clients send a same-origin POST on the first shot and terminal events,
 plus cumulative updates at most every 30 seconds during play. Hiding or leaving the page flushes
-an update using `sendBeacon`. Restoring a page from the browser's back/forward cache preserves
-its rack. Normal refresh starts a fresh attract screen.
+an update using `sendBeacon`. Unacknowledged updates for the most recent 20 racks remain in
+memory and retry every 30 seconds, including after a switch or restart. They are lost if the
+page is destroyed; a successful beacon only acknowledges browser queuing. Restoring a page from
+the browser's back/forward cache preserves its rack. Normal refresh starts a fresh attract screen.
 
-Online records are created by the Durable Object after a validated shot. The room retains its
-record across reconnects and hibernation, and retries writes on subsequent room activity and
-expiry. Analytics writes do not hold up shot animation. Delivery remains best effort: blocked
-requests, offline play, a killed tab, or a database outage can leave incomplete records. Later
-cumulative snapshots repair missed updates while that rack is active.
+Online records are created by the Durable Object after a validated shot. Changed snapshots are
+saved to a durable outbox before broadcasting, then delivery is explicitly awaited after the
+broadcast so database latency does not delay animation. Acknowledged versions are removed;
+failed records survive reconnects, hibernation and rematches and retry on activity or a one-minute
+alarm. The retry alarm preserves the separate 90-second shot timeout. An expired room is retained
+until all queued records have been delivered. Placements, ordinary results, rematch votes and
+reconnects do not issue D1 writes unless a previous delivery still needs retrying.
+
+Delivery remains best effort for browser games: blocked requests, offline play or a killed tab
+can leave incomplete records. Database outages delay online records until retry succeeds.
 
 A random UUID identifies a rack only. There are no visitor identifiers, analytics cookies,
 player names, room links, reconnect tokens, ball positions, or stored IP addresses. Settings
@@ -132,8 +140,11 @@ schema migrations, run:
 npm run analytics:migrate
 ```
 
-Both `npm run deploy` and the main-branch GitHub Actions deployment apply pending migrations
-before publishing. The existing `CLOUDFLARE_API_TOKEN` Actions secret needs **Account → D1 → Edit**
+Both `npm run deploy` and the main-branch GitHub Actions deployment attempt pending migrations
+before publishing. Migration failures emit a warning and allow gameplay deployment to continue.
+Analytics may remain unavailable until the permission or database issue is fixed and
+`npm run analytics:migrate` succeeds; the standalone migration command still exits nonzero on failure.
+The existing `CLOUDFLARE_API_TOKEN` Actions secret needs **Account → D1 → Edit**
 in addition to its Workers deployment permissions. Reporting-only API tokens can use D1 Read.
 Local Wrangler OAuth login also supports migrations and reports. Do not put these credentials
 in client code or the repository.

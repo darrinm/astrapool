@@ -57,3 +57,43 @@ test('settings contain only known, bounded categories', () => {
   assert.equal(settings.room, 'unknown'); assert.equal(settings.difficulty, 'tricky');
   assert.equal(settings.token, undefined); assert.equal(settings.device, 'mobile');
 });
+
+for (const reason of ['switch', 'restart']) test(`failed ${reason} delivery retries after selecting another rack`, async () => {
+  const attempts = []; let resolveEnd;
+  const { analytics: a, advance } = fixture(record => {
+    attempts.push(record);
+    if (record.endReason && !resolveEnd) return new Promise(resolve => { resolveEnd = resolve; });
+    return true;
+  });
+  a.select('local'); a.shot(); await Promise.resolve();
+  if (reason === 'restart') a.end('restart');
+  a.select('computer'); a.shot();
+  resolveEnd(false); await Promise.resolve();
+  const ended = attempts.find(record => record.endReason);
+  assert.equal(ended.endReason, reason);
+  a.flush(); assert.equal(attempts.filter(record => record.id === ended.id).length, 2);
+  advance(30000); a.flush(); await Promise.resolve();
+  assert.equal(attempts.filter(record => record.id === ended.id).length, 3);
+  assert.equal(attempts.at(-1).endedAt, ended.endedAt);
+  assert.equal(a.pending.has(ended.id), false);
+  advance(30000); a.flush(); assert.equal(attempts.filter(record => record.id === ended.id).length, 3);
+});
+
+test('an old request failure cannot dirty a successfully delivered terminal snapshot', async () => {
+  let rejectStart;
+  const { analytics: a } = fixture(record => record.finishedAt ? true : new Promise((resolve, reject) => { rejectStart = reject; }));
+  a.select('computer'); a.shot(); a.finish('player'); await Promise.resolve();
+  rejectStart(new Error('late failure')); await Promise.resolve();
+  assert.equal(a.dirty, false); assert.equal(a.pending.size, 0);
+});
+
+test('retired racks retry while no new game is selected and the outage buffer stays bounded', async () => {
+  const attempts = [];
+  const { analytics: a, advance } = fixture(record => { attempts.push(record); return false; });
+  for (let i = 0; i < 25; i++) { a.select('local'); a.shot(); }
+  a.select(null); await Promise.resolve();
+  assert.equal(a.pending.size, 20);
+  const before = attempts.length; advance(30000); a.flush();
+  assert.equal(attempts.length - before, 20);
+  assert.ok(attempts.slice(-20).every(record => record.endReason === 'switch'));
+});
