@@ -3,13 +3,13 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 
-import { P, pocketCenters } from './constants.js';
+import { P, pocketCenters, POCKET_DIMENSIONS } from './constants.js';
 export { P, pocketCenters } from './constants.js';
 export const RULES = () => ({ friction: RAPIER.CoefficientCombineRule.Max, restitution: RAPIER.CoefficientCombineRule.Min });
 
 // The felt outline with pocket holes (used for both the visual slab and the trimesh collider).
 export function tableShape(withHoles = true) {
-  const { HW, HH, CUSH, POCKET_R } = P, RAIL_W = 3.2;
+  const { HW, HH, CUSH, POCKET_R, RAIL_W } = P;
   const s = new THREE.Shape();
   const ox = HW + RAIL_W + CUSH, oy = HH + RAIL_W + CUSH;
   s.moveTo(-ox, -oy); s.lineTo(ox, -oy); s.lineTo(ox, oy); s.lineTo(-ox, oy); s.closePath();
@@ -30,15 +30,19 @@ export function feltCollider(world, feltZ, withHoles = true) {
 
 // Cushion polygons in table coordinates (nose on the playing line, ends angled into the pockets).
 export function cushionPolygons() {
-  const { HW, HH, CUSH, POCKET_R } = P;
-  const jc = POCKET_R * 1.15, js = POCKET_R * 1.25, jawC = CUSH * 1.3, jawS = CUSH * 0.8;
+  const { HW, HH, CUSH } = P;
+  const { corner, side } = POCKET_DIMENSIONS;
+  const cornerInset = corner.mouth / Math.SQRT2;
+  const sideInset = side.mouth / 2;
+  const cornerRun = CUSH / Math.tan((180 - corner.facingAngle) * Math.PI / 180);
+  const sideRun = CUSH / Math.tan((180 - side.facingAngle) * Math.PI / 180);
   const polys = [];
   for (const sy of [-1, 1]) for (const sx of [-1, 1]) {
-    const b0 = js - 0.6, b1 = HW - jc + 0.6, n0 = js + jawS, n1 = HW - jc - jawC;
+    const b0 = sideInset - sideRun, b1 = HW - cornerInset + cornerRun, n0 = sideInset, n1 = HW - cornerInset;
     polys.push([[sx * b0, sy * (HH + CUSH)], [sx * n0, sy * HH], [sx * n1, sy * HH], [sx * b1, sy * (HH + CUSH)]]);
   }
   for (const sx of [-1, 1]) {
-    const b = HH - jc + 0.6, n = HH - jc - jawC;
+    const b = HH - cornerInset + cornerRun, n = HH - cornerInset;
     polys.push([[sx * (HW + CUSH), -b], [sx * HW, -n], [sx * HW, n], [sx * (HW + CUSH), b]]);
   }
   return polys;
@@ -103,7 +107,7 @@ export function pocketWellColliders(world, feltZ, events = false) {
 
 // Backstop around the whole table so nothing leaves the area even on a jump.
 export function backstopColliders(world, feltZ) {
-  const { HW, HH, CUSH } = P, RAIL_W = 3.2, ox = HW + CUSH + RAIL_W, oy = HH + CUSH + RAIL_W, out = [];
+  const { HW, HH, CUSH, RAIL_W } = P, ox = HW + CUSH + RAIL_W, oy = HH + CUSH + RAIL_W, out = [];
   const add = (hx, hy, x, y) => out.push(world.createCollider(RAPIER.ColliderDesc.cuboid(hx, hy, 8).setTranslation(x, y, feltZ + 4).setRestitution(0).setFriction(1)));
   add(ox + 4, 1, 0, oy + 1); add(ox + 4, 1, 0, -oy - 1); add(1, oy + 4, ox + 1, 0); add(1, oy + 4, -ox - 1, 0);
   return out;
