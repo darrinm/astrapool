@@ -10,7 +10,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { RAPIER, DEPTH, renderer, scene, camera, world, eventQueue, heads, lights, DEFAULT_LIGHTS, setBallDetail, resetHeads, placeHead, hideHead,
   setHeadRadius, addMesh, addBody, addStaticCollider, registerProp, clearProps, pointerToPlane, meshUnderPointer, ui } from './core.js';
-import { noiseBump, feltMap, woodMap, clothNormal, radialShadow, gradientStrip } from './textures.js';
+import { noiseBump, feltMap, woodMap, clothNormal, radialShadow } from './textures.js';
 import { bakeCap, authenticBall, chooseBallMap, loadedHead, BALL_COLORS } from './ballcaps.js';
 import { ballSetById, nextBallSet, planetForBall } from './ball-sets.js';
 import { createPlanetSet, updatePlanetOrbits, updatePlanetCaps } from './planet-balls.js';
@@ -32,6 +32,9 @@ import { createPowerGuide, setPowerPath, limitCuePath, aimPathColor } from './ai
 import { AimPrediction } from './aim-prediction.js';
 import { CueAim } from './cue-aim.js';
 import { cuePose } from './cue-pose.js';
+import { railFrameShape } from './rail-frame.js';
+import { createPocketLiners } from './pocket-liners.js';
+import { createCushionShadows } from './cushion-shadows.js';
 import { projectPocketTargets, pocketAtPointer, pocketTapMoved, completesPocketTap } from './pocket-call.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
@@ -51,7 +54,7 @@ const { R, G, MU_SLIDE, MU_BALL, E_BALL, HW, HH, RAIL_H, CUSH, POCKET_R } = P;  
 const MAX_PULL = 24, MAX_SPEED = 24 * 0.44704 / 0.026;   // 24 mph in game units/s (1 unit = 26 mm), shared with flings
 const SPEED_PER_PULL = MAX_SPEED / MAX_PULL;
 const FELT_Z = -DEPTH, BALL_Z = FELT_Z + R;
-const RAIL_W = 3.2, WELL_DEPTH = P.WELL_DEPTH;
+const { RAIL_W, WELL_DEPTH } = P;
 let sunLight, targetRings, placementMarker;
 let cue, aiming = null, pockets = [], guide, cueStick, marker, pocketed = 0, shots = 0, spin = { x: 0, y: 0 }, spinEl, controls;
 let lastViewport = { w: innerWidth, h: innerHeight }, refitPending = false;
@@ -221,27 +224,22 @@ function build() {
     map: feltMap(512, 6, '#0a3820'), normalMap: clothNormal(512, 40), normalScale: new THREE.Vector2(0.45, 0.45),
     roughness: 1.0, sheen: 0.18, sheenRoughness: 0.95, sheenColor: new THREE.Color('#2f8a55'), color: '#ffffff',
   });
-  const slabWood = new THREE.MeshPhysicalMaterial({ map: woodMap(1024, 1, 11, ['#1f1007', '#2a170a', '#31200c', '#160b04']), roughness: 0.6, clearcoat: 0.15, clearcoatRoughness: 0.6, envMapIntensity: 0.08 });
-  const felt = addMesh(new THREE.Mesh(feltGeo, [feltMat, slabWood])); felt.receiveShadow = true;   // caps felt, sides wood
+  // The bed cloth wraps over the cut edge into each pocket. The outer slab sides
+  // are concealed by the rails and apron; no raised trim crosses the entrance.
+  const felt = addMesh(new THREE.Mesh(feltGeo, feltMat)); felt.receiveShadow = true;
   feltCol = feltCollider(world, FELT_Z); registerCollider(feltCol);
 
-  // ---- pocket wells: liner walls and a bottom, plus a leather rim ----
+  // ---- pocket wells: recessed liners below the cloth-covered slate edge ----
   const liner = new THREE.MeshStandardMaterial({ color: '#3a2a1d', roughness: 0.9, side: THREE.BackSide, bumpMap: noiseBump(256, 4, 9), bumpScale: 0.4 });
-  const leather = new THREE.MeshStandardMaterial({ color: '#1e140c', roughness: 0.55, bumpMap: noiseBump(256, 3, 9), bumpScale: 0.35 });
+  const linerTop = 1.15; // overlap the bottom of the 1.2-unit cloth-covered slab
   for (const p of pockets) {
-    const cyl = addMesh(new THREE.Mesh(new THREE.CylinderGeometry(POCKET_R + 0.2, POCKET_R + 0.2, WELL_DEPTH, 32, 1, true).rotateX(Math.PI / 2), liner));
-    cyl.position.set(p.x, p.y, FELT_Z - WELL_DEPTH / 2 + 0.05);
+    const cyl = addMesh(new THREE.Mesh(new THREE.CylinderGeometry(POCKET_R + 0.2, POCKET_R + 0.2, WELL_DEPTH - linerTop, 80, 1, true).rotateX(Math.PI / 2), liner));
+    cyl.position.set(p.x, p.y, FELT_Z - (WELL_DEPTH + linerTop) / 2);
     const bottom = addMesh(new THREE.Mesh(new THREE.CircleGeometry(POCKET_R + 0.2, 32), new THREE.MeshStandardMaterial({ color: '#2b1f15', roughness: 1 })));
     bottom.position.set(p.x, p.y, FELT_Z - WELL_DEPTH); bottom.receiveShadow = true;
-    const rim = addMesh(new THREE.Mesh(new THREE.TorusGeometry(POCKET_R + 0.12, 0.2, 10, 48), leather));
-    rim.position.set(p.x, p.y, FELT_Z + 0.02); rim.castShadow = true; rim.receiveShadow = true;
-    // pocket casting: a thick leather collar at rail height that covers the notch in the rails
-    const toward = Math.atan2(-p.y, -p.x);                          // direction from the pocket to the table centre
-    const arc = Math.abs(p.x) < 1 ? Math.PI * 1.05 : Math.PI * 1.35; // side pockets show less collar than corners
-    const casting = addMesh(new THREE.Mesh(new THREE.TorusGeometry(POCKET_R + 0.55, 0.5, 12, 40, arc), leather));
-    casting.position.set(p.x, p.y, FELT_Z + RAIL_H * 0.55); casting.rotation.z = toward + Math.PI - arc / 2;
-    casting.castShadow = true; casting.receiveShadow = true;
+
   }
+  addMesh(createPocketLiners(FELT_Z));
   for (const c of pocketWellColliders(world, FELT_Z, true)) registerCollider(c);
 
   // ---- cushions: each is a top-view polygon (nose edge on the playing line, ends angled into the pockets),
@@ -260,17 +258,15 @@ function build() {
   const walnut = ['#1f1007', '#2a170a', '#31200c', '#160b04'];   // dark walnut
   const woodTex = (seed, rx, ry, rot = 0) => { const t = woodMap(1024, 1, seed, walnut); t.repeat.set(rx, ry); t.rotation = rot; t.center.set(0.5, 0.5); return t; };
   const wood = (seed, rx, ry, rot) => new THREE.MeshPhysicalMaterial({ map: woodTex(seed, rx, ry, rot), roughness: 0.6, clearcoat: 0.15, clearcoatRoughness: 0.6, metalness: 0, envMapIntensity: 0.08 });   // satin; the environment carries the lamp at high intensity and would mirror it as a streak along the rounded edges
-  const railLong = wood(11, 4, 0.3), railShort = wood(12, 0.3, 2, Math.PI / 2), apronWood = wood(13, 4, 0.5), apronWoodEnd = wood(13, 2, 0.5, Math.PI / 2), legWood = wood(14, 0.4, 1.2, Math.PI / 2);
-  const rail = (w, h, x, y, mat) => {
-    const sh = new THREE.Shape([new THREE.Vector2(-w / 2, -h / 2), new THREE.Vector2(w / 2, -h / 2), new THREE.Vector2(w / 2, h / 2), new THREE.Vector2(-w / 2, h / 2)]);
-    // ExtrudeGeometry bevels both ends; the rail is sunk so the bottom chamfer sits inside the apron instead of
-    // catching the lamp as a bright line along the base.
-    const geo = new THREE.ExtrudeGeometry(sh, { depth: RAIL_H + 1.5, bevelEnabled: true, bevelThickness: 0.5, bevelSize: 0.45, bevelSegments: 5 });
-    const m = addMesh(new THREE.Mesh(geo, mat)); m.position.set(x, y, FELT_Z - 1.5); m.receiveShadow = true; m.castShadow = true;
-  };
+  const railLong = wood(11, 4, 0.3), apronWood = wood(13, 4, 0.5), apronWoodEnd = wood(13, 2, 0.5, Math.PI / 2), legWood = wood(14, 0.4, 1.2, Math.PI / 2);
   const ox = HW + CUSH + RAIL_W, oy = HH + CUSH + RAIL_W;
-  for (const sy of [-1, 1]) rail(ox * 2, RAIL_W, 0, sy * (HH + CUSH + RAIL_W / 2), railLong);
-  for (const sx of [-1, 1]) rail(RAIL_W, (HH + CUSH) * 2, sx * (HW + CUSH + RAIL_W / 2), 0, railShort);
+  const railGeo = new THREE.ExtrudeGeometry(railFrameShape(RAIL_W), {
+    depth: RAIL_H + 1.5, bevelEnabled: true, bevelThickness: 0.5,
+    bevelSize: P.RAIL_BEVEL, bevelSegments: 5, curveSegments: 40,
+  });
+  const frame = addMesh(new THREE.Mesh(railGeo, railLong));
+  frame.position.z = FELT_Z - 1.5;
+  frame.receiveShadow = true; frame.castShadow = true;
   // sight diamonds: inlaid rhombi, long axis across the rail (pointing at the playing surface), flush with the top
   const pearl = new THREE.MeshPhysicalMaterial({ color: '#efe6d6', roughness: 0.25, clearcoat: 0.6, clearcoatRoughness: 0.2, iridescence: 0.35, iridescenceIOR: 1.3 });
   const railTop = FELT_Z - 1.5 + RAIL_H + 1.5 + 0.5;   // extrude depth plus the top bevel
@@ -325,20 +321,14 @@ function build() {
   sunLight.shadow.camera.near = R * 1.04; sunLight.shadow.camera.far = 14;
   sunLight.shadow.bias = -0.001; sunLight.shadow.normalBias = 0.025;
 
-  tableFinish = { felt: feltMat, wood: [slabWood, railLong, railShort, apronWood, apronWoodEnd, legWood], trim: mouldMat, shade: shade.material, legs };
+  tableFinish = { felt: feltMat, wood: [railLong, apronWood, apronWoodEnd, legWood], trim: mouldMat, shade: shade.material, legs };
   tableLights = [area, spot];
   tableFinish.original = { felt: feltMat.map, wood: tableFinish.wood.map(material => material.map), lights: tableLights.map(light => light.color.clone()), intensities: tableLights.map(light => light.intensity) };
 
-  // ---- contact shadows under the balls, and occlusion strips where the cushions meet the felt ----
+  // ---- contact shadows under the balls, and soft contours where the cushions meet the felt ----
   const shadowTex = radialShadow();
   contactShadows = [...heads, { id: 'cue' }, { id: 'ball8' }].map(() => { const m = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(R * 2.6, R * 2.6), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, opacity: 0.55 }))); m.visible = false; return m; });
-  const stripTex = gradientStrip();
-  const strip = (len, x, y, rotZ) => {
-    const m = addMesh(new THREE.Mesh(new THREE.PlaneGeometry(0.9, len), new THREE.MeshBasicMaterial({ map: stripTex, transparent: true, depthWrite: false, opacity: 0.8 })));
-    m.position.set(x, y, FELT_Z + 0.012); m.rotation.z = rotZ;
-  };
-  for (const sy of [-1, 1]) strip(HW * 2, 0, sy * (HH - 0.45), sy > 0 ? -Math.PI / 2 : Math.PI / 2);
-  for (const sx of [-1, 1]) strip(HH * 2, sx * (HW - 0.45), 0, sx > 0 ? Math.PI : 0);
+  addMesh(createCushionShadows(FELT_Z));
 
   // ---- plain balls: the white cue ball (0) and the black 8, so the 14 heads plus one make a full rack ----
   extras = [0, 8].map((n) => {

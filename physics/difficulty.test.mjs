@@ -21,7 +21,8 @@ test('Easy makes straightforward short pots instead of missing indiscriminately'
 });
 
 test('Medium converts more shots and builds longer runs than Easy on shared seeded layouts', () => {
-  const layouts = endgameLayouts(54321, 12), totals = {};
+  // Use enough layouts that pocket-geometry changes do not let a few shots dominate the comparison.
+  const layouts = endgameLayouts(54321, 24), totals = {};
   for (const difficulty of ['easy', 'medium']) {
     const total = { shots: 0, pots: 0, fouls: 0, runouts: 0, visits: 0 };
     for (const [i, balls] of layouts.entries()) for (let attempt = 0; attempt < 2; attempt++) {

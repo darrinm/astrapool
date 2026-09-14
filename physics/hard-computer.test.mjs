@@ -3,15 +3,14 @@ import assert from 'node:assert/strict';
 import RAPIER from '@dimforge/rapier3d-compat';
 import layouts from './hard-layouts.json' with { type: 'json' };
 import { hardComputerShot } from '../src/hard-computer.js';
-import { computerShot } from '../src/computer.js';
 import { practiceTable, simulateShot } from '../src/shot-simulation.js';
 import { canPlace } from '../src/table-state.js';
 import { newMatch } from '../src/eight-ball.js';
 await RAPIER.init();
-for (const [i, { balls, state }] of layouts.entries()) test(`Hard avoids the old player's ${i === 0 ? 'wrong first contact' : 'scratch'} on layout ${i + 1}`, () => {
+for (const [i, { balls, state }] of layouts.entries()) test(`Hard plays historical foul-regression layout ${i + 1} without fouling`, () => {
   const table = practiceTable(balls), before = table.snapshot.slice();
-  const old = simulateShot(table, state, computerShot(balls, state, 'hard', () => 0.5));
-  assert.ok(old.state.ballInHand);
+  // These layouts originally triggered legacy-planner fouls. Pocket dimensions
+  // can change that baseline; the regression contract is the current planner's safe shot.
   const shot = hardComputerShot(balls, state, table), result = simulateShot(table, state, shot);
   if (i === 0) {
     const previews = [];
