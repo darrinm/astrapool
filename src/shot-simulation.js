@@ -16,7 +16,16 @@ export function practiceTable(balls, { blackHoleGravity = false } = {}) {
     return { snapshot: world.takeSnapshot(), handles, cushions, feltZ: 0, blackHoleGravity };
   } finally { world.free(); }
 }
-export function simulateShot(table, state, shot, trace = false, { arcade = false, solo = false } = {}) {
+export function simulateShot(...args) {
+  const simulation = simulateShotSteps(...args);
+  let next;
+  do { next = simulation.next(); } while (!next.done);
+  return next.value;
+}
+
+// Yielding never advances or changes physics. Interactive workers can abandon
+// an obsolete shot between batches; return() still frees the restored world.
+export function* simulateShotSteps(table, state, shot, trace = false, { arcade = false, solo = false, aimPreview = false, yieldEvery = 0, maxCueBounces = Infinity } = {}) {
   const world = RAPIER.World.restoreSnapshot(table.snapshot), queue = new RAPIER.EventQueue(true);
   try {
     const balls = table.handles.map(b => ({ number: b.number, body: world.getRigidBody(b.handle) }));
@@ -32,15 +41,16 @@ export function simulateShot(table, state, shot, trace = false, { arcade = false
       cue.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
       cue.setLinvel(zero, true); cue.setAngvel(zero, true);
     }
-    // Read a bounded sample from this simulation, without running a second shot
-    // or changing its physics. Only occasional search candidates request a trace.
-    const paths = trace ? balls.filter(b => arcade || b.number === 0 || b.number === shot.target).map(b => ({ number: b.number, points: [], body: b.body, ended: false })) : null;
+    // Read a bounded trace without running a second shot or changing its physics.
+    // Player aim retains longer paths; computer search uses shorter samples.
+    const paths = trace ? balls.filter(b => arcade || b.number === 0 || !aimPreview && b.number === shot.target).map(b => ({ number: b.number, points: [], bounces: [], body: b.body, ended: false })) : null;
+    const initial = aimPreview ? new Map(balls.map(b => [b.number, b.body.translation()])) : null;
     const sample = () => {
       for (const path of paths) {
         if (path.ended) continue;
         const p = path.body.translation(), previous = path.points.at(-1);
         if (!path.body.isEnabled() || p.z < table.feltZ || Math.abs(p.x) > P.HW + P.CUSH || Math.abs(p.y) > P.HH + P.CUSH) { path.ended = true; continue; }
-        if (path.points.length >= 96) { path.ended = true; continue; }
+        if (path.points.length >= (aimPreview ? 2048 : 96)) { path.ended = true; continue; }
         if (!previous || Math.hypot(p.x - previous.x, p.y - previous.y) > 0.2) path.points.push({ x: p.x, y: p.y });
       }
     };
@@ -50,11 +60,13 @@ export function simulateShot(table, state, shot, trace = false, { arcade = false
     strike(cue, shot.dir, shot.speed, shot.spin);
     let still = 0, settled = false;
     for (let step = 0; step < 480 * 24; step++) {
-      let traceContact = false;
+      if (yieldEvery && step > 0 && step % yieldEvery === 0) yield;
+      let traceContact = false, cueBounce = false;
       queue.drainCollisionEvents((a, b, started) => {
         if (!started) return;
         const na = numbers.get(a), nb = numbers.get(b);
-        if (paths && (arcade || na === 0 || nb === 0 || na === shot.target || nb === shot.target)) traceContact = true;
+        if (aimPreview && (na === 0 && (nb > 0 || cushions.has(b)) || nb === 0 && (na > 0 || cushions.has(a)))) cueBounce = true;
+        if (paths && (aimPreview || arcade || na === 0 || nb === 0 || na === shot.target || nb === shot.target)) traceContact = true;
         if (tracker) {
           if (na !== undefined && nb !== undefined) tracker.hit(step, na, nb, beforeMotion.get(na), beforeMotion.get(nb), byNumber.get(na).linvel(), byNumber.get(nb).linvel());
           const n = cushions.has(a) ? nb : cushions.has(b) ? na : undefined;
@@ -67,12 +79,26 @@ export function simulateShot(table, state, shot, trace = false, { arcade = false
           if (na === 0 && nb > 0) report.first = nb;
           if (nb === 0 && na > 0) report.first = na;
         }
+        if (aimPreview && paths?.length === 1 && report.first !== null) {
+          const number = report.first, p = initial.get(number);
+          paths.push({ number, body: byNumber.get(number), points: [{ x: p.x, y: p.y }], ended: false });
+        }
         if (report.first !== null) {
           const n = cushions.has(a) ? nb : cushions.has(b) ? na : undefined;
           if (n !== undefined && !report.rails.includes(n)) report.rails.push(n);
         }
       });
-      if (paths && (step % 16 === 0 || traceContact)) sample();
+      if (cueBounce && paths) {
+        const path = paths[0], p = cue.translation();
+        if (!path.ended && path.points.length < 2048) {
+          path.points.push({ x: p.x, y: p.y });
+          path.bounces.push(path.points.length - 1);
+        }
+      }
+      if (paths && (step % (aimPreview ? 8 : 16) === 0 || traceContact)) sample();
+      // A bounded look-ahead ends at the next impact after the allowed bounces.
+      // This is a truncated trajectory, so no ball receives a resting marker.
+      if (aimPreview && cueBounce && paths[0].bounces.length > maxCueBounces) break;
       if (tracker) for (const { number, body } of balls) {
         const p = body.translation();
         if (body.isEnabled() && p.z >= table.feltZ) tracker.sample(number, p);
@@ -105,9 +131,16 @@ export function simulateShot(table, state, shot, trace = false, { arcade = false
       }
       world.step(queue);
     }
+    // A stop marker needs the actual final centre, not the last periodic sample.
+    // Only show one when the full simulation settled and the ball remains on the cloth.
+    if (aimPreview && paths) for (const path of paths) {
+      const p = path.body.translation();
+      path.stopped = settled && !path.ended && path.body.isEnabled() && p.z >= table.feltZ;
+      if (path.stopped) path.points.push({ x: p.x, y: p.y });
+    }
     const ballsAfter = balls.filter(b => b.body.isEnabled()).map(b => ({ number: b.number, x: b.body.translation().x, y: b.body.translation().y }));
     return { ...(solo ? resolveSoloShot : resolveShot)(state, report), report, balls: ballsAfter, settled,
       ...(tracker && { evidence: tracker.evidence(), arcade: tracker.report() }),
-      ...(paths && { paths: paths.map(({ number, points }) => ({ number, points })) }) };
+      ...(paths && { paths: paths.map(({ number, points, stopped, bounces }) => ({ number, points, ...(aimPreview && { stopped, bounces: bounces || [] }) })) }) };
   } finally { queue.free(); world.free(); }
 }

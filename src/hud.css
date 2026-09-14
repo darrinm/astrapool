@@ -489,9 +489,14 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: cent
   .play-status { width: min(620px, 100%); gap: var(--s1); }
   .turn-controls { min-height: 32px; }
   .guidance { display: flex; align-items: baseline; flex-wrap: wrap; justify-content: center; column-gap: var(--s3); }
-  /* Power and Cancel use the header's space on short screens. */
+  /* Leave room for Cancel while aiming on short screens. */
   #hud.aiming .score-header { display: none; }
   #hud.aiming .play-status { width: min(420px, 100%); }
 }
 @media (hover: none) { .shortcuts { display: none; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } .room-photo { transition: none; } }
+
+.range-label, .range-labels { display: flex; justify-content: space-between; gap: var(--s3); }
+.range-label output { color: var(--ink-dim); }
+.range-labels { color: var(--ink-faint); font-size: var(--t-micro); }
+#look-ahead { width: 100%; min-height: 32px; margin: 0; accent-color: var(--accent); }

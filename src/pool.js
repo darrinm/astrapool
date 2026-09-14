@@ -28,6 +28,8 @@ import { inviteRoom, startupRoom, rememberGameChoice } from './room-navigation.j
 import { GameplayAnalytics, sendGameAnalytics } from './game-analytics.js';
 import { groupLabel, playerName, playerText, rackOutcome, turnStatus } from './match-copy.js';
 import { setOverheadCamera, withinCueTarget, setGuideLine } from './table-view.js';
+import { createPowerGuide, setPowerPath, limitCuePath } from './aim-guide.js';
+import { AimPrediction } from './aim-prediction.js';
 import { projectPocketTargets, pocketAtPointer, pocketTapMoved, completesPocketTap } from './pocket-call.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
@@ -54,7 +56,7 @@ let lastViewport = { w: innerWidth, h: innerHeight }, refitPending = false;
 // The three framings resetView() knows about. A change of shape needs a fresh camera, not just a
 // cleared view offset: a landscape position leaves half the table off a portrait screen.
 const viewShape = (w, h) => (h > w ? 'portrait' : h <= 600 ? 'short' : 'wide');
-let pocketedSet = new Set(), respotAt = 0, pmrem, envTex, feltCol, lastStatus = '', contactShadows = [], fixture = [], fixtureFade = [0, 1];
+let pocketedSet = new Set(), respotAt = 0, pmrem, envTex, feltCol, contactShadows = [], fixture = [], fixtureFade = [0, 1];
 const WHITE = new THREE.Color(0xffffff);
 const capped = new Map();   // head -> { plain, capped, ball } textures; caps are baked lazily once the plain map has loaded
 let capsOn = false;
@@ -74,6 +76,11 @@ let attractMode = false, attractWait = 0;
 const COMPUTER_CUE_TIME = 0.18;
 let difficulty = 'tricky', onlineShotSeq = null, onlineShooter = null;
 let gravityEnabled = false;
+let lookAhead = 6; // 0–5 bounces; 6 means the full simulated path.
+try {
+  const saved = localStorage.getItem('pool.lookAhead');
+  if (saved !== null && Number.isInteger(Number(saved)) && Number(saved) >= 0 && Number(saved) <= 6) lookAhead = Number(saved);
+} catch {}
 const gravityActive = () => !attractMode && gravityEnabled && gameMode !== 'online';
 let overhead = false, hudObserver;
 const online = new OnlineRoom(receiveOnline, text => {
@@ -188,7 +195,13 @@ async function setEnvironment(id, applyBallDefault = true) {
 }
 
 // ---------- table ----------
+function disposeGuide() {
+  aimPrediction.dispose();
+  guide?.traverse(mesh => { mesh.geometry?.dispose(); mesh.material?.dispose(); });
+  guide = null;
+}
 function build() {
+  disposeGuide();
   targetRings?.dispose();
   placementMarker?.dispose();
   clearProps();
@@ -334,18 +347,23 @@ function build() {
   cue = extras[0];
   for (const ball of extras) classicMaterials.set(ball, ball.mesh.material);
 
-  // ---- aiming guide (line to first impact, ghost ball, object-ball direction) and the cue stick ----
+  // ---- simulated aiming paths and the cue stick ----
   guide = new THREE.Group(); addMesh(guide);
-  guide.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85 }));
-  guide.ghost = new THREE.Mesh(new THREE.TorusGeometry(R, 0.06, 8, 48), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.8 }));
-  guide.objLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#ffd27a', transparent: true, opacity: 0.9 }));
-  guide.cueLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.5 }));
-  guide.add(guide.line, guide.ghost, guide.objLine, guide.cueLine); guide.visible = false;
+  guide.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.3 }));
+  guide.objLine = createPowerGuide('#ffd27a');
+  guide.cueLine = createPowerGuide('#ffffff');
+  for (const line of [guide.objLine, guide.cueLine]) {
+    line.stop = new THREE.Mesh(new THREE.TorusGeometry(R, 0.045, 6, 48),
+      new THREE.MeshBasicMaterial({ color: line.material.uniforms.color.value, transparent: true, opacity: 0.55, depthWrite: false }));
+    guide.add(line.stop);
+  }
+  guide.add(guide.line, guide.objLine, guide.cueLine); guide.visible = false;
   cueStick = new THREE.Group();
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 24, 16), new THREE.MeshStandardMaterial({ color: '#e2c48f', roughness: 0.35 }));
   const butt = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 18, 16), new THREE.MeshStandardMaterial({ map: woodMap(512, 1, 21, ['#2a1408', '#3d1f0c', '#1e0f06', '#4a2a12']), roughness: 0.4 }));
   const ferrule = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.8, 16), new THREE.MeshStandardMaterial({ color: '#f4efe6', roughness: 0.5 }));
   const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.2, 0.35, 16), new THREE.MeshStandardMaterial({ color: '#2a4d8f', roughness: 0.9 }));
+  cueStick.tip = tip;
   shaft.position.y = -12; butt.position.y = -33; ferrule.position.y = -0.4; tip.position.y = 0.17;
   for (const m of [shaft, butt, ferrule, tip]) { m.castShadow = true; cueStick.add(m); }
   cueStick.rotation.z = -Math.PI / 2;   // stick along +x with the tip at the origin
@@ -892,6 +910,7 @@ function showGameControls(show) {
   const styleEl = document.getElementById('style'); styleEl.hidden = !show;
   buildBallSetPicker(setBallStyle, setPlanetSaturation);
   setPlanetSaturation(planetSaturation);
+  syncLookAhead();
   updateBallSetPicker(ballStyle, null);
   if (!spinEl) {
     spinEl = document.getElementById('spin');
@@ -926,6 +945,12 @@ function showGameControls(show) {
       document.querySelectorAll('#difficulty button').forEach(o => o.setAttribute('aria-pressed', String(o.dataset.difficulty === difficulty)));
       if (computerTurn() && !activeShot) { cancelComputerSearch(); computerPlan = null; computerWait = 0; endAim(); }
     }));
+    document.getElementById('look-ahead').addEventListener('input', event => {
+      lookAhead = Number(event.target.value);
+      syncLookAhead();
+      if (guide) guide.prediction = null;
+      try { localStorage.setItem('pool.lookAhead', String(lookAhead)); } catch {}
+    });
     document.getElementById('black-hole-gravity-toggle').addEventListener('click', () => {
       if (!canChangeGravity()) return;
       gravityEnabled = !gravityEnabled;
@@ -972,41 +997,49 @@ function aimVector() {
   const c = cue.body.translation(), d = new THREE.Vector2(c.x - aiming.to.x, c.y - aiming.to.y);
   return { c, dir: d.lengthSq() ? d.clone().normalize() : new THREE.Vector2(1, 0), pull: Math.min(d.length(), MAX_PULL) };
 }
-const ballShape = new RAPIER.Ball(R);
-// Both players project the same guide from the shared table and aim direction.
-// Rendering a remote preview must not send it back or change the spectator's HUD.
-function updateGuide(c, dir) {
-  // Cast a ball along the aim line. The felt is excluded: the resting ball already touches it, and its triangle
-  // edges otherwise register as hits in the middle of the table.
-  const hit = world.castShape({ x: c.x, y: c.y, z: c.z }, { x: 0, y: 0, z: 0, w: 1 }, { x: dir.x, y: dir.y, z: 0 }, ballShape, 0, 200, false,
-    undefined, undefined, feltCol, cue.body);
-  const dist = hit ? hit.time_of_impact : 200;
-  const end = new THREE.Vector3(c.x + dir.x * dist, c.y + dir.y * dist, c.z);
-  setGuideLine(guide.line, new THREE.Vector3(c.x, c.y, c.z), end);
-  guide.ghost.position.copy(end); guide.ghost.visible = !!hit;
-  guide.objLine.visible = false; guide.cueLine.visible = false;
-  if (hit) {
-    const other = allBalls().find((h) => h.mesh.visible && h.body.collider(0).handle === hit.collider.handle);
-    if (other) {   // object ball leaves along the line of centres; a stunned cue ball leaves along the tangent
-      const o = other.body.translation(), n = new THREE.Vector3(o.x - end.x, o.y - end.y, 0).normalize();
-      setGuideLine(guide.objLine, new THREE.Vector3(o.x, o.y, o.z), new THREE.Vector3(o.x + n.x * 12, o.y + n.y * 12, o.z));
-      guide.objLine.visible = true;
-      const d3 = new THREE.Vector3(dir.x, dir.y, 0), tangent = d3.clone().sub(n.clone().multiplyScalar(d3.dot(n)));
-      if (tangent.length() > 0.05) {
-        tangent.normalize();
-        setGuideLine(guide.cueLine, end, end.clone().add(tangent.multiplyScalar(7)));
-        guide.cueLine.visible = true;
-      }
+const aimCastBall = new RAPIER.Ball(R);
+const aimPrediction = new AimPrediction(
+  () => new Worker(new URL('./computer-worker.js', import.meta.url), { type: 'module' }),
+  () => ({ snapshot: world.takeSnapshot(), feltZ: FELT_Z, cushions: [...cushionHandles], blackHoleGravity: gravityActive(),
+    handles: allBalls().filter(b => !pocketedSet.has(b)).map(b => ({ number: numberOf(b), handle: b.body.handle })) }),
+);
+// The geometric first-contact line is immediate; simulated paths and stopping
+// circles are updated separately and always belong to the current aim.
+function updateGuide(c, dir, pull, shotSpin = { x: 0, y: 0 }) {
+  const power = THREE.MathUtils.clamp(pull / MAX_PULL, 0, 1);
+  const prediction = pull >= 0.3 ? aimPrediction.update({ dir: { x: dir.x, y: dir.y }, speed: power * MAX_SPEED, spin: shotSpin, lookAhead: lookAhead === 6 ? null : lookAhead }) : null;
+  if (pull < 0.3) aimPrediction.clear();
+  const hit = world.castShape(c, { x: 0, y: 0, z: 0, w: 1 }, { x: dir.x, y: dir.y, z: 0 },
+    aimCastBall, 0, 200, false, undefined, undefined, feltCol, cue.body);
+  const distance = hit?.time_of_impact ?? 200;
+  const end = new THREE.Vector3(c.x + dir.x * distance, c.y + dir.y * distance, c.z);
+  const tip = cueStick.tip.getWorldPosition(new THREE.Vector3());
+  setGuideLine(guide.line, tip, end);
+  guide.line.visible = true;
+  if (!prediction) {
+    guide.cueLine.visible = guide.objLine.visible = false;
+    guide.cueLine.stop.visible = guide.objLine.stop.visible = false;
+    guide.prediction = null;
+    return;
+  }
+  if (guide.prediction === prediction) return;
+  guide.prediction = prediction;
+  for (const line of [guide.cueLine, guide.objLine]) {
+    const fullPath = prediction.paths.find(p => line === guide.cueLine ? p.number === 0 : p.number !== 0);
+    const path = line === guide.cueLine ? limitCuePath(fullPath, lookAhead === 6 ? Infinity : lookAhead) : fullPath;
+    setPowerPath(line, path?.points || [], BALL_Z, power);
+    line.stop.visible = line.visible && path.stopped;
+    if (line.stop.visible) {
+      const end = path.points.at(-1);
+      line.stop.position.set(end.x, end.y, BALL_Z);
     }
   }
 }
 function updateAim() {
   const { c, dir, pull } = aimVector();
-  updateGuide(c, dir);
   updateCueStick(c, dir, pull, spin);
+  updateGuide(c, dir, pull, spin);
   if (gameMode === 'online') online.sendAim({ dir: { x: dir.x, y: dir.y }, pull, spin });
-  const txt = `Power ${Math.round((pull / MAX_PULL) * 100)}%${spin.x || spin.y ? ' · spin applied' : ''}`;
-  if (!computerTurn() && txt !== lastStatus) { lastStatus = txt; ui.status(txt); }
 }
 function updateCueStick(c, dir, pull, spin) {
   // cue stick behind the ball, pulled back with the power, slightly elevated
@@ -1070,6 +1103,13 @@ function syncPocketCall() {
 function canChangeGravity() {
   return gameMode !== 'online' && !rackMotion && !activeShot && !arcade.active &&
     !replayView.active && !dragging && !placing && tableStill();
+}
+function syncLookAhead() {
+  const slider = document.getElementById('look-ahead');
+  const label = lookAhead === 6 ? 'All bounces' : lookAhead === 0 ? 'First impact only' : `${lookAhead} ${lookAhead === 1 ? 'bounce' : 'bounces'}`;
+  slider.value = lookAhead;
+  slider.setAttribute('aria-valuetext', label);
+  document.getElementById('look-ahead-value').textContent = label;
 }
 function syncGravityToggle() {
   const toggle = document.getElementById('black-hole-gravity-toggle');
@@ -1151,9 +1191,6 @@ function updateTurnStatus() {
   const room = document.getElementById('open-room');
   room.hidden = gameMode !== 'online' || (!roomUnavailable && !online.error);
   room.textContent = online.synced && !online.connected.every(Boolean) ? 'Invite' : 'Room';
-  // Aiming power is local feedback. Presence and score updates must not replace it.
-  if (aiming && !computerTurn()) { lastStatus = ''; updateAim(); return; }
-  lastStatus = '';
   if (document.getElementById('status').textContent !== state.title) ui.status(state.title);
   if (document.getElementById('hint').textContent !== state.detail) ui.hint(state.detail);
 }
@@ -1289,6 +1326,7 @@ function settleShot(dt) {
   setSpin(0, 0); updateScore();
 }
 function endAim() {
+  aimPrediction.clear();
   if (gameMode === 'online') online.sendAim(null);
   aiming = null; guide.visible = false; cueStick.visible = false; if (controls) controls.enabled = true;
   updateScore();
@@ -1304,6 +1342,7 @@ function shoot() {
   }
 }
 function takeShot(dir, speed, shotSpin = { x: 0, y: 0 }, fromRoom = false) {
+  aimPrediction.clear();
   computerThoughts.clear();
   // An accepted online shot takes precedence over a device's setup animation.
   finishRack(false);
@@ -1515,6 +1554,7 @@ export default {
     for (const ball of extras) classicMaterials.delete(ball);
     targetRings?.dispose();
     placementMarker?.dispose();
+    disposeGuide();
     clearProps(); showGameControls(false); world.gravity = { x: 0, y: 0, z: 0 }; capsOn = false; removeCaps();
     hudObserver?.disconnect(); hudObserver = null;
     controls?.dispose(); controls = null; setLook(false);
@@ -1615,6 +1655,10 @@ export default {
     if (rackMotion) {
       eventQueue.drainCollisionEvents(() => {}); physicsTime += world.timestep; return;
     }
+    // Preserve the contact caches and residual spin used by the aim snapshot,
+    // just as we already do while the computer plans its shot.
+    if (aiming && !computerTurn() || gameMode === 'online' && online.remoteAim && match.turn !== online.seat &&
+      !activeShot && !match.ballInHand && match.winner === null && onTable(cue)) return false;
     arcade.time = physicsTime;
     drainSounds();
     if (computerTurn() && !activeShot) {
@@ -1682,10 +1726,11 @@ export default {
       const aim = gameMode === 'online' && match.turn !== online.seat && !activeShot &&
         !match.ballInHand && match.winner === null && onTable(cue) && online.remoteAim;
       guide.visible = cueStick.visible = !!aim;
+      if (!aim) aimPrediction.clear();
       if (aim) {
         const c = cue.body.translation();
-        updateGuide(c, aim.dir);
         updateCueStick(c, aim.dir, aim.pull, aim.spin);
+        updateGuide(c, aim.dir, aim.pull, aim.spin);
       }
     }
     audio.setMuted(!!window.playful?.mute || document.hidden || replayView.active);
@@ -1703,7 +1748,7 @@ export default {
       valid: !placing || placing.valid,
     });
     if (ballStyle === 'planets') {
-      updatePlanetCaps(balls, playerAiming);
+      updatePlanetCaps(balls, false);
       const seconds = replayView.active ? (replayView.clip.metadata.planetTime ?? 0) + replayView.time : performance.now() / 1000;
       planetSet?.setTime(seconds);
       updatePlanetOrbits(balls, seconds);
@@ -1734,6 +1779,7 @@ export default {
     }
     if (marker) {
       const ready = !replayView.active && (!!dragging || (interactionMode === 'cue' && !aiming && cueReady()));
+      if (ready && !attractMode && !computerTurn()) aimPrediction.warm();
       marker.visible = ready;
       if (ready) { const c = (dragging?.ball || cue).body.translation(); marker.position.set(c.x, c.y, FELT_Z + 0.03); }
     }
