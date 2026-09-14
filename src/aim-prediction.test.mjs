@@ -46,3 +46,18 @@ test('worker errors and disposed worker messages cannot display a false endpoint
   workers[1].onmessage({ data: { id: messages.at(-1).id, paths: ['valid'] } });
   assert.deepEqual(p.result.paths, ['valid']);
 });
+
+test('changing Clairvoyant invalidates stale paths without resnapshotting the table', () => {
+  const { prediction: p, messages, workers } = fixture();
+  p.update({ speed: 30, clairvoyant: false });
+  const oldId = messages[0].id;
+  p.update({ speed: 30, clairvoyant: true });
+  assert.equal(messages[1].shot.clairvoyant, true);
+  assert.equal(messages[1].table, undefined);
+  workers[0].onmessage({ data: { id: oldId, paths: ['old'] } });
+  assert.equal(p.result, null);
+  workers[0].onmessage({ data: { id: messages[1].id, paths: ['all'] } });
+  assert.deepEqual(p.result.paths, ['all']);
+  p.update({ speed: 30, clairvoyant: false });
+  assert.equal(p.result, null);
+});

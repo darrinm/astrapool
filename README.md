@@ -35,7 +35,10 @@ collisions throughout the rack, cushions, and Black Hole Gravity. White follows 
 gold follows the first object hit. Stop rings mark their simulated final positions when they
 remain on the table. A faint, horizontal line from the cue ball to first impact updates immediately and remains visible
 while predictions update. Obsolete simulations are cancelled; incomplete previews do not
-claim a stopping position. Width and brightness reflect power. The **Look ahead** slider in settings limits the cue-ball
+claim a stopping position. Width and brightness reflect power. Enable **Clairvoyant** in settings
+to see paths for every moving ball, including combination shots and the break. Lines match the
+active ball set’s colors (planet colors for Planets); the black ball’s line has a light outline.
+Clairvoyant is off by default and remembered on this device. The **Look ahead** slider in settings limits the cue-ball
 preview to 0–5 bounces or **All**; contacts with balls and cushions both count. Shorter settings
 stop the simulation at that horizon too, truncating any object-ball path still in motion without
 a stopping circle. A shot that settles sooner still shows its predicted resting position.

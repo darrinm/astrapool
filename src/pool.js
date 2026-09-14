@@ -28,7 +28,7 @@ import { inviteRoom, startupRoom, rememberGameChoice } from './room-navigation.j
 import { GameplayAnalytics, sendGameAnalytics } from './game-analytics.js';
 import { groupLabel, playerName, playerText, rackOutcome, turnStatus } from './match-copy.js';
 import { setOverheadCamera, withinCueTarget, setGuideLine } from './table-view.js';
-import { createPowerGuide, setPowerPath, limitCuePath } from './aim-guide.js';
+import { createPowerGuide, setPowerPath, limitCuePath, aimPathColor } from './aim-guide.js';
 import { AimPrediction } from './aim-prediction.js';
 import { CueAim } from './cue-aim.js';
 import { cuePose } from './cue-pose.js';
@@ -78,6 +78,8 @@ let attractMode = false, attractWait = 0;
 const COMPUTER_CUE_TIME = 0.18;
 let difficulty = 'tricky', onlineShotSeq = null, onlineShooter = null;
 let gravityEnabled = false;
+let clairvoyant = false;
+try { clairvoyant = localStorage.getItem('pool.clairvoyant') === 'true'; } catch {}
 let lookAhead = 6; // 0–5 bounces; 6 means the full simulated path.
 try {
   const saved = localStorage.getItem('pool.lookAhead');
@@ -352,14 +354,16 @@ function build() {
   // ---- simulated aiming paths and the cue stick ----
   guide = new THREE.Group(); addMesh(guide);
   guide.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.3 }));
-  guide.objLine = createPowerGuide('#ffd27a');
-  guide.cueLine = createPowerGuide('#ffffff');
-  for (const line of [guide.objLine, guide.cueLine]) {
+  guide.pathLines = Array.from({ length: 16 }, (_, number) => {
+    const line = createPowerGuide(number === 0 ? '#ffffff' : '#ffd27a');
+    line.number = number;
     line.stop = new THREE.Mesh(new THREE.TorusGeometry(R, 0.045, 6, 48),
       new THREE.MeshBasicMaterial({ color: line.material.uniforms.color.value, transparent: true, opacity: 0.55, depthWrite: false }));
-    guide.add(line.stop);
-  }
-  guide.add(guide.line, guide.objLine, guide.cueLine); guide.visible = false;
+    guide.add(line, line.stop);
+    return line;
+  });
+  guide.cueLine = guide.pathLines[0];
+  guide.add(guide.line); guide.visible = false;
   cueStick = new THREE.Group();
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 24, 16), new THREE.MeshStandardMaterial({ color: '#e2c48f', roughness: 0.35 }));
   const butt = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 18, 16), new THREE.MeshStandardMaterial({ map: woodMap(512, 1, 21, ['#2a1408', '#3d1f0c', '#1e0f06', '#4a2a12']), roughness: 0.4 }));
@@ -455,6 +459,7 @@ async function setBallStyle(id) {
   }
   stopReplay();
   ballStyle = rackStyle = style;
+  if (guide) guide.prediction = null;
   try { localStorage.setItem('playful.ballStyle', style); } catch {}
   for (const ball of allBalls()) {
     planetSet?.detach(ball.mesh);
@@ -923,6 +928,7 @@ function showGameControls(show) {
   buildBallSetPicker(setBallStyle, setPlanetSaturation);
   setPlanetSaturation(planetSaturation);
   syncLookAhead();
+  syncClairvoyant();
   updateBallSetPicker(ballStyle, null);
   if (!spinEl) {
     spinEl = document.getElementById('spin');
@@ -962,6 +968,16 @@ function showGameControls(show) {
       syncLookAhead();
       if (guide) guide.prediction = null;
       try { localStorage.setItem('pool.lookAhead', String(lookAhead)); } catch {}
+    });
+    document.getElementById('clairvoyant-toggle').addEventListener('click', () => {
+      clairvoyant = !clairvoyant;
+      syncClairvoyant();
+      aimPrediction.clear();
+      if (guide) {
+        guide.prediction = null;
+        for (const line of guide.pathLines) line.visible = line.stop.visible = false;
+      }
+      try { localStorage.setItem('pool.clairvoyant', String(clairvoyant)); } catch {}
     });
     document.getElementById('black-hole-gravity-toggle').addEventListener('click', () => {
       if (!canChangeGravity()) return;
@@ -1021,7 +1037,8 @@ const aimPrediction = new AimPrediction(
 // circles are updated separately and always belong to the current aim.
 function updateGuide(c, dir, pull, shotSpin = { x: 0, y: 0 }) {
   const power = THREE.MathUtils.clamp(pull / MAX_PULL, 0, 1);
-  const prediction = pull >= 0.3 ? aimPrediction.update({ dir: { x: dir.x, y: dir.y }, speed: power * MAX_SPEED, spin: shotSpin, lookAhead: lookAhead === 6 ? null : lookAhead }) : null;
+  const revealAll = clairvoyant && !!aiming?.control;
+  const prediction = pull >= 0.3 ? aimPrediction.update({ dir: { x: dir.x, y: dir.y }, speed: power * MAX_SPEED, spin: shotSpin, lookAhead: lookAhead === 6 ? null : lookAhead, clairvoyant: revealAll }) : null;
   if (pull < 0.3) aimPrediction.clear();
   const hit = world.castShape(c, { x: 0, y: 0, z: 0, w: 1 }, { x: dir.x, y: dir.y, z: 0 },
     aimCastBall, 0, 200, false, undefined, undefined, feltCol, cue.body);
@@ -1033,16 +1050,21 @@ function updateGuide(c, dir, pull, shotSpin = { x: 0, y: 0 }) {
   setGuideLine(guide.line, start, end);
   guide.line.visible = true;
   if (!prediction) {
-    guide.cueLine.visible = guide.objLine.visible = false;
-    guide.cueLine.stop.visible = guide.objLine.stop.visible = false;
+    for (const line of guide.pathLines) line.visible = line.stop.visible = false;
     guide.prediction = null;
     return;
   }
   if (guide.prediction === prediction) return;
   guide.prediction = prediction;
-  for (const line of [guide.cueLine, guide.objLine]) {
-    const fullPath = prediction.paths.find(p => line === guide.cueLine ? p.number === 0 : p.number !== 0);
-    const path = line === guide.cueLine ? limitCuePath(fullPath, lookAhead === 6 ? Infinity : lookAhead) : fullPath;
+  for (const line of guide.pathLines) {
+    const number = line.number;
+    const fullPath = revealAll || number === 0 || number === prediction.first
+      ? prediction.paths.find(p => p.number === number) : null;
+    const path = number === 0 ? limitCuePath(fullPath, lookAhead === 6 ? Infinity : lookAhead) : fullPath;
+    const color = aimPathColor(number, ballStyle, revealAll);
+    line.material.uniforms.color.value.set(color);
+    line.material.uniforms.outline.value = revealAll && number === 8 ? 1 : 0;
+    line.stop.material.color.set(color);
     setPowerPath(line, path?.points || [], BALL_Z, power);
     line.stop.visible = line.visible && path.stopped;
     if (line.stop.visible) {
@@ -1121,6 +1143,9 @@ function syncPocketCall() {
 function canChangeGravity() {
   return gameMode !== 'online' && !rackMotion && !activeShot && !arcade.active &&
     !replayView.active && !dragging && !placing && tableStill();
+}
+function syncClairvoyant() {
+  document.getElementById('clairvoyant-toggle').setAttribute('aria-pressed', String(clairvoyant));
 }
 function syncLookAhead() {
   const slider = document.getElementById('look-ahead');

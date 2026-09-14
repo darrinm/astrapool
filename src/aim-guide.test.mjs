@@ -30,3 +30,15 @@ test('look ahead truncates at the next contact and never marks it as a resting p
   assert.equal(limitCuePath(path, 3), path);
   assert.equal(limitCuePath(path, Infinity), path);
 });
+
+test('Clairvoyant colors follow the active ball set, including stripes and the sun', async () => {
+  const { aimPathColor } = await import('./aim-guide.js');
+  const { BALL_COLORS } = await import('./ballcaps.js');
+  const { planetForBall } = await import('./ball-sets.js');
+  for (let number = 0; number <= 15; number++) {
+    assert.equal(aimPathColor(number, 'planets', true), planetForBall(number).color);
+    assert.equal(aimPathColor(number, 'balls', true), number === 0 ? '#ffffff' : BALL_COLORS[(number - 1) % 8 + 1]);
+    assert.equal(aimPathColor(number, 'heads', true), aimPathColor(number, 'balls', true));
+    assert.equal(aimPathColor(number, 'planets', false), number === 0 ? '#ffffff' : '#ffd27a');
+  }
+});

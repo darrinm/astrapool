@@ -103,3 +103,37 @@ test('look-ahead counts ball contacts as well as cushions and retains early stop
   assert.equal(soft.settled, true);
   assert.equal(soft.paths[0].stopped, true);
 });
+
+test('Clairvoyant follows secondary collisions and matches every moved ball’s live endpoint', () => {
+  const table = practiceTable([
+    { number: 0, x: -18, y: 0 }, { number: 5, x: -2, y: 0 },
+    { number: 2, x: 3, y: 0 }, { number: 14, x: 8, y: 0 }, { number: 1, x: -20, y: 12 },
+  ]);
+  const shot = { dir: { x: 1, y: 0 }, speed: 36 };
+  const normal = simulateShot(table, newMatch(), shot, true, { aimPreview: true });
+  const all = simulateShot(table, newMatch(), shot, true, { aimPreview: true, allBallPaths: true });
+  assert.deepEqual(normal.paths.map(p => p.number), [0, 5]);
+  assert.deepEqual(all.paths.map(p => p.number).sort((a,b) => a-b), [0, 2, 5, 14]);
+  assert.deepEqual(all.balls, normal.balls, 'recording more paths must not change physics');
+  assert.deepEqual(all.report, normal.report);
+  const actual = play(table, shot);
+  for (const path of all.paths) {
+    assert.ok(path.stopped);
+    const end = path.points.at(-1), ball = actual.find(b => b.number === path.number);
+    assert.ok(Math.hypot(end.x - ball.x, end.y - ball.y) < 0.01);
+  }
+});
+
+test('Clairvoyant includes the whole break and still honors shorter look ahead', () => {
+  const table = practiceTable(rackPositions());
+  const shot = { dir: { x: 1, y: 0 }, speed: 100 };
+  const full = simulateShot(table, newMatch(), shot, true, { aimPreview: true, allBallPaths: true });
+  assert.equal(full.paths.length, 16);
+  const short = simulateShot(table, newMatch(), shot, true, { aimPreview: true, allBallPaths: true, maxCueBounces: 0 });
+  assert.equal(short.settled, false);
+  assert.equal(short.paths[0].bounces.length, 1);
+  assert.ok(short.paths.every(path => !path.stopped));
+  for (const path of short.paths) {
+    assert.deepEqual(path.points, full.paths.find(p => p.number === path.number).points.slice(0, path.points.length));
+  }
+});
