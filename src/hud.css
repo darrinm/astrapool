@@ -344,7 +344,8 @@ body:has(#welcome[open]) #hud { visibility: hidden; }
   background: linear-gradient(#0b090800, #0b090844 22%, #0b090866 60%);
   text-align: center;
 }
-#welcome h1 { margin: 0; font: 400 clamp(44px, 9vw, 68px)/1 var(--display); letter-spacing: -.02em; }
+#welcome .welcome-logo { width: min(480px, 100%); margin: 0 auto; }
+.welcome-logo img { display: block; width: 100%; height: auto; }
 .welcome-lede { max-width: 54ch; margin: 0 0 var(--s3); color: var(--ink-dim); font-size: var(--t-lead); line-height: 1.55; text-wrap: balance; }
 #welcome .choices { width: min(560px, 100%); grid-template-columns: repeat(2, minmax(0, 1fr)); text-align: left; }
 /* A shade more present than in the sheet: here they are the only thing to do. */
@@ -352,14 +353,13 @@ body:has(#welcome[open]) #hud { visibility: hidden; }
 #welcome .choices button:hover { background: #ffffff24; border-color: var(--accent); }
 @media (max-width: 600px) {
   .welcome-inner { gap: var(--s2); padding: var(--s4) max(var(--s4), env(safe-area-inset-right)) max(var(--s4), env(safe-area-inset-bottom)) max(var(--s4), env(safe-area-inset-left)); }
-  #welcome h1 { font-size: 36px; }
   .welcome-lede { margin-bottom: var(--s2); font-size: var(--t-body); }
   #welcome .choices button { min-height: 60px; padding: var(--s2) var(--s3); align-content: center; }
   #welcome .choices span { font-size: 11px; line-height: 1.3; }
 }
 @media (max-height: 620px) {
   .welcome-inner { gap: var(--s2); padding-top: var(--s5); }
-  #welcome h1 { font-size: 38px; }
+  #welcome .welcome-logo { width: min(330px, 100%); }
   .welcome-lede { font-size: var(--t-body); margin-bottom: var(--s2); }
 }
 @media (orientation: landscape) and (max-height: 600px) and (min-width: 480px) {
