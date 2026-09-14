@@ -347,6 +347,9 @@ body:has(#welcome[open]) #hud { visibility: hidden; }
 .startup-logo { width: min(480px, 100%); margin: 0 auto; }
 .startup-logo img { display: block; width: 100%; height: auto; }
 .welcome-lede { max-width: 54ch; margin: 0 0 var(--s3); color: var(--ink-dim); font-size: var(--t-lead); line-height: 1.55; text-wrap: balance; }
+.welcome-credit { display: flex; align-items: center; justify-content: center; gap: var(--s2); color: #d8d4cc; font-size: var(--t-micro); }
+.welcome-credit a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--s2); color: inherit; text-underline-offset: 3px; }
+.welcome-credit a:hover { color: var(--ink); }
 #welcome .choices { width: min(560px, 100%); grid-template-columns: repeat(2, minmax(0, 1fr)); text-align: left; }
 /* A shade more present than in the sheet: here they are the only thing to do. */
 #welcome .choices button { background: #ffffff14; border-color: var(--edge-strong); }
