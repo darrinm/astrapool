@@ -1,6 +1,5 @@
-import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { report } from '../server/analytics.js';
+import { wranglerDatabase } from './d1.mjs';
 
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
@@ -16,22 +15,10 @@ for (let i = 0; i < args.length; i++) {
   else throw new Error(`Unknown option: ${args[i]}`);
 }
 if (![1, 7, 30, 90].includes(days) || !['all', 'local', 'computer', 'free', 'online'].includes(mode)) throw new Error('Invalid filter. Use --help.');
-// Only fixed SELECT queries and validated filters reach Wrangler. Its existing login
-// provides access; no analytics credential is shipped to the game or written to disk.
-const database = {
-  prepare(sql) { return { bind(...values) { let i = 0; return sql.replace(/\?/g, () => {
-    const value = values[i++]; return typeof value === 'number' ? String(value) : `'${value.replaceAll("'", "''")}'`;
-  }); } }; },
-  async batch(queries) {
-    const stdout = execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'execute', 'astrapool-analytics',
-      local ? '--local' : '--remote', '--json', '--command', queries.join(';\n')], {
-      cwd: fileURLToPath(new URL('../', import.meta.url)), encoding: 'utf8', maxBuffer: 4 * 1024 * 1024,
-      env: { ...process.env, CLOUDFLARE_SEND_METRICS: 'false' }, stdio: ['ignore', 'pipe', 'inherit'],
-    });
-    return JSON.parse(stdout);
-  },
-};
-const data = await report({ GAME_ANALYTICS: database }, days, mode);
+const database = wranglerDatabase({ local });
+let data;
+try { data = await report({ GAME_ANALYTICS: database }, days, mode); }
+catch (error) { console.error(error.message); process.exit(1); }
 if (json) console.log(JSON.stringify(data, null, 2));
 else {
   const s = data.summary, started = Number(s.started || 0), finished = Number(s.finished || 0);
