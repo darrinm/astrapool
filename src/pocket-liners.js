@@ -4,7 +4,10 @@ import { railPocketCuts } from './rail-frame.js';
 
 export function createPocketLiners(surfaceZ) {
   const group = new THREE.Group();
-  const material = new THREE.MeshStandardMaterial({ color: '#17120f', roughness: 0.9, side: THREE.DoubleSide });
+  // The fitted liner overlays the cloth and rail. Bias its depth so the tiny
+  // separation stays stable even when the camera is far from the table.
+  const material = new THREE.MeshStandardMaterial({ color: '#17120f', roughness: 0.9, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
   for (const c of railPocketCuts()) {
     const radius = c.radius - P.RAIL_BEVEL - 0.015;
     // Cover the rear slate edge, the exposed slate behind the drop, and the
