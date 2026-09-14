@@ -44,7 +44,7 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0b09; }
 canvas { display: block; touch-action: none; }
 /* Labels overlay the canvas; pointer-events alone does not prevent long-press selection. */
-canvas, #hud, .welcome-camera, .welcome-heading, #spin {
+canvas, #hud, .welcome-camera, .startup-heading, #spin {
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 #hud input, #hud textarea { -webkit-user-select: text; user-select: text; }
@@ -321,7 +321,6 @@ button:disabled { opacity: .45; cursor: default; }
 /* ---------------------------------------------------------------- welcome */
 #loading-screen { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); background: #0d0b09; }
 .loading-card { display: grid; justify-items: center; gap: 16px; width: min(280px, 100%); text-align: center; }
-.loading-card h1 { position: absolute; top: max(24px, env(safe-area-inset-top)); left: 0; width: 100%; padding: 0 24px; margin: 0; font: 400 42px/1.1 var(--display); }
 #loading-status { margin: 0; color: var(--ink-dim); }
 #loading-progress { width: 100%; height: 6px; border: 0; border-radius: 999px; overflow: hidden; accent-color: var(--accent); background: var(--edge); }
 #loading-progress::-webkit-progress-bar { background: var(--edge); border-radius: 999px; }
@@ -335,7 +334,8 @@ button:disabled { opacity: .45; cursor: default; }
 .welcome-camera { position: absolute; inset: 0; }
 /* The solo demo needs no scoreboard or playing controls behind the title. */
 body:has(#welcome[open]) #hud { visibility: hidden; }
-.welcome-heading { position: absolute; inset: 0 0 auto; z-index: 3; padding: max(var(--s5), env(safe-area-inset-top)) max(64px, env(safe-area-inset-right)) var(--s6) max(64px, env(safe-area-inset-left)); text-align: center; background: linear-gradient(#0b090899, #0b090800); pointer-events: none; }
+.startup-heading { position: absolute; inset: 0 0 auto; z-index: 3; padding: max(var(--s5), env(safe-area-inset-top)) max(64px, env(safe-area-inset-right)) var(--s6) max(64px, env(safe-area-inset-left)); text-align: center; pointer-events: none; }
+.welcome-heading { background: linear-gradient(#0b090899, #0b090800); }
 .welcome-inner {
   z-index: 3;
   position: absolute; inset: auto 0 0 0; display: grid; justify-items: center; gap: var(--s3);
@@ -344,8 +344,8 @@ body:has(#welcome[open]) #hud { visibility: hidden; }
   background: linear-gradient(#0b090800, #0b090844 22%, #0b090866 60%);
   text-align: center;
 }
-#welcome .welcome-logo { width: min(480px, 100%); margin: 0 auto; }
-.welcome-logo img { display: block; width: 100%; height: auto; }
+.startup-logo { width: min(480px, 100%); margin: 0 auto; }
+.startup-logo img { display: block; width: 100%; height: auto; }
 .welcome-lede { max-width: 54ch; margin: 0 0 var(--s3); color: var(--ink-dim); font-size: var(--t-lead); line-height: 1.55; text-wrap: balance; }
 #welcome .choices { width: min(560px, 100%); grid-template-columns: repeat(2, minmax(0, 1fr)); text-align: left; }
 /* A shade more present than in the sheet: here they are the only thing to do. */
@@ -359,7 +359,7 @@ body:has(#welcome[open]) #hud { visibility: hidden; }
 }
 @media (max-height: 620px) {
   .welcome-inner { gap: var(--s2); padding-top: var(--s5); }
-  #welcome .welcome-logo { width: min(330px, 100%); }
+  .startup-logo { width: min(330px, 100%); }
   .welcome-lede { font-size: var(--t-body); margin-bottom: var(--s2); }
 }
 @media (orientation: landscape) and (max-height: 600px) and (min-width: 480px) {

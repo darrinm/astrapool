@@ -30,8 +30,12 @@
   </head>
   <body>
     <div id="loading-screen" aria-labelledby="loading-title">
+      <header class="startup-heading">
+        <h1 id="loading-title" class="startup-logo">
+          <img src="/brand/astra-pool-logo.png" alt="Astra Pool" width="1653" height="396" fetchpriority="high" draggable="false" />
+        </h1>
+      </header>
       <div class="loading-card">
-        <h1 id="loading-title">Astra Pool</h1>
         <p id="loading-status" role="status">Loading game…</p>
         <progress id="loading-progress" max="4" aria-label="Loading Astra Pool" aria-describedby="loading-status"></progress>
         <button id="loading-retry" class="quiet-button" hidden>Try again</button>
@@ -41,8 +45,8 @@
     <div id="vignette" hidden></div>
     <dialog id="welcome" aria-labelledby="welcome-title" hidden>
       <div class="welcome-camera" aria-hidden="true"></div>
-      <header class="welcome-heading">
-        <h1 id="welcome-title" class="welcome-logo">
+      <header class="welcome-heading startup-heading">
+        <h1 id="welcome-title" class="startup-logo">
           <img src="/brand/astra-pool-logo.png" alt="Astra Pool" width="1653" height="396" fetchpriority="high" draggable="false" />
         </h1>
       </header>
