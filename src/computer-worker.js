@@ -6,8 +6,8 @@ import { AimWorkerRunner } from './aim-worker-runner.js';
 import { newMatch } from './eight-ball.js';
 const ready = RAPIER.init();
 const aimRunner = new AimWorkerRunner(function* ({ table, shot }) {
-  const result = yield* simulateShotSteps(table, newMatch(), shot, true, { aimPreview: true, yieldEvery: 64, maxCueBounces: shot.lookAhead ?? Infinity });
-  return { paths: result.paths, settled: result.settled };
+  const result = yield* simulateShotSteps(table, newMatch(), shot, true, { aimPreview: true, allBallPaths: !!shot.clairvoyant, yieldEvery: 64, maxCueBounces: shot.lookAhead ?? Infinity });
+  return { paths: result.paths, settled: result.settled, first: result.report.first };
 }, result => self.postMessage(result));
 self.onmessage = async ({ data }) => {
   try {

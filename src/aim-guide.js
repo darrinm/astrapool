@@ -1,10 +1,18 @@
 import * as THREE from 'three';
+import { BALL_COLORS } from './ballcaps.js';
+import { planetForBall } from './ball-sets.js';
+
+export function aimPathColor(number, style, clairvoyant) {
+  if (!clairvoyant) return number === 0 ? '#ffffff' : '#ffd27a';
+  if (style === 'planets') return planetForBall(number).color;
+  return number === 0 ? '#ffffff' : BALL_COLORS[(number - 1) % 8 + 1];
+}
 
 export function createPowerGuide(color) {
   // A ribbon gives real width on WebGL, where LineBasicMaterial's linewidth is ignored.
   const geometry = new THREE.BufferGeometry();
   const material = new THREE.ShaderMaterial({
-    uniforms: { color: { value: new THREE.Color(color) }, opacity: { value: 0 } },
+    uniforms: { color: { value: new THREE.Color(color) }, opacity: { value: 0 }, outline: { value: 0 } },
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
     vertexShader: `
       varying vec2 vUv;
@@ -15,11 +23,13 @@ export function createPowerGuide(color) {
     fragmentShader: `
       uniform vec3 color;
       uniform float opacity;
+      uniform float outline;
       varying vec2 vUv;
       void main() {
         float tip = 1.0 - smoothstep(0.85, 1.0, vUv.x);
         float edge = 1.0 - smoothstep(0.3, 0.5, abs(vUv.y - 0.5));
-        gl_FragColor = vec4(color, opacity * tip * edge);
+        vec3 ink = mix(color, vec3(0.9), outline * smoothstep(0.22, 0.42, abs(vUv.y - 0.5)));
+        gl_FragColor = vec4(ink, opacity * tip * edge);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,

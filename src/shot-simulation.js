@@ -25,7 +25,7 @@ export function simulateShot(...args) {
 
 // Yielding never advances or changes physics. Interactive workers can abandon
 // an obsolete shot between batches; return() still frees the restored world.
-export function* simulateShotSteps(table, state, shot, trace = false, { arcade = false, solo = false, aimPreview = false, yieldEvery = 0, maxCueBounces = Infinity } = {}) {
+export function* simulateShotSteps(table, state, shot, trace = false, { arcade = false, solo = false, aimPreview = false, allBallPaths = false, yieldEvery = 0, maxCueBounces = Infinity } = {}) {
   const world = RAPIER.World.restoreSnapshot(table.snapshot), queue = new RAPIER.EventQueue(true);
   try {
     const balls = table.handles.map(b => ({ number: b.number, body: world.getRigidBody(b.handle) }));
@@ -43,7 +43,7 @@ export function* simulateShotSteps(table, state, shot, trace = false, { arcade =
     }
     // Read a bounded trace without running a second shot or changing its physics.
     // Player aim retains longer paths; computer search uses shorter samples.
-    const paths = trace ? balls.filter(b => arcade || b.number === 0 || !aimPreview && b.number === shot.target).map(b => ({ number: b.number, points: [], bounces: [], body: b.body, ended: false })) : null;
+    const paths = trace ? balls.filter(b => arcade || b.number === 0 || aimPreview && allBallPaths || !aimPreview && b.number === shot.target).map(b => ({ number: b.number, points: [], bounces: [], body: b.body, ended: false })) : null;
     const initial = aimPreview ? new Map(balls.map(b => [b.number, b.body.translation()])) : null;
     const sample = () => {
       for (const path of paths) {
@@ -79,7 +79,7 @@ export function* simulateShotSteps(table, state, shot, trace = false, { arcade =
           if (na === 0 && nb > 0) report.first = nb;
           if (nb === 0 && na > 0) report.first = na;
         }
-        if (aimPreview && paths?.length === 1 && report.first !== null) {
+        if (aimPreview && !allBallPaths && paths?.length === 1 && report.first !== null) {
           const number = report.first, p = initial.get(number);
           paths.push({ number, body: byNumber.get(number), points: [{ x: p.x, y: p.y }], ended: false });
         }
@@ -141,6 +141,8 @@ export function* simulateShotSteps(table, state, shot, trace = false, { arcade =
     const ballsAfter = balls.filter(b => b.body.isEnabled()).map(b => ({ number: b.number, x: b.body.translation().x, y: b.body.translation().y }));
     return { ...(solo ? resolveSoloShot : resolveShot)(state, report), report, balls: ballsAfter, settled,
       ...(tracker && { evidence: tracker.evidence(), arcade: tracker.report() }),
-      ...(paths && { paths: paths.map(({ number, points, stopped, bounces }) => ({ number, points, ...(aimPreview && { stopped, bounces: bounces || [] }) })) }) };
+      ...(paths && { paths: paths.filter(path => !aimPreview || !allBallPaths || path.number === 0 ||
+        path.points.some(p => Math.hypot(p.x - path.points[0].x, p.y - path.points[0].y) > 0.02))
+        .map(({ number, points, stopped, bounces }) => ({ number, points, ...(aimPreview && { stopped, bounces: bounces || [] }) })) }) };
   } finally { queue.free(); world.free(); }
 }
