@@ -500,3 +500,7 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: cent
 .range-label output { color: var(--ink-dim); }
 .range-labels { color: var(--ink-faint); font-size: var(--t-micro); }
 #look-ahead { width: 100%; min-height: 32px; margin: 0; accent-color: var(--accent); }
+
+#fine-aim-status { margin: 0; color: var(--accent); font-size: var(--t-body); }
+#fine-aim-status span { display: block; margin-top: 4px; color: var(--ink-dim); font-size: 11px; }
+#hud.fine-aim #status { display: none; }

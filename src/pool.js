@@ -30,6 +30,8 @@ import { groupLabel, playerName, playerText, rackOutcome, turnStatus } from './m
 import { setOverheadCamera, withinCueTarget, setGuideLine } from './table-view.js';
 import { createPowerGuide, setPowerPath, limitCuePath } from './aim-guide.js';
 import { AimPrediction } from './aim-prediction.js';
+import { CueAim } from './cue-aim.js';
+import { cuePose } from './cue-pose.js';
 import { projectPocketTargets, pocketAtPointer, pocketTapMoved, completesPocketTap } from './pocket-call.js';
 import { rackPositions, canPlace } from './table-state.js';
 import { computerShot, computerPlacement } from './computer.js';
@@ -363,7 +365,6 @@ function build() {
   const butt = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 18, 16), new THREE.MeshStandardMaterial({ map: woodMap(512, 1, 21, ['#2a1408', '#3d1f0c', '#1e0f06', '#4a2a12']), roughness: 0.4 }));
   const ferrule = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.8, 16), new THREE.MeshStandardMaterial({ color: '#f4efe6', roughness: 0.5 }));
   const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.2, 0.35, 16), new THREE.MeshStandardMaterial({ color: '#2a4d8f', roughness: 0.9 }));
-  cueStick.tip = tip;
   shaft.position.y = -12; butt.position.y = -33; ferrule.position.y = -0.4; tip.position.y = 0.17;
   for (const m of [shaft, butt, ferrule, tip]) { m.castShadow = true; cueStick.add(m); }
   cueStick.rotation.z = -Math.PI / 2;   // stick along +x with the tip at the origin
@@ -878,6 +879,17 @@ function updateGestureControls() {
   document.querySelector('.guidance').setAttribute('aria-live', aiming && !computerTurn() ? 'off' : 'polite');
   document.getElementById('cancel-gesture').hidden = !(placing || dragging || (aiming && !computerTurn()));
   syncReplayButton();
+  syncFineAim();
+}
+function syncFineAim() {
+  const fine = !!aiming?.control?.fine;
+  if (cueStick?.userData.fineAim === fine) return;
+  document.getElementById('fine-aim-status').hidden = !fine;
+  document.getElementById('hud').classList.toggle('fine-aim', fine);
+  if (cueStick) {
+    cueStick.userData.fineAim = fine;
+    for (const part of cueStick.children) part.material.emissive.set(fine ? '#193b40' : '#000000');
+  }
 }
 function endGesture() {
   if (calling) { calling = null; controls.enabled = true; }
@@ -994,7 +1006,9 @@ function wireOnce(group, onClick) {
   group.dataset.wired = '1'; group.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => onClick(b)));
 }
 function aimVector() {
-  const c = cue.body.translation(), d = new THREE.Vector2(c.x - aiming.to.x, c.y - aiming.to.y);
+  const c = cue.body.translation();
+  if (aiming.control) return { c, dir: new THREE.Vector2(aiming.control.dir.x, aiming.control.dir.y), pull: aiming.control.pull };
+  const d = new THREE.Vector2(c.x - aiming.to.x, c.y - aiming.to.y);
   return { c, dir: d.lengthSq() ? d.clone().normalize() : new THREE.Vector2(1, 0), pull: Math.min(d.length(), MAX_PULL) };
 }
 const aimCastBall = new RAPIER.Ball(R);
@@ -1012,9 +1026,11 @@ function updateGuide(c, dir, pull, shotSpin = { x: 0, y: 0 }) {
   const hit = world.castShape(c, { x: 0, y: 0, z: 0, w: 1 }, { x: dir.x, y: dir.y, z: 0 },
     aimCastBall, 0, 200, false, undefined, undefined, feltCol, cue.body);
   const distance = hit?.time_of_impact ?? 200;
-  const end = new THREE.Vector3(c.x + dir.x * distance, c.y + dir.y * distance, c.z);
-  const tip = cueStick.tip.getWorldPosition(new THREE.Vector3());
-  setGuideLine(guide.line, tip, end);
+  // Keep the guide on the same horizontal plane as the predicted paths,
+  // independent of the cue's elevation and pullback above the rail.
+  const start = new THREE.Vector3(c.x, c.y, BALL_Z);
+  const end = new THREE.Vector3(c.x + dir.x * distance, c.y + dir.y * distance, BALL_Z);
+  setGuideLine(guide.line, start, end);
   guide.line.visible = true;
   if (!prediction) {
     guide.cueLine.visible = guide.objLine.visible = false;
@@ -1037,20 +1053,22 @@ function updateGuide(c, dir, pull, shotSpin = { x: 0, y: 0 }) {
 }
 function updateAim() {
   const { c, dir, pull } = aimVector();
+  if (aiming.control && !aiming.control.fine) {
+    // Follow the cue's direction on screen, including the camera's perspective.
+    const center = new THREE.Vector3(c.x, c.y, BALL_Z).project(camera);
+    const behind = new THREE.Vector3(c.x - dir.x, c.y - dir.y, BALL_Z).project(camera);
+    const axis = { x: (behind.x - center.x) * innerWidth, y: (center.y - behind.y) * innerHeight };
+    if (aiming.control.tick(performance.now(), axis)) syncFineAim();
+  }
   updateCueStick(c, dir, pull, spin);
   updateGuide(c, dir, pull, spin);
   if (gameMode === 'online') online.sendAim({ dir: { x: dir.x, y: dir.y }, pull, spin });
 }
 function updateCueStick(c, dir, pull, spin) {
-  // cue stick behind the ball, pulled back with the power, slightly elevated
-  const h = cueStick.holder, right = new THREE.Vector2(dir.y, -dir.x);   // shooter's right-hand side
-  h.position.set(c.x - dir.x * (R + 0.5 + pull * 0.6) + right.x * spin.x * R * 0.7, c.y - dir.y * (R + 0.5 + pull * 0.6) + right.y * spin.x * R * 0.7, BALL_Z + 0.15 + spin.y * R * 0.7);
-  // Elevate the cue so the butt clears the rail behind the ball: find how far back the nearest cushion line is
-  // along the stick, and pitch the stick so it is above the rail top there (a player's cue over the rail).
-  const railDist = (() => { let d = Infinity; if (dir.x > 1e-6) d = Math.min(d, (c.x + HW) / dir.x); if (dir.x < -1e-6) d = Math.min(d, (c.x - HW) / dir.x); if (dir.y > 1e-6) d = Math.min(d, (c.y + HH) / dir.y); if (dir.y < -1e-6) d = Math.min(d, (c.y - HH) / dir.y); return Math.max(d, 1); })();
-  const tipZ = 0.15 + spin.y * R * 0.7, railClear = RAIL_H + 0.9 - (R + tipZ) + 0.4;   // rise needed above the tip at the rail
-  const elevation = THREE.MathUtils.clamp(Math.atan2(railClear, railDist + RAIL_W), THREE.MathUtils.degToRad(5), THREE.MathUtils.degToRad(40));
-  h.rotation.set(0, elevation, Math.atan2(dir.y, dir.x), 'ZYX');   // aim about the table normal first, then pitch the butt up
+  const pose = cuePose(c, dir, pull, spin, FELT_Z);
+  const h = cueStick.holder;
+  h.position.set(pose.x, pose.y, pose.z);
+  h.rotation.set(0, pose.elevation, pose.yaw, 'ZYX');
 }
 function tableStill() {
   return allBalls().every((h) => {
@@ -1178,7 +1196,7 @@ function updateTurnStatus() {
   const state = free ? {
     title: '',
     detail: rackMotion || pocketed === 15 ? '' : interactionMode === 'fling' ? 'Drag a ball to fling or place it' :
-      cueLearned ? '' : 'Pull back from the cue ball. Release to shoot.',
+      cueLearned ? '' : 'Pull back from the cue ball. Hold still for fine aim. Release to shoot.',
     active: false,
   } : turnStatus({ match, mode: gameMode, seat: online.seat, racking: !!rackMotion,
     shooting: !!activeShot, pending: gameMode === 'online' && online.pending,
@@ -1612,7 +1630,10 @@ export default {
     if (!cueReady() || !cueUnderPointer(e)) return false;
     controls.enabled = false;
     const center = new THREE.Vector3().copy(cue.body.translation());
-    aiming = { to: center.clone(), offset: center.clone().sub(pointerToPlane(e, BALL_Z)) };
+    aiming = {
+      offset: center.clone().sub(pointerToPlane(e, BALL_Z)),
+      control: new CueAim(e, { maxPull: MAX_PULL, now: performance.now() }),
+    };
     guide.visible = true; cueStick.visible = true; updateGestureControls(); return true;
   },
   // Only the captured pointer's moves arrive during a gesture; otherwise the return value is the hover state.
@@ -1627,7 +1648,17 @@ export default {
       dragging.to = dragTarget(e); // Project once per event; coalesced samples only contribute velocity.
       return;
     }
-    if (aiming) { aiming.to = pointerToPlane(e, BALL_Z).add(aiming.offset); return; }
+    if (aiming) {
+      const center = cue.body.translation();
+      const samples = e.getCoalescedEvents?.();
+      const now = performance.now();
+      for (const sample of samples?.length ? samples : [e]) {
+        const raw = pointerToPlane(sample, BALL_Z).add(aiming.offset);
+        aiming.control.update(sample, { x: raw.x - center.x, y: raw.y - center.y }, now);
+      }
+      syncFineAim();
+      return;
+    }
     if (canCallPocket() && pocketAtPointer(pocketTargets, e) !== null) return 'pointer';
     if (interactionMode === 'fling') return !!ballUnderPointer(e);
     return cueReady() && cueUnderPointer(e);

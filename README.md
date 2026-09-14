@@ -1,6 +1,6 @@
 # Astra Pool
 
-Eight-ball on a 7-foot table, in a browser tab. Orbit the table, pull back from the cue ball,
+Eight-ball on a 7-foot table, in a browser tab. Orbit the table, aim from the cue ball,
 release. Rack the planets, a standard set, or faces.
 
 **[Play it at astrapool.darrinm.com](https://astrapool.darrinm.com)** — no install, no account.
@@ -26,11 +26,14 @@ private link), and **Free Play** (no rules). On every refresh the welcome screen
 demo behind the menu; choosing a mode or pressing Escape starts a fresh rack. Online room links
 restore the player and table directly instead of starting the demo.
 
-Drag back from the cue ball and release. The further the pull, the harder the hit, up to 24 mph.
+Pull back from the cue ball to aim directly and set power, up to 24 mph. Hold within about
+6 screen pixels for 400 ms to enter **Fine aim**: power locks, the cue highlights, and movement
+across the cue rotates the shot at 0.1° per pixel. Move along the cue by 20 pixels to resume normal
+aiming without a jump. Release to shoot in either mode. This works on mouse and touch.
 Aim lines preview the shot with the same physics as the live game, including rolling spin,
 collisions throughout the rack, cushions, and Black Hole Gravity. White follows the cue ball;
 gold follows the first object hit. Stop rings mark their simulated final positions when they
-remain on the table. A faint line from the cue tip to first impact updates immediately and remains visible
+remain on the table. A faint, horizontal line from the cue ball to first impact updates immediately and remains visible
 while predictions update. Obsolete simulations are cancelled; incomplete previews do not
 claim a stopping position. Width and brightness reflect power. The **Look ahead** slider in settings limits the cue-ball
 preview to 0–5 bounces or **All**; contacts with balls and cushions both count. Shorter settings
