@@ -27,6 +27,15 @@ demo behind the menu; choosing a mode or pressing Escape starts a fresh rack. On
 restore the player and table directly instead of starting the demo.
 
 Drag back from the cue ball and release. The further the pull, the harder the hit, up to 24 mph.
+Aim lines preview the shot with the same physics as the live game, including rolling spin,
+collisions throughout the rack, cushions, and Black Hole Gravity. White follows the cue ball;
+gold follows the first object hit. Stop rings mark their simulated final positions when they
+remain on the table. A faint line from the cue tip to first impact updates immediately and remains visible
+while predictions update. Obsolete simulations are cancelled; incomplete previews do not
+claim a stopping position. Width and brightness reflect power. The **Look ahead** slider in settings limits the cue-ball
+preview to 0–5 bounces or **All**; contacts with balls and cushions both count. Shorter settings
+stop the simulation at that horizon too, truncating any object-ball path still in motion without
+a stopping circle. A shot that settles sooner still shows its predicted resting position.
 The ball widget sets follow, draw and english. Left-drag to orbit, right-drag to pan, wheel to
 zoom. On touch: drag to orbit, two fingers to pan, pinch to zoom, and tap **Cancel** with a second
 finger to abandon a shot in progress.
@@ -70,8 +79,8 @@ Three collections, cycled with `B` or **Game → Ball collection**.
 
 **Planets** racks the solar system. Mercury through Uranus are 1–7, a black hole is the 8, and
 Neptune, the Moon, Io, Europa, Ganymede, Titan and Pluto are 9–15; the cue ball is the Sun. The
-gas giants carry rings and moons, Earth has a cloud shell, and numbered caps appear on each
-world's upper face while you aim. It is an illustrated set, not calibrated imagery: sizes and ring
+gas giants carry rings and moons, and Earth has a cloud shell. It is an illustrated set,
+not calibrated imagery: sizes and ring
 spacing are exaggerated, and six bodies use reconstructed terrain where the source maps are blank
 or blurred. About 11.5 MB of maps load the first time it is selected.
 

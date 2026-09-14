@@ -174,6 +174,13 @@
             </div>
           </div>
 
+          <div class="field look-ahead-setting">
+            <label class="range-label" for="look-ahead">Look ahead <output id="look-ahead-value" for="look-ahead">All bounces</output></label>
+            <input id="look-ahead" type="range" min="0" max="6" step="1" value="6" aria-valuetext="All bounces" aria-describedby="look-ahead-description">
+            <div class="range-labels"><span>First impact</span><span>All bounces</span></div>
+            <p id="look-ahead-description" class="arcade-description">Cue-ball preview length. Contacts with balls and cushions count as bounces.</p>
+          </div>
+
           <div class="field arcade-setting">
             <button id="arcade-toggle" class="switch" aria-pressed="true"><span>Arcade</span><span class="switch-track" aria-hidden="true"></span></button>
             <p class="arcade-description">Big little celebrations. Skill points, lucky shots, and glorious mistakes.</p>
@@ -201,7 +208,7 @@
               <label class="planet-color-label" for="planet-saturation">Color intensity <output id="planet-saturation-value" for="planet-saturation">100%</output></label>
               <input id="planet-saturation" type="range" min="1" max="1.7" step="0.05" value="1">
               <div class="planet-range-labels"><span>Natural</span><span>Vivid</span></div>
-              <p>Fifteen different worlds. Eight planets, five moons, Pluto, and a black-hole 8; the Sun is your cue ball. Small companions and rings are enlarged for play. Moons visibly orbit; numbered caps appear while you aim.</p>
+              <p>Fifteen different worlds. Eight planets, five moons, Pluto, and a black-hole 8; the Sun is your cue ball. Small companions and rings are enlarged for play. Moons visibly orbit their worlds.</p>
             </div>
           </div>
 
