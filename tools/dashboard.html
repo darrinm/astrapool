@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Astra Pool analytics</title>
+<style>
+:root {
+  color-scheme: dark light;
+  --bg: #0b0f17; --panel: #131a26; --panel-edge: #1f2937; --ink: #e8edf5; --muted: #8b9ab0;
+  --accent: #4ade80; --accent-dim: #16653b; --second: #60a5fa; --warn: #fbbf24; --grid: #1e2836;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --panel-edge: #e3e7ee; --ink: #101828; --muted: #5b6878;
+    --accent: #15803d; --accent-dim: #bbf7d0; --second: #2563eb; --warn: #b45309; --grid: #eceff4;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+header {
+  position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--panel-edge);
+  padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+}
+h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+h1 span { color: var(--muted); font-weight: 400; }
+.controls { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.segmented { display: flex; border: 1px solid var(--panel-edge); border-radius: 8px; overflow: hidden; }
+.segmented button {
+  border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px;
+  padding: 6px 12px; cursor: pointer;
+}
+.segmented button + button { border-left: 1px solid var(--panel-edge); }
+.segmented button[aria-pressed="true"] { background: var(--accent); color: var(--bg); font-weight: 600; }
+select, .ghost {
+  font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 8px;
+  border: 1px solid var(--panel-edge); background: var(--panel); color: var(--ink); cursor: pointer;
+}
+.badge { font-size: 12px; color: var(--muted); padding: 4px 8px; border: 1px solid var(--panel-edge); border-radius: 999px; }
+main { padding: 20px; max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; }
+.tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); }
+/* min-width: 0 lets a card shrink below its table's intrinsic width, so the
+   table scrolls inside the card instead of widening the page. */
+.tile, .card { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.tile dt { font-size: 12px; color: var(--muted); margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.tile dd { margin: 0; font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.tile small { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); font-weight: 400; }
+.card h2 { font-size: 14px; margin: 0 0 2px; font-weight: 620; }
+.card p.sub { margin: 0 0 14px; font-size: 12px; color: var(--muted); }
+.columns { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
+.grid-settings { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 5px 0 5px 10px; font-size: 13px; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; padding-left: 0; }
+thead th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--panel-edge); }
+tbody tr + tr td { border-top: 1px solid color-mix(in srgb, var(--panel-edge) 55%, transparent); }
+.bar { position: relative; min-width: 110px; }
+.bar span { position: absolute; inset: 0 auto 0 0; background: var(--accent-dim); border-radius: 3px; z-index: 0; }
+.bar b { position: relative; z-index: 1; font-weight: 500; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }
+svg { width: 100%; height: auto; display: block; overflow: visible; }
+svg text { fill: var(--muted); font-size: 10px; }
+.scroll { overflow-x: auto; }
+.scroll table { width: max-content; min-width: 100%; }
+.empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+footer { max-width: 1180px; margin: 0 auto; padding: 4px 20px 40px; color: var(--muted); font-size: 12px; }
+footer a { color: var(--second); }
+footer p { margin: 6px 0; }
+#error {
+  display: none; background: color-mix(in srgb, var(--warn) 14%, var(--panel)); border: 1px solid var(--warn);
+  border-radius: 12px; padding: 14px 16px; font-size: 13px; white-space: pre-wrap; word-break: break-word;
+}
+#error.on { display: block; }
+body.loading main { opacity: 0.45; transition: opacity 0.15s; }
+rect.hit { fill: transparent; }
+</style>
+</head>
+<body class="loading">
+<header>
+  <h1>Astra Pool <span>gameplay analytics</span></h1>
+  <div class="controls">
+    <div class="segmented" id="range" role="group" aria-label="Time range"></div>
+    <select id="mode" aria-label="Game mode">
+      <option value="all">All modes</option>
+      <option value="local">Local</option>
+      <option value="computer">Computer</option>
+      <option value="free">Free Play</option>
+      <option value="online">Online</option>
+    </select>
+    <button class="ghost" id="refresh" type="button">Refresh</button>
+    <span class="badge" id="source"></span>
+  </div>
+</header>
+<main>
+  <div id="error"></div>
+  <dl class="tiles" id="tiles"></dl>
+  <section class="card">
+    <h2>Daily starts</h2>
+    <p class="sub">Racks grouped by the UTC day they started. A rack finishing tomorrow still counts on the day it began.</p>
+    <div class="legend">
+      <span><i style="background: var(--accent)"></i>Finished</span>
+      <span><i style="background: var(--second)"></i>Ended early</span>
+      <span><i style="background: var(--grid)"></i>Unfinished or still playing</span>
+    </div>
+    <div id="daily"></div>
+  </section>
+  <div class="columns">
+    <section class="card"><h2>Game modes</h2><p class="sub">Starts, with completion rate.</p><div id="modes"></div></section>
+    <section class="card"><h2>Winners</h2><p class="sub">Finished racks only.</p><div id="outcomes"></div></section>
+  </div>
+  <div class="grid-settings" id="settings"></div>
+</main>
+<footer>
+  <p id="generated"></p>
+  <p><strong>Started</strong> is the first accepted shot. <strong>Finished</strong> means the rules declared a winner, or Free Play cleared the table.
+  <strong>Ended early</strong> is an observed switch, restart, page exit, or expired online room.
+  <strong>Unfinished</strong> is everything else, which includes racks whose final update never arrived — browsers cannot report every tab closure. It is not a live-player count.</p>
+  <p>Definitions and SQL: <a href="https://github.com/darrinm/astrapool/blob/main/docs/analytics.md">docs/analytics.md</a> &middot;
+  Raw rows: <a href="https://dash.cloudflare.com/f1a4a152b72d6ebcb0b82a8b384d4c1b/workers/d1">D1 console</a></p>
+</footer>
+<script>
+const RANGES = [[1, '24 hours'], [7, '7 days'], [30, '30 days'], [90, '90 days']];
+const SETTING_LABELS = { difficulty: 'Computer difficulty', room: 'Room', balls: 'Ball collection', arcade: 'Arcade scoring',
+  effects: 'Effects', sound: 'Sound', input: 'Input', device: 'Device' };
+const store = { get: key => { try { return localStorage.getItem(key); } catch { return null; } },
+  set: (key, value) => { try { localStorage.setItem(key, value); } catch {} } };
+const state = { days: Number(store.get('days')) || 7, mode: store.get('mode') || 'all' };
+const el = id => document.getElementById(id);
+const num = value => Number(value || 0);
+const fmt = value => num(value).toLocaleString();
+const pct = (part, whole) => whole ? (100 * part / whole).toFixed(1) + '%' : '—';
+const duration = seconds => !seconds ? '—' : seconds < 90 ? Math.round(seconds) + 's' :
+  Math.floor(seconds / 60) + 'm ' + String(Math.round(seconds % 60)).padStart(2, '0') + 's';
+
+el('range').innerHTML = RANGES.map(([days, label]) =>
+  `<button type="button" data-days="${days}" aria-pressed="${days === state.days}">${label}</button>`).join('');
+el('range').addEventListener('click', event => {
+  const days = event.target.closest('button')?.dataset.days;
+  if (days) { state.days = Number(days); store.set('days', days); load(); }
+});
+el('mode').value = state.mode;
+el('mode').addEventListener('change', event => { state.mode = event.target.value; store.set('mode', state.mode); load(); });
+el('refresh').addEventListener('click', () => load());
+
+function tile(label, value, note) {
+  return `<div class="tile"><dt>${label}</dt><dd>${value}${note ? `<small>${note}</small>` : ''}</dd></div>`;
+}
+
+// Horizontal bar rows: the bar width encodes starts, so long tails stay readable.
+function barTable(rows, { value = row => num(row.started), label = 'Starts', extra = true } = {}) {
+  if (!rows.length) return '<p class="empty">No racks in this range.</p>';
+  const top = Math.max(...rows.map(value), 1);
+  const head = extra ? '<th>Finished</th><th>Completed</th><th>Avg rack</th>' : '';
+  return `<div class="scroll"><table><thead><tr><th></th><th>${label}</th>${head}</tr></thead><tbody>` + rows.map(row => {
+    const started = value(row);
+    return `<tr><td class="bar"><span style="width: ${100 * started / top}%"></span><b>${row.name ?? row.day}</b></td>` +
+      `<td>${fmt(started)}</td>` + (extra ? `<td>${fmt(row.finished)}</td><td>${pct(num(row.finished), started)}</td><td>${duration(num(row.avg_seconds))}</td>` : '') + '</tr>';
+  }).join('') + '</tbody></table></div>';
+}
+
+// Fill gaps so quiet days are visible rather than silently skipped.
+function dailySeries(rows, days) {
+  const byDay = new Map(rows.map(row => [row.day, row]));
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const row = byDay.get(day) || {};
+    out.push({ day, started: num(row.started), finished: num(row.finished), ended: num(row.ended) });
+  }
+  return out;
+}
+
+function dailyChart(rows, days) {
+  const series = dailySeries(rows, days);
+  const top = Math.max(...series.map(row => row.started), 1);
+  const W = 960, H = 220, pad = { top: 8, right: 8, bottom: 22, left: 40 };
+  const plot = { w: W - pad.left - pad.right, h: H - pad.top - pad.bottom };
+  const step = plot.w / series.length, width = Math.max(1, Math.min(38, step - Math.max(2, step * 0.25)));
+  const y = value => pad.top + plot.h - (value / top) * plot.h;
+  const ticks = [0, 0.5, 1].map(f => Math.round(top * f));
+  const labelEvery = Math.ceil(series.length / 12);
+  const bars = series.map((row, i) => {
+    const x = pad.left + i * step + (step - width) / 2;
+    const parts = [['finished', row.finished, 'var(--accent)'], ['ended', row.ended, 'var(--second)'],
+      ['other', Math.max(0, row.started - row.finished - row.ended), 'var(--grid)']];
+    let offset = 0;
+    const stack = parts.map(([, value, fill]) => {
+      if (!value) return '';
+      const height = (value / top) * plot.h, top_ = pad.top + plot.h - offset - height;
+      offset += height;
+      return `<rect x="${x.toFixed(1)}" y="${top_.toFixed(1)}" width="${width.toFixed(1)}" height="${Math.max(1, height).toFixed(1)}" fill="${fill}" rx="1.5"/>`;
+    }).join('');
+    const title = `${row.day}: ${row.started} started, ${row.finished} finished, ${row.ended} ended early`;
+    const tick = i % labelEvery === 0 || i === series.length - 1
+      ? `<text x="${(x + width / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${row.day.slice(5)}</text>` : '';
+    return `<g><title>${title}</title>${stack}<rect class="hit" x="${(pad.left + i * step).toFixed(1)}" y="${pad.top}" width="${step.toFixed(1)}" height="${plot.h}"/></g>${tick}`;
+  }).join('');
+  const guides = ticks.map(value =>
+    `<line x1="${pad.left}" x2="${W - pad.right}" y1="${y(value).toFixed(1)}" y2="${y(value).toFixed(1)}" stroke="var(--grid)"/>` +
+    `<text x="${pad.left - 8}" y="${(y(value) + 3).toFixed(1)}" text-anchor="end">${fmt(value)}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily starts">${guides}${bars}</svg>`;
+}
+
+function render(data) {
+  const s = data.summary || {};
+  const started = num(s.started), finished = num(s.finished), ended = num(s.ended);
+  el('tiles').innerHTML = [
+    tile('Started', fmt(started), 'racks with a first shot'),
+    tile('Finished', fmt(finished), pct(finished, started) + ' of starts'),
+    tile('Ended early', fmt(ended), pct(ended, started) + ' of starts'),
+    tile('Unfinished', fmt(started - finished - ended), 'includes lost final updates'),
+    tile('Shots', fmt(s.shots), started ? (num(s.shots) / started).toFixed(1) + ' per rack' : ''),
+    tile('Avg rack', duration(num(s.avg_seconds)), 'finished racks only'),
+    tile('Settings changes', fmt(s.settings_changes), 'local, computer, Free Play'),
+  ].join('');
+  el('daily').innerHTML = (data.daily || []).length ? dailyChart(data.daily, data.days) : '<p class="empty">No racks in this range.</p>';
+  el('modes').innerHTML = barTable(data.modes || []);
+  el('outcomes').innerHTML = barTable(data.outcomes || [], { value: row => num(row.count), label: 'Racks', extra: false });
+  el('settings').innerHTML = Object.entries(data.settings || {}).map(([key, rows]) =>
+    `<section class="card"><h2>${SETTING_LABELS[key] || key}</h2><p class="sub">By the setting in force on the first shot.</p>${barTable(rows)}</section>`).join('');
+  el('generated').textContent = `${data.rangeLabel} · ${data.mode === 'all' ? 'all modes' : data.mode} · UTC · read ${new Date(data.generatedAt).toLocaleTimeString()} from ${data.source}`;
+  el('source').textContent = data.source;
+}
+
+async function load() {
+  document.body.classList.add('loading');
+  for (const button of el('range').children) button.setAttribute('aria-pressed', String(Number(button.dataset.days) === state.days));
+  try {
+    const response = await fetch(`/api/report?days=${state.days}&mode=${state.mode}`);
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || response.statusText);
+    el('error').classList.remove('on');
+    render(body);
+  } catch (error) {
+    el('error').textContent = error.message;
+    el('error').classList.add('on');
+  } finally {
+    document.body.classList.remove('loading');
+  }
+}
+load();
+</script>
+</body>
+</html>

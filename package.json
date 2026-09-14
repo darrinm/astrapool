@@ -24,6 +24,7 @@
     "deploy:private": "npm run heads:restore && npm run build && wrangler deploy --config wrangler.private.jsonc",
     "heads:guard": "node tools/heads.mjs guard",
     "analytics": "node tools/analytics.mjs",
+    "analytics:dashboard": "node tools/dashboard.mjs",
     "analytics:migrate": "wrangler d1 migrations apply GAME_ANALYTICS --remote"
   },
   "dependencies": {

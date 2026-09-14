@@ -192,8 +192,9 @@ Anonymous rack statistics live in Cloudflare D1: games started and finished, com
 game modes, outcomes, shots, duration, arcade score, and starting/current settings. Attract mode
 is excluded; a game starts on its first shot. Online rooms count once across both players.
 
-Run `npm run analytics` for the last seven days, or `npm run analytics -- --days 30 --mode computer`.
-Use `--json` for exports. The same data is available in the Cloudflare dashboard under
+Run `npm run analytics:dashboard` for charts in a browser, served from localhost through your own
+Wrangler login. Run `npm run analytics` for the same report as text, with `--days 30`,
+`--mode computer` and `--json` filters. The raw rows are in the Cloudflare dashboard under
 **Storage & databases → D1 → astrapool-analytics → Console**.
 See [analytics definitions, queries, and setup](docs/analytics.md).
 

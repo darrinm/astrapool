@@ -6,19 +6,32 @@ and no reporting credential in the browser.
 
 ## View reports
 
-In the [Cloudflare dashboard](https://dash.cloudflare.com/f1a4a152b72d6ebcb0b82a8b384d4c1b/workers/d1),
-open **astrapool-analytics → Console** to run the SQL below. The database's Data view also lets
-you inspect individual rack records.
-
 From a checkout with dependencies installed and `npx wrangler login` completed:
 
 ```sh
+npm run analytics:dashboard                   # charts in a browser
 npm run analytics                             # last 7 days, all modes
 npm run analytics -- --days 30                 # 1, 7, 30, or 90 days
 npm run analytics -- --days 30 --mode computer # local, computer, free, online, or all
 npm run --silent analytics -- --json > analytics.json
 npm run analytics -- --local                  # local development data only
 ```
+
+`npm run analytics:dashboard` serves the same report as a page and opens it. Summary tiles,
+daily starts, modes, winners and every settings breakdown are on one screen, with buttons for
+the range and mode. It listens on `127.0.0.1:8788` only, so the report is readable from this
+machine and not from the network. `--port`, `--local` and `--no-open` change that; Ctrl+C stops it.
+Each refresh runs the fixed report queries through Wrangler's own login, so no analytics
+credential is published, stored in the browser, or added to the game.
+
+Cloudflare's own **Dashboards** section charts Cloudflare telemetry, not table contents. Its D1
+datasets report rows read, query latency and storage size for `astrapool-analytics`, and cannot
+group by mode, difficulty or room. Gameplay charts have to come from the dashboard command above,
+or from SQL.
+
+In the [Cloudflare dashboard](https://dash.cloudflare.com/f1a4a152b72d6ebcb0b82a8b384d4c1b/workers/d1),
+open **astrapool-analytics → Console** to run the SQL below. The database's Data view also lets
+you inspect individual rack records.
 
 Reports include daily counts, modes, winners, and breakdowns by starting difficulty, room,
 ball collection, arcade setting, effects setting, sound, input, and device category. Each
@@ -159,6 +172,6 @@ local Worker. Its records stay in local D1. Plain `npm run dev` disables browser
 The separate private Worker has no analytics binding and does not collect records into the
 public database.
 
-`npm test` covers lifecycle, validation, deduplication and SQL reporting. `npm run test:online`
+`npm test` covers lifecycle, validation, deduplication, SQL reporting and the dashboard's routes and filters. `npm run test:online`
 uses an isolated local database and a real Worker to check HTTP ingestion and one-record online
 racks across two peers and reconnects.
