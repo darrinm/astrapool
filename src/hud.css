@@ -234,7 +234,8 @@ button:disabled { opacity: .45; cursor: default; }
 #hud-sheet::backdrop { background: #05090d33; }
 .sheet-heading { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: var(--s4); padding: var(--s4) var(--s5); background: var(--panel-solid); border-bottom: 1px solid var(--edge); }
 .sheet-heading h2 { margin: 0; font: 400 var(--t-title)/1 var(--display); }
-#close-sheet { border: 0; background: transparent; color: var(--accent); }
+#close-sheet { width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--ink-dim); }
+#close-sheet:hover { background: var(--raise-hover); color: var(--ink); }
 #sheet-content { padding: var(--s5); }
 #panel-settings { display: grid; gap: var(--s6); }
 
@@ -296,8 +297,9 @@ button:disabled { opacity: .45; cursor: default; }
 [aria-pressed="true"] > .switch-track::after { transform: translateX(17px); background: var(--accent-ink); }
 
 /* Actions differ by consequence: quiet for view, marked for destructive. */
-.sheet-actions { display: flex; flex-wrap: wrap; gap: var(--s2); padding-top: var(--s5); border-top: 1px solid var(--edge); }
-.sheet-actions .quiet-button { flex: 1 1 auto; }
+.sheet-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; gap: var(--s2); }
+.sheet-actions .switch { min-width: 0; justify-content: flex-start; gap: var(--s2); }
+.sheet-actions .quiet-button { min-width: 0; padding-inline: var(--s2); }
 .danger-button { border-color: #e0907940; background: #e090791a; color: var(--danger); }
 .danger-button:hover { border-color: var(--danger); background: #e090792e; }
 .sheet-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
@@ -457,6 +459,11 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 5px; text-align: cent
   .choices { grid-template-columns: 1fr; }
   .rooms { grid-template-columns: repeat(2, 1fr); }
   #hud-sheet button, #hud-sheet summary, #hud-sheet select, #hud-sheet input { min-height: 44px; }
+}
+@media (max-width: 600px) {
+  .sheet-actions { gap: var(--s1); }
+  .sheet-actions .quiet-button { padding-inline: var(--s1); font-size: 12px; }
+  .sheet-actions .switch { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; font-size: 11px; }
 }
 @media (max-width: 360px) {
   .bottom-hud { column-gap: 0; }

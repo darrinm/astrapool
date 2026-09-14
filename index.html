@@ -121,7 +121,7 @@
     </div>
 
     <dialog id="hud-sheet" aria-labelledby="sheet-title">
-      <header class="sheet-heading"><h2 id="sheet-title">Game</h2><button id="close-sheet" class="text-button" autofocus>Done</button></header>
+      <header class="sheet-heading"><h2 id="sheet-title">Game</h2><button id="close-sheet" class="quiet-button icon-button" aria-label="Close" title="Close" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
       <div id="sheet-content">
 
         <section id="panel-match" hidden>
@@ -129,6 +129,13 @@
         </section>
 
         <section id="panel-settings">
+          <div class="sheet-actions">
+            <button class="switch" data-sound-toggle aria-pressed="true"><span>Sound</span><span class="switch-track" aria-hidden="true"></span><span data-sound-state hidden>on</span></button>
+            <button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button>
+            <button id="overhead-view" class="quiet-button">Overhead</button>
+            <button id="rerack" class="quiet-button danger-button" title="Re-rack (R)">New rack</button>
+          </div>
+
           <div class="field">
             <span class="eyebrow" id="mode-label">Game</span>
             <div id="game-mode" class="choices" role="group" aria-labelledby="mode-label">
@@ -137,19 +144,6 @@
               <button data-game="online" aria-pressed="false"><strong>Play a Friend</strong><span>Share a private link</span></button>
               <button data-game="free" aria-pressed="false"><strong>Free Play</strong><span>No rules, just the table</span></button>
             </div>
-          </div>
-
-          <div class="field arcade-setting">
-            <button id="arcade-toggle" class="switch" aria-pressed="true"><span>Arcade</span><span class="switch-track" aria-hidden="true"></span></button>
-            <p class="arcade-description">Big little celebrations. Skill points, lucky shots, and glorious mistakes.</p>
-            <div id="arcade-intensity" class="segmented" role="group" aria-label="Arcade effects"><button data-effects="full" aria-pressed="true">Full effects</button><button data-effects="reduced" aria-pressed="false">Reduced effects</button></div>
-            <p id="arcade-best" hidden></p>
-          </div>
-
-          <div class="field arcade-setting">
-            <button id="black-hole-gravity-toggle" class="switch" aria-pressed="false" aria-describedby="black-hole-gravity-description"><span>Black Hole Gravity</span><span class="switch-track" aria-hidden="true"></span></button>
-            <p id="black-hole-gravity-description" class="arcade-description">The 8-ball pulls nearby moving balls toward it within about 16 ball diameters. The computer adjusts its aim. Toggle when the balls are at rest.</p>
-            <p id="black-hole-gravity-online" class="arcade-description" hidden>Available in local games and Free Play.</p>
           </div>
 
           <div class="field" id="difficulty-group" hidden>
@@ -172,18 +166,31 @@
             <button id="online-retry" class="quiet-button" hidden>Reconnect</button>
           </section>
 
-          <div class="field">
-            <span class="eyebrow" id="room-label">Room</span>
-            <div id="environment-options" class="rooms" role="group" aria-labelledby="room-label"></div>
-            <p id="room-status" role="status"></p>
-          </div>
-
           <div class="field" id="interaction-group" hidden>
             <span class="eyebrow" id="play-label">Play your way</span>
             <div id="mode" class="segmented" role="group" aria-labelledby="play-label">
               <button data-mode="cue" aria-pressed="true" title="Shoot with the cue">Cue</button>
               <button data-mode="fling" aria-pressed="false" title="Grab and throw any ball">Fling</button>
             </div>
+          </div>
+
+          <div class="field arcade-setting">
+            <button id="arcade-toggle" class="switch" aria-pressed="true"><span>Arcade</span><span class="switch-track" aria-hidden="true"></span></button>
+            <p class="arcade-description">Big little celebrations. Skill points, lucky shots, and glorious mistakes.</p>
+            <div id="arcade-intensity" class="segmented" role="group" aria-label="Arcade effects"><button data-effects="full" aria-pressed="true">Full effects</button><button data-effects="reduced" aria-pressed="false">Reduced effects</button></div>
+            <p id="arcade-best" hidden></p>
+          </div>
+
+          <div class="field arcade-setting">
+            <button id="black-hole-gravity-toggle" class="switch" aria-pressed="false" aria-describedby="black-hole-gravity-description"><span>Black Hole Gravity</span><span class="switch-track" aria-hidden="true"></span></button>
+            <p id="black-hole-gravity-description" class="arcade-description">The 8-ball pulls nearby moving balls toward it within about 16 ball diameters. The computer adjusts its aim. Toggle when the balls are at rest.</p>
+            <p id="black-hole-gravity-online" class="arcade-description" hidden>Available in local games and Free Play.</p>
+          </div>
+
+          <div class="field">
+            <span class="eyebrow" id="room-label">Room</span>
+            <div id="environment-options" class="rooms" role="group" aria-labelledby="room-label"></div>
+            <p id="room-status" role="status"></p>
           </div>
 
           <div class="field">
@@ -195,19 +202,7 @@
               <input id="planet-saturation" type="range" min="1" max="1.7" step="0.05" value="1">
               <div class="planet-range-labels"><span>Natural</span><span>Vivid</span></div>
               <p>Fifteen different worlds. Eight planets, five moons, Pluto, and a black-hole 8; the Sun is your cue ball. Small companions and rings are enlarged for play. Moons visibly orbit; numbered caps appear while you aim.</p>
-              <details class="planet-guide"><summary>Meet the planets &amp; credits</summary>
-                <p>Cue Sun · 1 Mercury · 2 Venus · 3 Earth · 4 Mars · 5 Jupiter · 6 Saturn · 7 Uranus · 8 Black hole · 9 Neptune · 10 Moon · 11 Io · 12 Europa · 13 Ganymede · 14 Titan · 15 Pluto.</p>
-                <p>Earth has the Moon; Mars has Phobos and Deimos. The outer planets show a selection of major moons, with simplified smaller companions. Pluto has Charon. All four outer planets have rings; faint rings are brightened. Sizes and spacing are arranged for the table. Rings and moons rotate with their world.</p>
-                <p>Maps by <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>, based on NASA imagery. Additional world and moon maps from <a href="https://science.nasa.gov/3d-resources/" target="_blank" rel="noopener">NASA / VTAD</a>, <a href="https://space.jpl.nasa.gov/tmaps/mars.html" target="_blank" rel="noopener">JPL / USGS</a>, and <a href="https://www.usgs.gov/media/images/charon-new-horizons-global-mosaic-300m" target="_blank" rel="noopener">New Horizons / USGS</a>. Pluto, Charon, Titania, Oberon and Triton use AI artistic reconstructions of missing and blurry terrain, based on their credited source maps. The Sun is an artistic solar texture with animated glow. Color adjusted for play; Neptune rebalanced toward blue-green.</p>
-              </details>
             </div>
-            <button class="switch" data-sound-toggle aria-pressed="true"><span>Sound</span><span class="switch-track" aria-hidden="true"></span><span data-sound-state hidden>on</span></button>
-          </div>
-
-          <div class="sheet-actions">
-            <button id="reset-view" class="quiet-button" title="Reset view (C)">Reset view</button>
-            <button id="overhead-view" class="quiet-button">Overhead</button>
-            <button id="rerack" class="quiet-button danger-button" title="Re-rack (R)">New rack</button>
           </div>
 
           <details class="rules">
@@ -238,6 +233,12 @@
               <p>Hit your group first, then pocket a ball or drive any ball to a cushion. Fouls give ball-in-hand anywhere. An early 8, a scratch with the 8, or the wrong pocket loses. An 8 on the break is spotted. A dry break needs four object balls to a cushion; otherwise the opponent breaks a fresh rack.</p>
               <p>Vs Computer: Easy is forgiving and favors simple pots. Medium is accurate enough to build runs, but leaves openings. Hard plans ahead, uses spin and banks, and plays defensively when needed. Tricky prefers reliable banks, kicks, combinations and caroms, then plays for points among those choices. It takes a simple pot when the tricks are too risky and looks ahead for its next trick.</p>
             </div>
+          </details>
+
+          <details class="planet-guide"><summary>Meet the planets &amp; credits</summary>
+            <p>Cue Sun · 1 Mercury · 2 Venus · 3 Earth · 4 Mars · 5 Jupiter · 6 Saturn · 7 Uranus · 8 Black hole · 9 Neptune · 10 Moon · 11 Io · 12 Europa · 13 Ganymede · 14 Titan · 15 Pluto.</p>
+            <p>Earth has the Moon; Mars has Phobos and Deimos. The outer planets show a selection of major moons, with simplified smaller companions. Pluto has Charon. All four outer planets have rings; faint rings are brightened. Sizes and spacing are arranged for the table. Rings and moons rotate with their world.</p>
+            <p>Maps by <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>, based on NASA imagery. Additional world and moon maps from <a href="https://science.nasa.gov/3d-resources/" target="_blank" rel="noopener">NASA / VTAD</a>, <a href="https://space.jpl.nasa.gov/tmaps/mars.html" target="_blank" rel="noopener">JPL / USGS</a>, and <a href="https://www.usgs.gov/media/images/charon-new-horizons-global-mosaic-300m" target="_blank" rel="noopener">New Horizons / USGS</a>. Pluto, Charon, Titania, Oberon and Triton use AI artistic reconstructions of missing and blurry terrain, based on their credited source maps. The Sun is an artistic solar texture with animated glow. Color adjusted for play; Neptune rebalanced toward blue-green.</p>
           </details>
         </section>
 
