@@ -202,7 +202,9 @@ See [analytics definitions, queries, and setup](docs/analytics.md).
 
 The **Heads** collection textures the balls with photographs of real people. They are not in this
 repository and are not redistributable, so a checkout has no `public/heads/` and Heads falls back
-to plain colours.
+to plain colours. The build detects which private textures are present; public
+startup makes no face-texture requests. Restart the dev server after restoring
+or clearing private textures so it picks up the new file list.
 
 A copy lives outside the repository, in `~/.pool-heads` or `$POOL_HEADS_DIR`. `npm run
 heads:restore` puts it in the working tree; `heads:status`, `heads:stash` and `heads:clear` manage
