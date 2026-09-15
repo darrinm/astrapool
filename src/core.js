@@ -51,7 +51,7 @@ let headRadius = RADIUS;
 
 PEOPLE.forEach((id, i) => {
   const material = new THREE.MeshPhysicalMaterial({ color: new THREE.Color().setHSL(i / PEOPLE.length, 0.55, 0.6), roughness: 0.5 });
-  loader.load(`/heads/${id}.jpg?v=${HEADS_VERSION}`, (tex) => {
+  if (__POOL_HEAD_TEXTURE_IDS__.includes(id)) loader.load(`/heads/${id}.jpg?v=${HEADS_VERSION}`, (tex) => {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     material.map = tex; material.color.set('#ffffff'); material.needsUpdate = true;
