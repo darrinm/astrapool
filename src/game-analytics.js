@@ -1,3 +1,4 @@
+import { gameRequest, nativeBridge } from './platform.js';
 // Anonymous rack records: no visitor IDs, room links, reconnect tokens or ball positions.
 export const SETTINGS = {
   difficulty: ['easy', 'medium', 'hard', 'tricky', 'none'],
@@ -95,7 +96,7 @@ export class GameplayAnalytics {
 export function sendGameAnalytics(record, beacon = false) {
   const body = JSON.stringify(record);
   // Queuing is not a server acknowledgement. A surviving page confirms this snapshot with fetch.
-  if (beacon && navigator.sendBeacon?.('/api/analytics/game', new Blob([body], { type: 'application/json' }))) return 'queued';
-  return fetch('/api/analytics/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true })
+  if (beacon && !nativeBridge() && navigator.sendBeacon?.('/api/analytics/game', new Blob([body], { type: 'application/json' }))) return 'queued';
+  return gameRequest('/api/analytics/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true })
     .then(response => response.ok).catch(() => false);
 }

@@ -1,3 +1,4 @@
+import { nativeBridge } from './platform.js';
 import * as THREE from 'three';
 import { renderer, scene, camera, world, eventQueue, syncMeshes, snapshotPoses, heads } from './core.js';
 import pool from './pool.js';
@@ -9,12 +10,20 @@ import { stepPhysics } from './physics-step.js';
 import { finishLoading } from './loading.js';
 
 const current = pool;
+current.audio.preload();
 const STEP = 1 / current.stepRate;   // 480 Hz: see the note on stepRate in pool.js
 let accumulator = 0;
 world.timestep = STEP;
 const environmentReady = current.enter();
 connectHud(current);
 connectEnvironmentPicker(current);
+if (nativeBridge()) {
+  document.getElementById('copy-invite').textContent = 'Share invite';
+  const join = document.createElement('button');
+  join.className = 'quiet-button'; join.textContent = 'Join an invite link';
+  join.addEventListener('click', () => nativeBridge().postMessage({ action: 'join' }).catch(() => {}));
+  document.getElementById('game-mode').parentElement.append(join);
+}
 
 // ---------- input ----------
 connectPointerInput(renderer.domElement, current, current.controls());
@@ -49,10 +58,17 @@ let last = performance.now();
 const perf = { frames: 0, worst: 0, step: 0, render: 0, steps: 0, slow: 0, gaps: 0, reset() { this.frames = this.worst = this.step = this.render = this.steps = this.slow = this.gaps = 0; } };
 function tick() { snapshotPoses(); return stepPhysics(current, world, eventQueue); }
 window.playful = { heads, world, renderer, camera, scene3: scene, THREE, tick, scene: () => current, perf, mute: false }; // debug handle
+let nativePaused = false;
+addEventListener('astra-lifecycle', ({ detail }) => {
+  nativePaused = !detail.active; last = performance.now(); accumulator = 0;
+  if (nativePaused) { dispatchEvent(new Event('blur')); current.audio.ctx?.suspend(); }
+  else { current.audio.ctx?.resume(); current.resumeOnline(); }
+});
 let firstFrame;
 const rendered = new Promise(resolve => { firstFrame = resolve; });
 function animate(now) {
   requestAnimationFrame(animate);
+  if (nativePaused) { last = now; return; }
   const t0 = performance.now();
   if (now - last > 25) perf.gaps++;   // long gap between frames = a visible hitch, whatever caused it
   accumulator += Math.min((now - last) / 1000, 0.05); last = now;

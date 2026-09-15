@@ -228,3 +228,17 @@ test('completion during reconnect waits for that connection to confirm the pendi
   room.socket.message({ type: 'state', seq: 1, seat: 0, connected: [true, true], pending });
   assert.deepEqual(room.socket.sent, [{ type: 'result', seq: 1, ...completed }]);
 });
+
+test('native resume replaces the socket but preserves an unacknowledged shot result', t => {
+  const { room } = setup(t), original = room.socket;
+  room.id = 'room'; room.token = 'token';
+  room.pending = true; room.submitResult({ snapshot: 'pending snapshot' });
+  const result = room.result;
+  room.resume();
+  assert.notEqual(room.socket, original);
+  assert.equal(room.result, result);
+  assert.equal(room.synced, false);
+  assert.equal(room.canAct, false);
+  original.message({ type: 'state', seq: 99, seat: 0, connected: [true, true] });
+  assert.notEqual(room.seq, 99, 'stale connection events must be ignored');
+});

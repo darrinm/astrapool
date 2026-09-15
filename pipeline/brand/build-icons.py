@@ -28,3 +28,14 @@ frames[-1].save(public / 'favicon.ico', sizes=[(16, 16), (32, 32), (48, 48)],
                 append_images=frames[:-1])
 # iOS supplies its own corner mask. Give its home-screen icon an opaque backdrop.
 icon(180, 18, '#101719').convert('RGB').save(public / 'apple-touch-icon.png', optimize=True)
+
+# Optional native app catalog export; no extra dependency beyond this pipeline.
+if __name__ == '__main__':
+    import sys
+    if '--ios' in sys.argv:
+        target = root / 'ios/AstraPool/Assets.xcassets/AppIcon.appiconset/AppIcon.png'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        mark = icon(512, 32).resize((1024, 1024), Image.Resampling.LANCZOS)
+        canvas = Image.new('RGBA', (1024, 1024), '#101719')
+        canvas.alpha_composite(mark)
+        canvas.convert('RGB').save(target, optimize=True)
