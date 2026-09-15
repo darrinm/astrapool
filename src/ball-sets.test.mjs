@@ -28,15 +28,106 @@ test('all 15 object balls are distinct worlds and the cue is the Sun', () => {
   assert.deepEqual(PLANETS.filter(p => !p.moons.length).map(p => p.id), ['mercury', 'venus']);
 });
 
-test('a failed collection download releases successful maps, including late arrivals', async () => {
-  const disposed = [], loaded = [];
-  const result = createPlanetSet(async url => {
-    if (url.includes('mars')) throw new Error('offline');
-    await new Promise(resolve => setTimeout(resolve, url.includes('saturn') ? 10 : 0));
-    loaded.push(url); return { dispose() { disposed.push(url); } };
-  });
-  await assert.rejects(result, /offline/);
-  assert.equal(loaded.length, 24); assert.deepEqual(new Set(disposed), new Set(loaded));
+// These lifecycle checks use real Three.js materials/textures; only canvas
+// painting is stubbed because Node has no browser canvas.
+function mockCanvas(t) {
+  const previous = globalThis.document;
+  t.after(() => { globalThis.document = previous; });
+  globalThis.document = { createElement: () => ({ getContext: () => new Proxy({}, {
+    get: (_, key) => key === 'getImageData' ? (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4).fill(255) }) : () => {},
+  }) }) };
+}
+function deferredMaps(t) {
+  mockCanvas(t);
+  const pending = new Map(), downloaded = [];
+  const set = createPlanetSet(url => new Promise((resolve, reject) => pending.set(url, { resolve, reject })));
+  t.after(() => set.dispose());
+  function arrive(url, width = 512) {
+    const texture = new THREE.Texture({ width, height: width / 2 });
+    let disposed = false; texture.addEventListener('dispose', () => { disposed = true; });
+    downloaded.push(() => disposed);
+    pending.get(url).resolve(texture); pending.delete(url);
+    return texture.image;
+  }
+  return { set, pending, arrive, downloaded };
+}
+const tick = () => new Promise(resolve => setImmediate(resolve));
+
+test('planets render before downloads and upgrade shared live/replay textures independently', async t => {
+  const { set, pending, arrive, downloaded } = deferredMaps(t);
+  const earth = new THREE.Mesh(), pluto = new THREE.Mesh(), sun = new THREE.Mesh(), saturn = new THREE.Mesh();
+  set.attach(earth, 3); set.attach(pluto, 15); set.attach(sun, 0); set.attach(saturn, 6);
+  const clone = cloneReplayMesh(earth), map = earth.material.map;
+  const ring = saturn.getObjectByName('saturn-rings').material.map, ringVersion = ring.version;
+  assert.equal(map.image.width, 1);
+  assert.equal(pending.size, 17);
+  assert.ok([...pending.keys()].every(url => url.includes('/preview/')));
+  assert.ok(!pending.has('/planets/preview/charon.webp'), 'companions wait for the rack');
+  let allocationsReleased = 0; map.addEventListener('dispose', () => allocationsReleased++);
+  earth.position.set(1, 2, 3); earth.rotation.set(.2, .3, .4);
+  const rotation = earth.quaternion.clone(), decoration = earth.children[0];
+  const preview = arrive('/planets/preview/earth.webp');
+  await tick();
+  assert.equal(map.image, preview);
+  assert.equal(clone.material.map, map);
+  assert.equal(earth.children[0], decoration);
+  assert.deepEqual(earth.position.toArray(), [1, 2, 3]);
+  assert.ok(earth.quaternion.equals(rotation));
+  assert.equal(pluto.material.map.image.width, 1, 'an unfinished map does not hold up Earth');
+  for (const url of [...pending.keys()]) arrive(url);
+  await tick();
+  assert.equal(pending.size, 8);
+  assert.ok(ring.version > ringVersion, 'Saturn density map refreshes');
+  for (const url of [...pending.keys()]) arrive(url);
+  await set.ready;
+  assert.equal(pluto.material.map.offset.x, .5);
+  assert.equal(sun.material.map.wrapS, THREE.RepeatWrapping);
+  assert.equal(earth.getObjectByName('planet-clouds').material.alphaMap.colorSpace, THREE.NoColorSpace);
+  const details = set.loadDetails(); assert.equal(details, set.loadDetails());
+  await tick();
+  assert.equal(pending.size, 2, 'detail downloads are bounded');
+  for (let i = 0; i < 20 && pending.size; i++) {
+    for (const url of [...pending.keys()]) arrive(url, 2048);
+    await tick();
+    assert.ok(pending.size <= 2);
+  }
+  await details;
+  assert.equal(map.image.width, 2048);
+  assert.equal(allocationsReleased, 2, 'each resolution change releases immutable GPU storage');
+  assert.equal(clone.material.map, map);
+  assert.ok(downloaded.every(isDisposed => isDisposed()), 'temporary loader textures are released');
+});
+
+test('missing previews keep a fallback and can recover with a detailed map', async t => {
+  const { set, pending, arrive } = deferredMaps(t);
+  const mars = new THREE.Mesh(); set.attach(mars, 4);
+  pending.get('/planets/preview/mars.webp').reject(new Error('offline'));
+  pending.delete('/planets/preview/mars.webp');
+  for (const url of [...pending.keys()]) arrive(url);
+  await tick();
+  for (const url of [...pending.keys()]) arrive(url);
+  await set.ready;
+  assert.equal(mars.material.map.image.width, 1);
+  const details = set.loadDetails(); await tick();
+  while (pending.size) {
+    for (const url of [...pending.keys()]) arrive(url, 2048);
+    await tick();
+  }
+  await details;
+  assert.equal(mars.material.map.image.width, 2048);
+});
+
+test('disposing a collection releases late downloads and stops queued work', async t => {
+  const { set, pending, arrive, downloaded } = deferredMaps(t);
+  const earth = new THREE.Mesh(); set.attach(earth, 3);
+  const map = earth.material.map, version = map.version;
+  set.dispose(); set.dispose();
+  assert.equal(earth.children.length, 0);
+  for (const url of [...pending.keys()]) arrive(url);
+  await set.ready; await set.loadDetails();
+  assert.equal(pending.size, 0);
+  assert.equal(map.version, version, 'late arrivals do not resurrect disposed textures');
+  assert.ok(downloaded.every(isDisposed => isDisposed()));
 });
 
 test('moon orbits preserve their local plane through planet transforms and replay cloning', () => {
