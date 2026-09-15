@@ -30,6 +30,19 @@ New Horizons mosaic, cropped to
 restore 2:1 projection with its black no-data pixels initially replaced by neutral gray.
 That reference and preparation recipe remain in the manifest.
 
+## Progressive loading
+
+Run `python3 pipeline/planets/build-previews.py` after changing a source map (Pillow required).
+It derives 512-pixel WebP previews in `public/planets/preview/`, preserving the original maps
+and their credits. The small Saturn ring strip keeps its original width and transparency.
+The 25 previews total about 548 KB, versus 11.5 MB for the original detail maps.
+
+The collection starts with colored surfaces and requests rack previews alongside room assets.
+Companion-only moon previews follow the rack. Texture arrivals update existing live/replay
+materials without moving balls or restarting play. Once the collection is shown, original
+maps upgrade it in the background, two at a time. Failed downloads retain the prior appearance;
+disposing the collection releases late arrivals and prevents queued downloads from starting.
+
 ## Art direction
 
 - Sun cue: generated golden photosphere with granulation and small sunspots, animated UV
@@ -101,7 +114,7 @@ They share resources across companions/replays and release those resources on ta
 
 A future collection starts with an entry in `src/ball-sets.js` (the picker and B shortcut use
 that catalog), an owned renderer like `createPlanetSet`, and a loading/attachment branch in
-`setBallStyle`. Keep loading atomic, preserve the original ball materials and physics bodies,
+`setBallStyle`. Preserve the original ball materials and physics bodies as maps arrive,
 and ensure decorations can be cloned by `ReplayView` without owning their shared resources.
 
 Visual references: https://www.nasa.gov/universe/nasa-visualization-shows-a-black-holes-warped-world/

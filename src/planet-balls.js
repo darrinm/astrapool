@@ -24,12 +24,15 @@ export function updatePlanetCaps(balls, visible) {
   }
 }
 
-// One lazy, owned collection. Nothing touches live meshes before every map loads.
-// Sharing maps/materials with companions also keeps replay clones cheap.
-export async function createPlanetSet(load = url => new THREE.TextureLoader().loadAsync(url)) {
+// Stable textures let downloads improve live balls and replay clones in place.
+// Collection creation never waits for the network.
+export function createPlanetSet(load = url => new THREE.TextureLoader().loadAsync(url), { onUpdate = () => {} } = {}) {
   const maps = new Map(), materials = new Set(), geometries = new Set();
   const roots = new Set();
+  let disposed = false, details;
   function dispose() {
+    if (disposed) return;
+    disposed = true;
     roots.forEach(root => {
       if (root.parent) {
         root.parent.receiveShadow = root.userData.originalReceiveShadow;
@@ -39,16 +42,13 @@ export async function createPlanetSet(load = url => new THREE.TextureLoader().lo
     }); roots.clear();
     maps.forEach(map => map.dispose()); materials.forEach(mat => mat.dispose()); geometries.forEach(geo => geo.dispose());
   }
-  const ids = [...new Set([SUN.id, ...WORLDS.map(p => p.id).filter(id => id !== 'black-hole'),
-    ...WORLDS.flatMap(p => p.moons.map(([name]) => name.toLowerCase())), 'clouds', 'saturn-ring'])];
-  const results = await Promise.allSettled(ids.map(async id => {
-    const map = await load(`/planets/${id}.${id === 'saturn-ring' ? 'png' : 'jpg'}`);
-    map.colorSpace = id === 'clouds' ? THREE.NoColorSpace : THREE.SRGBColorSpace;
-    map.anisotropy = 8;
-    maps.set(id, map);
-  }));
-  const failure = results.find(result => result.status === 'rejected');
-  if (failure) { dispose(); throw failure.reason; }
+  const primaryIds = [SUN.id, ...WORLDS.map(p => p.id).filter(id => id !== 'black-hole'), 'clouds', 'saturn-ring'];
+  const companionIds = [...new Set(WORLDS.flatMap(p => p.moons.map(([name]) => name.toLowerCase())))].filter(id => !primaryIds.includes(id));
+  const ids = [...primaryIds, ...companionIds];
+  const colors = new Map([SUN, ...WORLDS].map(p => [p.id, p.color]));
+  for (const world of WORLDS) for (const [name, color] of world.moons) {
+    if (!colors.has(name.toLowerCase())) colors.set(name.toLowerCase(), color);
+  }
 
   function canvasMap(id, width, height, draw) {
     const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
@@ -56,23 +56,32 @@ export async function createPlanetSet(load = url => new THREE.TextureLoader().lo
     const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = 8; maps.set(id, map); return map;
   }
+  for (const id of ids) {
+    const map = canvasMap(id, 1, 1, ctx => {
+      ctx.fillStyle = id === 'clouds' ? '#000000' : colors.get(id) || '#e3c58f';
+      ctx.fillRect(0, 0, 1, 1);
+    });
+    if (id === 'clouds') map.colorSpace = THREE.NoColorSpace;
+  }
   // Radial density strips stay crisp at close range and mipmap cleanly at
   // table scale. Saturn retains the source colors, with a clear main division.
+  function paintRing(type, ctx, width, height) {
+    ctx.clearRect(0, 0, width, height);
+    if (type === 'saturn') ctx.drawImage(maps.get('saturn-ring').image, 0, 0, width, height);
+    else { ctx.fillStyle = type === 'dust' ? '#b9a28c' : '#dad2bf'; ctx.fillRect(0, 0, width, height); }
+    const pixels = ctx.getImageData(0, 0, width, height), data = pixels.data;
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const r = x / (width - 1), i = (y * width + x) * 4;
+      const grain = .78 + .14 * Math.sin(x * .31) + .08 * Math.sin(x * 1.13);
+      const edge = Math.min(1, r * 45, (1 - r) * 45);
+      const gap = type === 'saturn' && r > .675 && r < .72 ? .025 : 1;
+      const density = type === 'dust' ? .26 * Math.sin(Math.PI * r) : type === 'saturn' ? 1 : .85;
+      data[i + 3] *= grain * edge * gap * density;
+    }
+    ctx.putImageData(pixels, 0, 0);
+  }
   for (const type of ['saturn', 'dust', 'fine', 'arcs']) {
-    canvasMap(`ring-${type}`, 2048, 8, (ctx, width, height) => {
-      if (type === 'saturn') ctx.drawImage(maps.get('saturn-ring').image, 0, 0, width, height);
-      else { ctx.fillStyle = type === 'dust' ? '#b9a28c' : '#dad2bf'; ctx.fillRect(0, 0, width, height); }
-      const pixels = ctx.getImageData(0, 0, width, height), data = pixels.data;
-      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-        const r = x / (width - 1), i = (y * width + x) * 4;
-        const grain = .78 + .14 * Math.sin(x * .31) + .08 * Math.sin(x * 1.13);
-        const edge = Math.min(1, r * 45, (1 - r) * 45);
-        const gap = type === 'saturn' && r > .675 && r < .72 ? .025 : 1;
-        const density = type === 'dust' ? .26 * Math.sin(Math.PI * r) : type === 'saturn' ? 1 : .85;
-        data[i + 3] *= grain * edge * gap * density;
-      }
-      ctx.putImageData(pixels, 0, 0);
-    });
+    canvasMap(`ring-${type}`, 2048, 8, (ctx, width, height) => paintRing(type, ctx, width, height));
   }
   const time = { value: 0 };
   const sun = createSunMaterials(time, maps.get(SUN.id));
@@ -120,12 +129,6 @@ export async function createPlanetSet(load = url => new THREE.TextureLoader().lo
       // Retain the original NASA reference map's longitude alignment
       // for the approved artistic reconstruction.
       map.wrapS = THREE.RepeatWrapping; map.offset.x = .5;
-    }
-    if (id === 'neptune') {
-      const c = document.createElement('canvas'); c.width = map.image.width; c.height = map.image.height;
-      const ctx = c.getContext('2d'); ctx.drawImage(map.image, 0, 0);
-      ctx.globalAlpha = .62; ctx.fillStyle = '#83bdc7'; ctx.fillRect(0, 0, c.width, c.height);
-      map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8; maps.set('neptune-graded', map);
     }
     const capMap = new THREE.CanvasTexture(capCanvas(index + 1));
     capMap.colorSpace = THREE.SRGBColorSpace; capMap.anisotropy = 8; maps.set(`${id}-cap`, capMap);
@@ -203,7 +206,54 @@ export async function createPlanetSet(load = url => new THREE.TextureLoader().lo
       const arc = new THREE.Mesh(ringGeometry(1.29, 1.34, .2, .65), ringMats.get(type)); system.add(arc);
     }
   }
+  async function loadMap(id, preview) {
+    if (disposed) return;
+    const url = preview ? `/planets/preview/${id}.webp` : `/planets/${id}.${id === 'saturn-ring' ? 'png' : 'jpg'}`;
+    const downloaded = await load(url);
+    try {
+      if (disposed) return;
+      let image = downloaded.image;
+      if (id === 'neptune') {
+        // Apply the same visible-light color correction at both resolutions.
+        const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+        const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+        ctx.globalAlpha = .62; ctx.fillStyle = '#83bdc7'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        image = canvas;
+      }
+      const map = maps.get(id);
+      // WebGL texture storage is immutable in size. Release that allocation
+      // before changing resolution, while retaining the shared JS texture.
+      if (map.image.width !== image.width || map.image.height !== image.height) map.dispose();
+      map.image = image; map.needsUpdate = true;
+      if (id === 'saturn-ring') {
+        const ring = maps.get('ring-saturn'), canvas = ring.image;
+        paintRing('saturn', canvas.getContext('2d'), canvas.width, canvas.height);
+        ring.needsUpdate = true;
+      }
+      onUpdate();
+    } finally { downloaded.dispose(); }
+  }
+  // Prioritize the rack itself; tiny companion moons follow. A missing map
+  // keeps its fallback without preventing the game or other maps from loading.
+  const ready = Promise.allSettled(primaryIds.map(id => loadMap(id, true)))
+    .then(() => Promise.allSettled(companionIds.map(id => loadMap(id, true))));
   return {
+    ready,
+    loadDetails() {
+      // Called once the room is visible. Two downloads at a time avoid a burst
+      // of large transfers and GPU uploads while the player is taking a shot.
+      return details ??= ready.then(async () => {
+        const queue = [...ids];
+        async function worker() {
+          while (!disposed && queue.length) {
+            const id = queue.shift();
+            try { await loadMap(id, false); }
+            catch (error) { if (!disposed) console.warn(`Could not load detailed ${id} texture`, error); }
+          }
+        }
+        await Promise.all([worker(), worker()]);
+      });
+    },
     dispose,
     setTime(seconds) { time.value = seconds; },
     setSaturation(value) { saturation.value = THREE.MathUtils.clamp(value, 1, 1.7); },

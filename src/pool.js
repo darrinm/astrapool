@@ -65,7 +65,7 @@ let pocketedSet = new Set(), respotAt = 0, pmrem, envTex, feltCol, contactShadow
 const WHITE = new THREE.Color(0xffffff);
 const capped = new Map();   // head -> { plain, capped, ball } textures; caps are baked lazily once the plain map has loaded
 let capsOn = false;
-let ballStyle = 'balls', rackStyle = 'balls', planetSet, planetLoading, styleRequest = 0;
+let ballStyle = 'balls', rackStyle = 'balls', planetSet, styleRequest = 0;
 const classicMaterials = new Map(heads.map(ball => [ball, ball.mesh.material]));
 let planetSaturation = 1;
 try { const value = Number(localStorage.getItem('pool.planetSaturation')); if (value >= 1 && value <= 1.7) planetSaturation = value; } catch {}
@@ -139,6 +139,8 @@ async function setEnvironment(id, applyBallDefault = true) {
   const minimal = theme.id === 'minimal';
   const next = buildEnvironment(theme, FELT_Z - 1.2 - 4 - 24);
   pendingRoom = next;
+  // Start small planet maps alongside the room, without changing a live collection.
+  if (applyBallDefault && theme.id === 'orbital') ensurePlanetSet();
   try { if (!minimal) await next.ready; }
   catch (error) {
     next.dispose();
@@ -425,28 +427,13 @@ function setPlanetSaturation(value) {
   document.getElementById('planet-saturation-value').textContent = `${Math.round(planetSaturation * 100)}%`;
   try { localStorage.setItem('pool.planetSaturation', String(planetSaturation)); } catch {}
 }
+function ensurePlanetSet() {
+  return planetSet ??= createPlanetSet(undefined, { onUpdate: () => { renderer.shadowMap.needsUpdate = true; } });
+}
 async function setBallStyle(id) {
-  const style = ballSetById(id).id, request = ++styleRequest;
-  if (style === 'planets' && !planetSet) {
-    setLoadingStage(3, 'Loading balls…');
-    updateBallSetPicker(ballStyle === 'planets' ? 'balls' : ballStyle, style);
-    try {
-      planetLoading ??= createPlanetSet().then(set => {
-        if (!capsOn) { set.dispose(); throw new Error('Table closed'); }
-        planetSet = set; return set;
-      }).finally(() => { planetLoading = null; });
-      await planetLoading;
-    } catch (error) {
-      if (request === styleRequest) {
-        if (ballStyle === 'planets') ballStyle = 'balls';
-        rackStyle = ballStyle;
-        if (rackMotion) for (const entry of rackMotion.entries) entry.rotationTo.copy(rackRot(entry.ball));
-        updateBallSetPicker(ballStyle, null, 'Planets could not load. Choose Planets to try again.');
-      }
-      return false;
-    }
-    if (request !== styleRequest) return false;
-  }
+  const style = ballSetById(id).id;
+  ++styleRequest;
+  if (style === 'planets') ensurePlanetSet();
   stopReplay();
   ballStyle = rackStyle = style;
   if (guide) guide.prediction = null;
@@ -462,6 +449,7 @@ async function setBallStyle(id) {
   // online shot or computer plan may already have snapshotted it.
   updateBallSetPicker(style, null);
   applyCaps(); updateScore();
+  if (style === 'planets') planetSet.loadDetails();
   renderer.shadowMap.needsUpdate = true;
   return true;
 }
