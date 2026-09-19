@@ -26,6 +26,9 @@ final class NativeTests: XCTestCase {
         }
         XCTAssertTrue(loaded, "Bundled Three.js and Rapier must start without a hosted website")
         guard loaded else { return }
+        let collections = try await web.evaluateJavaScript("Array.from(document.querySelectorAll('#style button'), button => button.dataset.style)")
+        XCTAssertEqual(collections as? [String], ["balls", "planets"], "Only bundled collections should be offered")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: Bundle.main.resourceURL!.appendingPathComponent("Web/heads").path))
         // No shot or table gesture has occurred: startup must have prepared all takes.
         let audio = try await web.callAsyncJavaScript("""
         const audio = window.playful.scene().audio;
@@ -73,6 +76,36 @@ final class NativeTests: XCTestCase {
         let secure = try await web.evaluateJavaScript("isSecureContext && typeof crypto.randomUUID === 'function'")
         XCTAssertEqual(secure as? Bool, true)
         XCTAssertEqual(web.url?.host, "127.0.0.1")
+        let gameURL = web.url
+        let policyLink = "document.querySelector('a[href=\"/privacy.html\"]')"
+        try await web.evaluateJavaScript("window.policyTestGame = window.playful; \(policyLink).click()")
+        for _ in 0..<40 {
+            if controller.presentedViewController is UINavigationController { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let sheet = try XCTUnwrap(controller.presentedViewController as? UINavigationController)
+        let policy = try XCTUnwrap(sheet.topViewController as? PrivacyViewController)
+        var policyLoaded = false
+        for _ in 0..<60 {
+            if (try? await policy.webView.evaluateJavaScript("document.querySelector('h1')?.textContent === 'Privacy Policy' && document.body.textContent.includes('Changes and questions')")) as? Bool == true {
+                policyLoaded = true; break
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        XCTAssertTrue(policyLoaded, "The complete policy must load from the bundle, without Safari or a remote website")
+        XCTAssertEqual(policy.webView.url?.host, "127.0.0.1")
+        XCTAssertEqual(policy.webView.url?.path, "/privacy.html")
+        let bundledPolicy = try String(contentsOf: Bundle.main.resourceURL!.appendingPathComponent("Web/privacy.html"), encoding: .utf8)
+        XCTAssertTrue(bundledPolicy.contains("<h1>Privacy Policy</h1>"))
+        try await policy.webView.evaluateJavaScript("document.querySelector('a[href=\"/\"]').click()")
+        for _ in 0..<40 {
+            if controller.presentedViewController == nil { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        XCTAssertNil(controller.presentedViewController)
+        XCTAssertEqual(web.url, gameURL)
+        let sameGame = try await web.evaluateJavaScript("window.policyTestGame === window.playful")
+        XCTAssertEqual(sameGame as? Bool, true, "Closing the policy must preserve the current game")
         let rejected = try await web.callAsyncJavaScript("try { await webkit.messageHandlers.astra.postMessage({action:'request',path:'/api/admin',body:''}); return false; } catch { return true; }", arguments: [:], in: nil, contentWorld: .page)
         XCTAssertEqual(rejected as? Bool, true, "The native bridge must not be a general-purpose proxy")
         controller.setActive(false)

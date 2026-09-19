@@ -3,7 +3,8 @@ export const BALL_SETS = [
   { id: 'balls', name: 'Classic', description: 'The original solids & stripes.' },
   { id: 'planets', name: 'Planets', description: 'A little solar system on the felt.' },
   { id: 'heads', name: 'Heads', description: 'Familiar faces, numbered underneath.' },
-];
+].filter(set => set.id !== 'heads' ||
+  (typeof __POOL_HEAD_TEXTURE_IDS__ !== 'undefined' && __POOL_HEAD_TEXTURE_IDS__.length > 0));
 export const ballSetById = id => BALL_SETS.find(set => set.id === id) || BALL_SETS[0];
 export function readBallSet(storage) {
   try { return ballSetById(storage.getItem('playful.ballStyle')).id; } catch { return 'balls'; }

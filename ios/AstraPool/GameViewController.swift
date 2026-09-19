@@ -179,7 +179,16 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKUIDele
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { status.text = "Couldn’t load Astra Pool."; status.isHidden = false; retry.isHidden = false }
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = action.request.url else { decisionHandler(.cancel); return }
-        if url.scheme == origin?.scheme && url.host == origin?.host && url.port == origin?.port { decisionHandler(.allow); return }
+        if url.scheme == origin?.scheme && url.host == origin?.host && url.port == origin?.port {
+            if url.path == "/privacy.html" {
+                decisionHandler(.cancel)
+                if presentedViewController == nil {
+                    present(UINavigationController(rootViewController: PrivacyViewController(url: url)), animated: true)
+                }
+                return
+            }
+            decisionHandler(.allow); return
+        }
         decisionHandler(.cancel)
         if ["https", "mailto"].contains(url.scheme ?? "") { UIApplication.shared.open(url) }
     }
@@ -188,5 +197,29 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKUIDele
         let alert = UIAlertController(title: "Astra Pool", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(false) })
         alert.addAction(UIAlertAction(title: "Continue", style: .default) { _ in completionHandler(true) }); present(alert, animated: true)
+    }
+}
+
+// A separate local page keeps the current game alive and works without internet.
+final class PrivacyViewController: UIViewController, WKNavigationDelegate {
+    let webView = WKWebView()
+    private let policyURL: URL
+    init(url: URL) { policyURL = url; super.init(nibName: nil, bundle: nil) }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "Privacy Policy"
+        navigationItem.rightBarButtonItem = UIBarButtonItem(systemItem: .done, primaryAction: UIAction { [weak self] _ in self?.dismiss(animated: true) })
+        webView.navigationDelegate = self
+        view = webView
+        webView.load(URLRequest(url: policyURL))
+    }
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = action.request.url else { decisionHandler(.cancel); return }
+        if url == policyURL { decisionHandler(.allow); return }
+        decisionHandler(.cancel)
+        if url.scheme == policyURL.scheme && url.host == policyURL.host && url.port == policyURL.port && url.path == "/" {
+            dismiss(animated: true)
+        } else if ["https", "mailto"].contains(url.scheme ?? "") { UIApplication.shared.open(url) }
     }
 }

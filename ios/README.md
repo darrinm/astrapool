@@ -35,6 +35,7 @@ The tests exercise the actual bundled game and a Rapier shot in its prediction w
 - `GameViewController.swift` owns WKWebView and a restricted main-frame script bridge. It permits only room creation, game analytics, and room sockets to `https://astrapool.darrinm.com`. URLSession handles the remote connections; the server's browser-origin protection is unchanged.
 - `src/platform.js` selects that bridge only when the native handler exists. The website continues using normal fetch and WebSocket. Room protocol and physics remain shared, including browser/app multiplayer.
 - All game environments, sounds, planet textures and branding are bundled. Google Fonts are removed from the iOS HTML; the existing system-serif fallback works offline. Private head photographs are never included in the iOS asset build.
+- The ball collection catalog omits Heads when no head textures are bundled; saved Heads selections fall back to Classic. Settings opens the bundled privacy policy in a dismissible native sheet without leaving the current game or requiring internet access.
 - Backgrounding cancels the active pointer gesture, pauses the game loop and audio, and closes room sockets. Foregrounding resumes without simulating the elapsed background interval and reconnects/resynchronizes online rooms. WebKit process termination reloads the game; an unfinished local rack is not persisted across process termination in this first version.
 - External HTTPS links open outside the embedded game. Existing confirmation dialogs use UIKit alerts. The in-game **Share invite** button opens the native share sheet; **Join an invite link** accepts a browser invite.
 
@@ -89,3 +90,10 @@ The export produces a signed App Store IPA locally; it does not publish the app.
 - JavaScript regression suite: 360 tests passed. Native tests also verify that startup prepares every bundled sound and first playback performs no additional decoding; scheduling timings are retained in the Xcode test report.
 - Reviewer instructions are preserved in `app-store/review-notes.txt`.
 - Release tag: `ios-v1.0-build3`. Archive and upload from this source using the commands above, with a distinct archive path for build 3.
+
+### Release candidate 1.0 (4) — September 19, 2026
+
+- Removes the unavailable Heads collection from the picker and keyboard cycling, including fallback for saved Heads preferences.
+- Bundles the published `public/privacy.html` unchanged and rewrites the native Settings link to the local page. A separate WebKit sheet provides Done and a return-to-game link while preserving the current game.
+- All 361 JavaScript tests passed. All three native tests passed on iPhone 17 / iOS 26.5, including the bundled collection picker, local privacy-page navigation and return to the existing game.
+- The signed Release archive was checked for build number 4, the complete bundled policy, the local Settings link, and the absence of private head textures.
