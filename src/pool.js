@@ -1,3 +1,4 @@
+import { inviteURL, shareInvite, nativeBridge } from './platform.js';
 // Pool, built like a game: a 7-foot table with real holes the heads fall through, physically based materials,
 // an overhead lamp with shadows, an orbit camera, an aiming guide, and sampled impact sounds.
 //
@@ -93,7 +94,7 @@ let overhead = false, hudObserver;
 const online = new OnlineRoom(receiveOnline, text => {
   document.getElementById('online-status').textContent = text;
   const invite = document.getElementById('invite-link');
-  invite.value = online.id ? `${location.origin}/#room=${online.id}` : '';
+  invite.value = online.id ? inviteURL(online.id) : '';
   document.querySelector('.online-row').hidden = !online.id;
   document.getElementById('online-retry').hidden = !!online.id && online.connected.every(Boolean);
   if (gameMode === 'online') updateTurnStatus();
@@ -931,7 +932,7 @@ function showGameControls(show) {
     document.getElementById('online-retry').addEventListener('click', () => { if (online.id) online.join(online.id); else void online.create(); });
     document.getElementById('copy-invite').addEventListener('click', async () => {
       const field = document.getElementById('invite-link');
-      try { await navigator.clipboard.writeText(field.value); document.getElementById('online-status').textContent = 'Invite link copied. Send it to your friend.'; }
+      try { await shareInvite(field.value); document.getElementById('online-status').textContent = nativeBridge() ? 'Invite ready to share.' : 'Invite link copied. Send it to your friend.'; }
       catch { field.focus(); field.select(); document.getElementById('online-status').textContent = 'Select and copy this invite link.'; }
     });
     document.querySelectorAll('#difficulty button').forEach(b => b.addEventListener('click', () => {
@@ -1728,6 +1729,7 @@ export default {
   setBallStyle,
   ballStyle: () => ballStyle,
   environment: () => environmentId,
+  resumeOnline: () => online.resume(),
   setGame: (mode) => startGame(mode),
   startAttract: () => setAttract(true),
   matchState: () => ({ mode: gameMode, attract: attractMode, match: structuredClone(match), shot: activeShot && structuredClone(activeShot), calledPocket, racking: !!rackMotion }),

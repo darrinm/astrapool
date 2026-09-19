@@ -215,6 +215,10 @@ in the working tree.
 Run `npm run check:publishable` before making a repository public. Untracking the textures leaves
 the blobs in earlier commits, and a public repository publishes its whole history.
 
+## iOS app
+
+The Apple-framework-only iOS shell shares the web game code and bundles assets for offline local play. Run `npm run ios:prepare`, then open `ios/AstraPool.xcodeproj`. See [the iOS build and distribution guide](ios/README.md).
+
 ## License
 
 Code is [MIT](LICENSE). The art and audio are not; each set has its own terms.

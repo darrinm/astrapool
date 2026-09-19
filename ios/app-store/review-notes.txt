@@ -1,0 +1,15 @@
+Astra Pool is a complete 3D pool game. No account, sign-in, purchases, subscriptions, or advertising, or user chat are required.
+
+Local play works offline: the game engine, sounds, planetary textures, and room environments are included in the app. Internet is needed for Play a Friend online matches and anonymous gameplay analytics. The app uses Apple's WebKit to run the shared game engine, with native sharing, invitation entry, and lifecycle/audio handling.
+
+To play:
+- Choose Vs Computer for a game against the AI, Local 8-ball for two players sharing one device, or Free Play for unrestricted practice.
+- Drag from the cue ball to aim and set shot power, then release to shoot. Hold the aim steady briefly for finer control. Drag elsewhere to orbit; pinch to zoom.
+- The top-right settings gear provides game modes, sound, AI difficulty, environments, Black Hole Gravity, Look Ahead, and Clairvoyant projected paths. Gravity is disabled for online matches.
+
+To test online multiplayer without accounts:
+1. Choose Play a Friend and create a private room.
+2. Use Share invite to share the generated link with a second device. The link can be opened in a browser without installing the app.
+3. To join from another installed copy, open settings, choose Join an invite link, and paste the complete shared URL.
+
+The privacy policy is linked inside settings and at https://astrapool.darrinm.com/privacy.html. The game supports iPhone and iPad in portrait and landscape.

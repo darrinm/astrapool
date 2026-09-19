@@ -25,7 +25,9 @@
     "heads:guard": "node tools/heads.mjs guard",
     "analytics": "node tools/analytics.mjs",
     "analytics:dashboard": "node tools/dashboard.mjs",
-    "analytics:migrate": "wrangler d1 migrations apply GAME_ANALYTICS --remote"
+    "analytics:migrate": "wrangler d1 migrations apply GAME_ANALYTICS --remote",
+    "ios:prepare": "node tools/ios-prepare.mjs",
+    "ios:build": "npm run ios:prepare && xcodebuild -project ios/AstraPool.xcodeproj -scheme AstraPool -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",

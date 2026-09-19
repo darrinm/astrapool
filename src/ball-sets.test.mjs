@@ -8,13 +8,25 @@ import { cloneReplayMesh } from './replay-view.js';
 import { createPlanetSet, updatePlanetOrbits, updatePlanetCaps } from './planet-balls.js';
 
 test('saved collections tolerate old/invalid values and unavailable storage; B visits every set', () => {
-  assert.equal(readBallSet({ getItem: () => 'heads' }), 'heads');
+  assert.equal(readBallSet({ getItem: () => 'heads' }), 'balls');
   assert.equal(readBallSet({ getItem: () => 'planets' }), 'planets');
   assert.equal(readBallSet({ getItem() { throw Error('denied'); } }), 'balls');
   assert.equal(ballSetById('removed-set').id, 'balls');
   let id = 'balls'; const visited = new Set();
   for (let i = 0; i < BALL_SETS.length; i++) { visited.add(id); id = nextBallSet(id); }
   assert.equal(visited.size, BALL_SETS.length); assert.equal(id, 'balls');
+});
+
+test('catalog, saved selection, and cycling follow the available head textures', async () => {
+  const source = readFileSync(new URL('./ball-sets.js', import.meta.url), 'utf8');
+  for (const ids of [[], ['p01', 'p02']]) {
+    const module = await import(`data:text/javascript;base64,${Buffer.from(
+      `const __POOL_HEAD_TEXTURE_IDS__ = ${JSON.stringify(ids)};\n${source}`
+    ).toString('base64')}`);
+    assert.deepEqual(module.BALL_SETS.map(set => set.id), ids.length ? ['balls', 'planets', 'heads'] : ['balls', 'planets']);
+    assert.equal(module.readBallSet({ getItem: () => 'heads' }), ids.length ? 'heads' : 'balls');
+    assert.equal(module.nextBallSet('planets'), ids.length ? 'heads' : 'balls');
+  }
 });
 
 test('all 15 object balls are distinct worlds and the cue is the Sun', () => {

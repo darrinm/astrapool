@@ -4,11 +4,12 @@
 // bed: a phenolic ball on worsted cloth is near silent, 30-40 dB under the clicks, so the space between hits is
 // left quiet. Sources are panned by position and attenuated by distance, and a short synthetic room impulse adds
 // space. The old modal-synthesis voices are kept behind `mode = 'synth'` so the two can be compared on audition.html.
-const SFX_BASE = `${import.meta.env.BASE_URL}sfx/`;
+const SFX_BASE = `${import.meta.env?.BASE_URL ?? '/'}sfx/`;
 export class PoolAudio {
   constructor() { this.ctx = null; this.enabled = true; this.buffers = {}; this.mode = 'samples'; this.loaded = null; }
-  ensure() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return this.ctx; }
+  // Prepare the graph without resuming audio: decoding also works while suspended.
+  context() {
+    if (this.ctx) return this.ctx;
     try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { this.ctx = null; return null; }
     const ctx = this.ctx;
     this.master = ctx.createGain(); this.master.gain.value = 0.9; this.master.connect(ctx.destination);
@@ -17,15 +18,50 @@ export class PoolAudio {
     this.wet = ctx.createGain(); this.wet.gain.value = 0.18; this.reverb.connect(this.wet).connect(this.master);
     this.dry = ctx.createGain(); this.dry.gain.value = 1; this.dry.connect(this.master);
     this.master.gain.value = this.enabled ? 0.9 : 0;
-    this.load();
     return ctx;
   }
-  // Fetch and decode every take in the manifest; the game is silent-but-working until they arrive.
+  ensure() {
+    const ctx = this.context();
+    if (ctx?.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx) this.load();
+    return ctx;
+  }
+  preload() {
+    // Let the first frame appear before constructing the reverb and decoding samples.
+    // Playback stays gesture-controlled; preparation never starts a source or resumes audio.
+    if (!this.preparing) this.preparing = new Promise(resolve => {
+      const start = () => resolve(this.load());
+      if (globalThis.requestIdleCallback) requestIdleCallback(start, { timeout: 500 });
+      else setTimeout(start, 0);
+    });
+    return this.preparing;
+  }
+  // Decode one take at a time, visiting every category before its extra variations.
+  // Publish each ready take immediately; a missing file must not silence other sounds.
   load() {
     if (this.loaded) return this.loaded;
-    this.loaded = fetch(`${SFX_BASE}manifest.json`).then((r) => r.json()).then((manifest) => Promise.all(Object.entries(manifest).map(async ([cat, files]) => {
-      this.buffers[cat] = await Promise.all(files.map((f) => fetch(SFX_BASE + f).then((r) => r.arrayBuffer()).then((b) => this.ctx.decodeAudioData(b))));
-    }))).then(() => this.buffers).catch((e) => { console.warn('sfx load failed', e); return this.buffers; });
+    const ctx = this.context();
+    if (!ctx) return Promise.resolve(this.buffers);
+    this.loaded = (async () => {
+      const response = await fetch(`${SFX_BASE}manifest.json`);
+      if (!response.ok) throw new Error(`Sound manifest: ${response.status}`);
+      const categories = Object.entries(await response.json());
+      const takeCount = Math.max(0, ...categories.map(([, files]) => files.length));
+      for (let take = 0; take < takeCount; take++) {
+        for (const [cat, files] of categories) {
+          if (!files[take]) continue;
+          try {
+            const response = await fetch(SFX_BASE + files[take]);
+            if (!response.ok) throw new Error(`Sound sample: ${response.status}`);
+            const buffer = await ctx.decodeAudioData(await response.arrayBuffer());
+            (this.buffers[cat] ||= []).push(buffer);
+          } catch (error) { console.warn('sfx sample failed', files[take], error); }
+          // Yield to input/rendering between decodes, including when assets are cached locally.
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+      return this.buffers;
+    })().catch(error => { console.warn('sfx load failed', error); return this.buffers; });
     return this.loaded;
   }
   noise(seconds) {

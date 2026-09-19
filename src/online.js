@@ -1,3 +1,4 @@
+import { gameRequest, roomSocket, roomSocketURL } from './platform.js';
 import { rememberGameChoice } from './room-navigation.js';
 
 const VERSION = 2;
@@ -22,7 +23,7 @@ export class OnlineRoom {
     this.leave(); const generation = this.generation;
     this.onStatus('Creating a private room…');
     try {
-      const response = await fetch('/api/rooms', { method: 'POST' });
+      const response = await gameRequest('/api/rooms', { method: 'POST' });
       if (!response.ok) throw new Error('Could not create a room. Try again.');
       const { id } = await response.json();
       if (generation === this.generation) this.join(id);
@@ -40,7 +41,7 @@ export class OnlineRoom {
     this.synced = false;
     const generation = this.generation;
     this.onStatus(this.retry ? 'Connection lost. Reconnecting…' : 'Joining room…');
-    const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/rooms/${this.id}/socket`);
+    const socket = roomSocket(roomSocketURL(this.id));
     this.socket = socket;
     socket.addEventListener('open', () => {
       if (generation !== this.generation) { socket.close(); return; }
@@ -127,6 +128,12 @@ export class OnlineRoom {
     const angle = start + Math.atan2(Math.sin(end - start), Math.cos(end - start)) * t;
     return { dir: { x: Math.cos(angle), y: Math.sin(angle) }, pull: mix(from.pull, to.pull),
       spin: { x: mix(from.spin.x, to.spin.x), y: mix(from.spin.y, to.spin.y) } };
+  }
+  resume() {
+    if (!this.id) return;
+    this.generation++; clearTimeout(this.reconnect); clearInterval(this.heartbeat);
+    this.socket?.close(); this.connected = [false, false]; this.waiting = false;
+    this.aim = null; this.lastAim = null; this.connect();
   }
   leave() {
     this.generation++; clearTimeout(this.reconnect); clearInterval(this.heartbeat);
