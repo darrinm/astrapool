@@ -124,3 +124,32 @@ old soft contact patches without blocking the room.
 The pool table uses a procedural soft rectangular shadow in every room, plus
 four smaller foot shadows for grounded tables. Orbital omits the feet and uses
 a broader, softer silhouette to show the hovering gap.
+
+### Orbital Earth replacement
+
+`orbital_earth.py` replaces the painted Earth in the Orbital panorama with a rendered one. The painted Earth had
+smeared, repeated cloud texture. The script keeps the window frame, the mullions and the star field from the artwork,
+masks the glass (see the docstring), and renders a sphere whose limb top sits where the painting's did. The painted
+limb fits a circle of about 84 degrees, which is Earth from about 30 km; at that size the map would be magnified
+about 3x. The render uses 62 degrees, a higher orbit, so the map is downsampled. Painted Earth outside the new disc
+is replaced with star field copied from higher in the same column.
+
+Maps (pipeline inputs only; nothing but the panorama ships):
+
+| File | Source | Licence | SHA-256 |
+|---|---|---|---|
+| `bluemarble-21600.jpg` | https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73776/world.topo.bathy.200408.3x21600x10800.jpg | NASA, public domain | `05d984f723776f3d44fc473cc3d9eb67a48c425e82a56d7133e3761b2e231e86` |
+| `blackmarble-2016-3km.jpg` | https://eoimages.gsfc.nasa.gov/images/imagerecords/144000/144898/BlackMarble_2016_3km.jpg | NASA, public domain | `230aac448ae68c358be433dd518888cccb3a85ccf66f7b44326441c324ad6725` |
+| `8k_earth_clouds.jpg` | https://www.solarsystemscope.com/textures/download/8k_earth_clouds.jpg | Solar System Scope, CC BY 4.0 | `c792eca228989d36ebb45d3ea6ff1198be5e21a25d70d2fbcb2124ffd14ba7f5` |
+
+Run it on the 4096 x 2048 Lanczos reduction of the scale-corrected master (`orbital-corrected.png`, 7096 x 3548).
+The defaults reproduce the shipped panorama exactly:
+
+```sh
+magick /path/to/masters/orbital-corrected.png -filter Lanczos -resize 4096x2048 /tmp/orbital-4k.png
+python3 pipeline/environments/orbital_earth.py /tmp/orbital-4k.png /path/to/maps /tmp/orbital-earth.png /tmp/orbital-mask.png
+cwebp -q 90 /tmp/orbital-earth.png -o public/environments/orbital.webp
+cwebp -q 88 -resize 640 320 /tmp/orbital-earth.png -o public/environments/orbital-preview.webp
+```
+
+The optional fourth path writes the glass mask (red) and the new limb (green) over the result for checking.

@@ -84,3 +84,10 @@ Carried over from playful-photos when the pool game was extracted (2026-09-05).
   yourself. `close` is fine as a backstop, never as the only path.
 - Rule: assert the cleanup, not the closing. `open === false` was true in every broken run; the tell
   was `autoRotate` still true and the storage key still null.
+
+## 2026-09-23 — ExtrudeGeometry UVs are world units
+- The felt, cushions and rail frame are ExtrudeGeometry, whose default UVs are the vertex coordinates. Texture
+  repeats written for 0–1 UVs (felt ×6, cloth ×40, rails ×4) tiled hundreds of times across the table and mipped
+  down to flat colour or a woven moiré, so the felt and rail textures never showed.
+- Rule: before tuning a texture, check which UV generator the geometry uses and what one repeat spans on screen.
+  For extrusions, set repeats in tiles per world unit, or pass a UVGenerator.

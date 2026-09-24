@@ -117,3 +117,20 @@ The defect pass fixed what was measurably wrong inside the old structure; this r
       following a friend's link is joining, not arriving.
 - [x] The HUD is hidden behind it: there is no game yet, so there is no scoreboard.
 - [x] Removed `markPlaying()`, which added a `.playing` class the redesign left unstyled.
+
+## Table-first lighting, textures, table detail, Orbital Earth (2026-09-23)
+- [x] Room fill, hemisphere and reflections ×0.7 (`ROOM_LIGHT`); table lamp ×2.6 (was ×1.2); the panorama dims
+      from 0.85 at the table to 0.5 at 40–130 units out. Felt/room mean luminance, default view, before → after:
+      corner 1.55→3.93, desert 1.01→1.78, tokyo 2.59→6.80, orbital 1.52→3.38, alpine 1.59→3.67,
+      glasshouse 0.70→1.15, coast 0.94→1.61, riad 0.69→1.50; Minimal 6.89→6.71 (its cloth texture now shows).
+- [x] Texture scale: ExtrudeGeometry UVs are world units, so the felt (×6), cloth normal (×40) and rail wood (×4)
+      tiled hundreds of times per rail and mipped to flat colour and a woven moiré. Repeats are now per unit;
+      the rail frame gets top-face UVs that run the grain along each rail; `woodMap` and the cloth weave tile.
+- [x] Turned legs (still hidden in Orbital), rounded apron, warmer diamonds 5/1000 proud of the rail.
+- [x] Balls receive shadows; the room fill light casts shadows so the furniture shades itself.
+- [x] HUD: darker header scrim and text shadow; the arcade label and an idle ×1 are neutral, a live streak keeps
+      the player's colour (`data-hot` on the multiplier badge).
+- [x] Orbital: the painted Earth is replaced by a render of NASA Blue Marble / Black Marble with Solar System Scope
+      clouds (`pipeline/environments/orbital_earth.py`; README has sources, hashes and the rebuild). Credited in the
+      planets & credits panel.
+- [ ] Not done: Tokyo and Glasshouse panoramas bend at the edges; fixing that needs regenerated panoramas.
