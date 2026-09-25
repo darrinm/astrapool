@@ -25,24 +25,29 @@ export function feltMap(size = 512, repeat = 6, base = '#1e6a3f') {
   const r = rnd(3);
   return canvasTexture(size, (ctx, n) => {
     ctx.fillStyle = base; ctx.fillRect(0, 0, n, n);
-    for (let i = 0; i < 9000; i++) {
-      ctx.fillStyle = `rgba(${r() < 0.5 ? '255,255,255' : '0,0,0'},${0.02 + r() * 0.04})`;
+    for (let i = 0; i < 9000 * (n / 512) ** 2; i++) {
+      const light = r() < 0.5;   // light flecks stay fainter: on the dark cloth they read as speckle
+      ctx.fillStyle = `rgba(${light ? '255,255,255' : '0,0,0'},${(0.01 + r() * 0.02) * (light ? 0.5 : 1)})`;
       ctx.beginPath(); ctx.arc(r() * n, r() * n, 1 + r() * 3, 0, Math.PI * 2); ctx.fill();
     }
   }, repeat);
 }
 
-// Wood: layered grain lines with slow waviness, warm walnut tones.
+// Wood: layered grain lines with slow waviness, warm walnut tones. Tiles seamlessly: each line's waves
+// complete whole cycles across the canvas, and a line near the top or bottom edge is drawn on both sides.
 export function woodMap(size = 1024, repeat = 1, seed = 11, tones = ['#4a2c15', '#5c3a1e', '#6b4526', '#3e2411']) {
   const r = rnd(seed);
   return canvasTexture(size, (ctx, n) => {
     ctx.fillStyle = tones[1]; ctx.fillRect(0, 0, n, n);
     for (let i = 0; i < 260; i++) {
-      const y = r() * n, w = 1 + r() * 4, amp = 6 + r() * 18, freq = 0.002 + r() * 0.006, phase = r() * 6.28;
+      const y = r() * n, w = (1 + r() * 4) * n / 1024, amp = (6 + r() * 18) * n / 1024, freq = Math.PI * 2 * (r() < 0.65 ? 1 : 2) / n, phase = r() * 6.28;
       ctx.strokeStyle = tones[r() * tones.length | 0]; ctx.globalAlpha = 0.25 + r() * 0.45; ctx.lineWidth = w;
-      ctx.beginPath();
-      for (let x = 0; x <= n; x += 8) { const yy = y + Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 3.1 + phase) * amp * 0.3; x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); }
-      ctx.stroke();
+      for (const shift of [-n, 0, n]) {
+        if (y + shift + amp * 1.3 + w < 0 || y + shift - amp * 1.3 - w > n) continue;
+        ctx.beginPath();
+        for (let x = 0; x <= n; x += 8) { const yy = y + shift + Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 3 + phase) * amp * 0.3; x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); }
+        ctx.stroke();
+      }
     }
     ctx.globalAlpha = 1;
   }, repeat);
@@ -60,9 +65,9 @@ export function carpetMap(size = 512, repeat = 30, base = '#2a2530') {
 // Tangent-space normal map from a height field: fine noise plus a faint two-way weave, for cloth nap.
 export function clothNormal(size = 512, repeat = 36, seed = 13, strength = 2.2) {
   const r = rnd(seed);
-  const n = size, h = new Float32Array(n * n);
+  const n = size, h = new Float32Array(n * n), k = Math.PI * 2 * Math.round(n * 0.35 / (Math.PI * 2)) / n;
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    const weave = 0.5 + 0.5 * Math.sin(x * 0.35) * Math.sin(y * 0.35);
+    const weave = 0.5 + 0.5 * Math.sin(x * k) * Math.sin(y * k);   // whole cycles across the tile, so it wraps
     h[y * n + x] = weave * 0.35 + r() * 0.65;
   }
   // light blur so the noise reads as fibres rather than pixels

@@ -14,6 +14,12 @@ export const ENVIRONMENTS = [
   { id: 'riad', name: 'Atlas Courtyard', time: '7:48 PM · LANTERN HOUR', description: 'Rose plaster, emerald tile, and amber lanterns beneath carved cedar.', felt: '#325e53', wood: ['#4c2b1c', '#72432a', '#945f3a', '#5d3521'], trim: '#503520', floor: '#a88c69', sky: '#1d2546', lamp: '#ffdfae', accent: '#edbd77', hemi: 0.6, exposure: 1.0 },
 ];
 const DEFAULT_ENVIRONMENT = ENVIRONMENTS.find(environment => environment.id === 'orbital');
+// The table lamp is the key light. Room fill, hemisphere and reflections run at this fraction of the
+// values above, and the photographed room darkens with distance from the table, so the lit table is
+// the brightest thing in every room.
+export const ROOM_LIGHT = 0.7;
+const BACKDROP_NEAR = 0.85, BACKDROP_FAR = 0.5;    // panorama brightness at the table and at the walls
+const BACKDROP_FALLOFF = [40, 130];                // distance from the table centre over which it falls
 export const environmentById = id => ENVIRONMENTS.find(environment => environment.id === id) || DEFAULT_ENVIRONMENT;
 export function readEnvironment(storage) {
   try { return environmentById(storage.getItem('pool.environment')).id; } catch { return DEFAULT_ENVIRONMENT.id; }
@@ -112,6 +118,16 @@ export function buildEnvironment(theme, floorZ, loaders = assets) {
     const sky = own(new GroundedSkybox(map, height, 380, 96));
     sky.rotation.x = Math.PI / 2; sky.position.z = floorZ + height;
     sky.material.toneMapped = false; sky.renderOrder = -10;
+    sky.material.onBeforeCompile = shader => {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vRoomXY;')
+        .replace('#include <project_vertex>', '#include <project_vertex>\nvRoomXY = (modelMatrix * vec4(transformed, 1.0)).xy;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vRoomXY;')
+        .replace('#include <opaque_fragment>', `outgoingLight *= mix(${BACKDROP_NEAR.toFixed(3)}, ${BACKDROP_FAR.toFixed(3)},
+          smoothstep(${BACKDROP_FALLOFF[0].toFixed(1)}, ${BACKDROP_FALLOFF[1].toFixed(1)}, length(vRoomXY)));
+#include <opaque_fragment>`);
+    };
     // Backdrop only: never participate in aiming or room occlusion queries.
     sky.raycast = () => {};
     group.add(sky);
@@ -146,7 +162,7 @@ export function buildEnvironment(theme, floorZ, loaders = assets) {
     group.add(furniture);
     // Broad room fill matches the window/sconce illumination baked into the art.
     // It has no sharp shadow: the overhead fixture still defines ball shadows.
-    const fill = new THREE.DirectionalLight(theme.id === 'corner' ? '#ffdaad' : theme.lamp, theme.fill ?? (theme.id === 'desert' ? 1.6 : 1.1));
+    const fill = new THREE.DirectionalLight(theme.id === 'corner' ? '#ffdaad' : theme.lamp, ROOM_LIGHT * (theme.fill ?? (theme.id === 'desert' ? 1.6 : 1.1)));
     fill.position.set(-100, -70, floorZ + 160); fill.target.position.set(0, 0, floorZ);
     group.add(fill, fill.target);
 

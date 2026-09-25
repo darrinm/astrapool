@@ -117,3 +117,22 @@ The defect pass fixed what was measurably wrong inside the old structure; this r
       following a friend's link is joining, not arriving.
 - [x] The HUD is hidden behind it: there is no game yet, so there is no scoreboard.
 - [x] Removed `markPlaying()`, which added a `.playing` class the redesign left unstyled.
+
+## Table-first lighting, textures, table detail, Orbital Earth (2026-09-23)
+- [x] Room fill, hemisphere and reflections ×0.7 (`ROOM_LIGHT`); table lamp ×2.6 (was ×1.2); the panorama dims
+      from 0.85 at the table to 0.5 at 40–130 units out. Felt/room mean luminance, default view, before → after:
+      corner 1.55→3.93, desert 1.01→1.78, tokyo 2.59→6.80, orbital 1.52→3.38, alpine 1.59→3.67,
+      glasshouse 0.70→1.15, coast 0.94→1.61, riad 0.69→1.50; Minimal 6.89→6.71 (its cloth texture now shows).
+- [x] Texture scale: ExtrudeGeometry UVs are world units, so the felt (×6), cloth normal (×40) and rail wood (×4)
+      tiled hundreds of times per rail and mipped to flat colour and a woven moiré. Repeats are now per unit;
+      the rail frame gets top-face UVs that run the grain along each rail; `woodMap` and the cloth weave tile.
+- [x] Turned legs (still hidden in Orbital), rounded apron, warmer diamonds 5/1000 proud of the rail.
+- [x] Balls receive shadows.
+- [ ] Furniture shading from the room fill light's shadow was removed after play testing: its 1024 map spans 280
+      units (0.27 per texel), so the moons' fill shadows stepped a texel about 4 times a second. three.js has no
+      per-light caster list, so the moons could not be left out of that light alone.
+- [x] HUD: darker header scrim and text shadow; the arcade label and an idle ×1 are neutral, a live streak keeps
+      the player's colour (`data-hot` on the multiplier badge).
+- [ ] Orbital Earth: a render of NASA Blue Marble / Black Marble composited into the panorama was reverted after
+      play testing; it left artifacts along the cutout lines (frame and mullion edges).
+- [ ] Not done: Tokyo and Glasshouse panoramas bend at the edges; fixing that needs regenerated panoramas.

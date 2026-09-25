@@ -11,7 +11,11 @@ body:has(#hud-sheet[open]) #arcade-effects { visibility: hidden; }
 .arcade-player { display: flex; align-items: baseline; gap: 6px; color: #ffe08a; font-size: 11px; white-space: nowrap; }
 .arcade-player[data-player='1'] { color: #a8e8be; }
 .arcade-player > strong, #arcade-free > strong { font: 750 17px/1.2 ui-rounded, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
-.arcade-multiplier { border-radius: 8px; padding: 1px 5px; color: #ffe08a; background: #ffe08a17; font: 700 11px/1.4 ui-rounded, system-ui, sans-serif; }
+/* Only the score carries the player's colour; the label and an idle ×1 stay neutral beside the room accent. */
+.arcade-player > span:first-child { color: var(--ink-faint); }
+.arcade-multiplier { border-radius: 8px; padding: 1px 5px; color: var(--ink-dim); background: #ffffff12; font: 700 11px/1.4 ui-rounded, system-ui, sans-serif; }
+.arcade-multiplier[data-hot] { color: #ffe08a; background: #ffe08a17; }
+.arcade-player[data-player='1'] .arcade-multiplier[data-hot] { color: #a8e8be; background: #a8e8be17; }
 .arcade-multiplier { display: inline-flex; align-items: center; gap: 3px; position: relative; }
 .streak-break { display: none; width: 14px; height: 14px; }
 .arcade-multiplier[data-reset] .streak-break { display: block; }
