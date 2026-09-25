@@ -164,10 +164,6 @@ export function buildEnvironment(theme, floorZ, loaders = assets) {
     // It has no sharp shadow: the overhead fixture still defines ball shadows.
     const fill = new THREE.DirectionalLight(theme.id === 'corner' ? '#ffdaad' : theme.lamp, ROOM_LIGHT * (theme.fill ?? (theme.id === 'desert' ? 1.6 : 1.1)));
     fill.position.set(-100, -70, floorZ + 160); fill.target.position.set(0, 0, floorZ);
-    // The fill's shadow gives the furniture its own shading (seat under the back, under the arms).
-    fill.castShadow = true; fill.shadow.mapSize.set(1024, 1024);
-    Object.assign(fill.shadow.camera, { left: -140, right: 140, top: 140, bottom: -140, near: 60, far: 420 });
-    fill.shadow.bias = -0.0005; fill.shadow.normalBias = 0.05;
     group.add(fill, fill.target);
 
   });

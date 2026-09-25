@@ -127,10 +127,12 @@ The defect pass fixed what was measurably wrong inside the old structure; this r
       tiled hundreds of times per rail and mipped to flat colour and a woven moiré. Repeats are now per unit;
       the rail frame gets top-face UVs that run the grain along each rail; `woodMap` and the cloth weave tile.
 - [x] Turned legs (still hidden in Orbital), rounded apron, warmer diamonds 5/1000 proud of the rail.
-- [x] Balls receive shadows; the room fill light casts shadows so the furniture shades itself.
+- [x] Balls receive shadows.
+- [ ] Furniture shading from the room fill light's shadow was removed after play testing: its 1024 map spans 280
+      units (0.27 per texel), so the moons' fill shadows stepped a texel about 4 times a second. three.js has no
+      per-light caster list, so the moons could not be left out of that light alone.
 - [x] HUD: darker header scrim and text shadow; the arcade label and an idle ×1 are neutral, a live streak keeps
       the player's colour (`data-hot` on the multiplier badge).
-- [x] Orbital: the painted Earth is replaced by a render of NASA Blue Marble / Black Marble with Solar System Scope
-      clouds (`pipeline/environments/orbital_earth.py`; README has sources, hashes and the rebuild). Credited in the
-      planets & credits panel.
+- [ ] Orbital Earth: a render of NASA Blue Marble / Black Marble composited into the panorama was reverted after
+      play testing; it left artifacts along the cutout lines (frame and mullion edges).
 - [ ] Not done: Tokyo and Glasshouse panoramas bend at the edges; fixing that needs regenerated panoramas.

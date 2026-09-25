@@ -91,3 +91,10 @@ Carried over from playful-photos when the pool game was extracted (2026-09-05).
   down to flat colour or a woven moiré, so the felt and rail textures never showed.
 - Rule: before tuning a texture, check which UV generator the geometry uses and what one repeat spans on screen.
   For extrusions, set repeats in tiles per world unit, or pass a UVGenerator.
+
+## 2026-09-24 — A second shadow light shadows everything, at its own texel size
+- I gave the room fill light a 1024 shadow map over 280 units to shade the furniture. It also took shadows of the
+  moons, at 0.27 units per texel against a 0.22-unit moon moving ~1 unit/s, so the moon shadows stepped about four
+  times a second. The user saw it as shadows "updating at a slow rate". three.js has no per-light caster list.
+- Rule: before adding a shadow-casting light, list every moving caster it will pick up and compute
+  texel size / caster speed; if the steps are slower than ~20 per second they will read as lag.
