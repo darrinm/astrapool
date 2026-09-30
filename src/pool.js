@@ -22,7 +22,8 @@ import { RuleFeedback } from './rule-feedback.js';
 import { buildBallSetPicker, updateBallSetPicker } from './ball-set-picker.js';
 import { PoolAudio } from './sounds.js';
 import { trackShadowChanges } from './shadow-updates.js';
-import { buildEnvironment, environmentById, readEnvironment } from './environments.js';
+import { buildEnvironment, environmentById, readEnvironment, ROOM_LIGHT } from './environments.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { flingVelocity, pushSample } from './fling.js';
 import { OnlineRoom } from './online.js';
 import { inviteRoom, startupRoom, rememberGameChoice } from './room-navigation.js';
@@ -131,6 +132,10 @@ const rackRot = (ball) => {
 const IDENTITY = { x: 0, y: 0, z: 0, w: 1 };
 const saved = {};
 let environmentId = readEnvironment(localStorage), room, pendingRoom, tableFinish, tableLights;
+const TABLE_LIGHT = 2.6;   // table lamp in the photographed rooms, relative to Minimal; see ROOM_LIGHT
+// ExtrudeGeometry UVs are world units, so these repeats are texture tiles per unit: the felt mottling spans
+// 10 units, the cloth weave 2, and the wood grain 22 along the rails.
+const FELT_TILE = 1 / 10, CLOTH_TILE = 1 / 2, GRAIN_TILE = 1 / 22;
 let environmentRequest = 0;
 async function setEnvironment(id, applyBallDefault = true) {
   const theme = environmentById(id), request = ++environmentRequest, initialStyleRequest = styleRequest;
@@ -161,11 +166,11 @@ async function setEnvironment(id, applyBallDefault = true) {
   const original = tableFinish.original;
   tableFinish.legs.forEach(mesh => { mesh.visible = theme.id !== 'orbital'; });
   if (tableFinish.felt.map !== original.felt) tableFinish.felt.map.dispose();
-  tableFinish.felt.map = minimal ? original.felt : feltMap(512, 6, theme.felt);
+  tableFinish.felt.map = minimal ? original.felt : feltMap(1024, FELT_TILE, theme.felt);
   if (!minimal) tableFinish.felt.map.colorSpace = THREE.SRGBColorSpace;
   tableFinish.felt.sheenColor.set(minimal ? '#2f8a55' : theme.felt);
   // Each finish needs independent UV transforms, but all share the same grain image.
-  const grain = minimal ? null : woodMap(512, 1, 11, theme.wood);
+  const grain = minimal ? null : woodMap(1024, 1, 11, theme.wood);
   if (grain) grain.colorSpace = THREE.SRGBColorSpace;
   tableFinish.wood.forEach((material, index) => {
     const initial = original.wood[index], old = material.map;
@@ -184,14 +189,14 @@ async function setEnvironment(id, applyBallDefault = true) {
   tableFinish.shade.color.set(minimal || theme.id === 'corner' ? '#12301f' : theme.trim);
   tableLights.forEach((light, index) => {
     light.color.set(minimal ? original.lights[index] : theme.lamp);
-    light.intensity = original.intensities[index] * (minimal ? 1 : 1.2);
+    light.intensity = original.intensities[index] * (minimal ? 1 : TABLE_LIGHT);
   });
-  lights.hemi.intensity = theme.hemi;
+  lights.hemi.intensity = theme.hemi * (minimal ? 1 : ROOM_LIGHT);
   renderer.toneMappingExposure = theme.exposure;
   scene.background = new THREE.Color(theme.sky); scene.fog = minimal ? new THREE.Fog(theme.sky, 140, 330) : null;
   scene.environment = minimal ? envTex : next.environmentMap;
   scene.environmentRotation.set(minimal ? 0 : Math.PI / 2, 0, 0);
-  scene.environmentIntensity = minimal ? 0.5 : 0.8;
+  scene.environmentIntensity = minimal ? 0.5 : 0.8 * ROOM_LIGHT;
   room?.dispose(); room = next; scene.add(room.group);
   renderer.shadowMap.needsUpdate = true;
   document.documentElement.dataset.environment = theme.id;
@@ -205,6 +210,21 @@ async function setEnvironment(id, applyBallDefault = true) {
 }
 
 // ---------- table ----------
+// The rail frame is one extrusion, so its top faces need their own UVs: grain runs along the long rails in x
+// and along the short (end) rails in y. The side walls keep ExtrudeGeometry's mapping, which already runs
+// along each wall. UVs stay in world units, like the defaults, so GRAIN_TILE applies unchanged.
+const railUVs = {
+  generateTopUV(geometry, vertices, a, b, c) {
+    const at = i => [vertices[i * 3], vertices[i * 3 + 1]];
+    const [ax, ay] = at(a), [bx, by] = at(b), [cx, cy] = at(c);
+    const endRail = Math.abs(ax + bx + cx) / 3 > HW + CUSH;   // centroid beyond the cushion line at either end
+    return [at(a), at(b), at(c)].map(([x, y]) => endRail ? new THREE.Vector2(y, -x) : new THREE.Vector2(x, y));
+  },
+  generateSideWallUV(geometry, vertices, a, b, c, d) {   // three's default (not exported): (x, z) or (y, z) by wall direction
+    const alongX = Math.abs(vertices[a * 3 + 1] - vertices[b * 3 + 1]) < Math.abs(vertices[a * 3] - vertices[b * 3]);
+    return [a, b, c, d].map(i => new THREE.Vector2(vertices[i * 3 + (alongX ? 0 : 1)], 1 - vertices[i * 3 + 2]));
+  },
+};
 function disposeGuide() {
   aimPrediction.dispose();
   guide?.traverse(mesh => { mesh.geometry?.dispose(); mesh.material?.dispose(); });
@@ -224,7 +244,7 @@ function build() {
   const feltGeo = new THREE.ExtrudeGeometry(shape, { depth: 1.2, bevelEnabled: false, curveSegments: 40 });
   feltGeo.translate(0, 0, FELT_Z - 1.2);
   const feltMat = new THREE.MeshPhysicalMaterial({
-    map: feltMap(512, 6, '#0a3820'), normalMap: clothNormal(512, 40), normalScale: new THREE.Vector2(0.45, 0.45),
+    map: feltMap(1024, FELT_TILE, '#0a3820'), normalMap: clothNormal(512, CLOTH_TILE), normalScale: new THREE.Vector2(0.3, 0.3),
     roughness: 1.0, sheen: 0.18, sheenRoughness: 0.95, sheenColor: new THREE.Color('#2f8a55'), color: '#ffffff',
   });
   // The bed cloth wraps over the cut edge into each pocket. The outer slab sides
@@ -261,41 +281,41 @@ function build() {
   const walnut = ['#1f1007', '#2a170a', '#31200c', '#160b04'];   // dark walnut
   const woodTex = (seed, rx, ry, rot = 0) => { const t = woodMap(1024, 1, seed, walnut); t.repeat.set(rx, ry); t.rotation = rot; t.center.set(0.5, 0.5); return t; };
   const wood = (seed, rx, ry, rot) => new THREE.MeshPhysicalMaterial({ map: woodTex(seed, rx, ry, rot), roughness: 0.6, clearcoat: 0.15, clearcoatRoughness: 0.6, metalness: 0, envMapIntensity: 0.08 });   // satin; the environment carries the lamp at high intensity and would mirror it as a streak along the rounded edges
-  const railLong = wood(11, 4, 0.3), apronWood = wood(13, 4, 0.5), apronWoodEnd = wood(13, 2, 0.5, Math.PI / 2), legWood = wood(14, 0.4, 1.2, Math.PI / 2);
+  const railLong = wood(11, GRAIN_TILE, GRAIN_TILE), apronWood = wood(13, 4, 0.5), apronWoodEnd = wood(13, 2, 0.5, Math.PI / 2), legWood = wood(14, 0.4, 1.2, Math.PI / 2);
   const ox = HW + CUSH + RAIL_W, oy = HH + CUSH + RAIL_W;
   const railGeo = new THREE.ExtrudeGeometry(railFrameShape(RAIL_W), {
     depth: RAIL_H + 1.5, bevelEnabled: true, bevelThickness: 0.5,
-    bevelSize: P.RAIL_BEVEL, bevelSegments: 5, curveSegments: 40,
+    bevelSize: P.RAIL_BEVEL, bevelSegments: 5, curveSegments: 40, UVGenerator: railUVs,
   });
   const frame = addMesh(new THREE.Mesh(railGeo, railLong));
   frame.position.z = FELT_Z - 1.5;
   frame.receiveShadow = true; frame.castShadow = true;
-  // sight diamonds: inlaid rhombi, long axis across the rail (pointing at the playing surface), flush with the top
-  const pearl = new THREE.MeshPhysicalMaterial({ color: '#efe6d6', roughness: 0.25, clearcoat: 0.6, clearcoatRoughness: 0.2, iridescence: 0.35, iridescenceIOR: 1.3 });
+  // sight diamonds: inlaid rhombi, long axis across the rail (pointing at the playing surface), 5/1000 proud of the top
+  const pearl = new THREE.MeshPhysicalMaterial({ color: '#d6cab4', roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2, iridescence: 0.35, iridescenceIOR: 1.3 });
   const railTop = FELT_Z - 1.5 + RAIL_H + 1.5 + 0.5;   // extrude depth plus the top bevel
   const rhombus = (longAxis, shortAxis) => new THREE.Shape([new THREE.Vector2(longAxis / 2, 0), new THREE.Vector2(0, shortAxis / 2), new THREE.Vector2(-longAxis / 2, 0), new THREE.Vector2(0, -shortAxis / 2)]);
   const diamondAcross = new THREE.ExtrudeGeometry(rhombus(0.5, 1.1), { depth: 0.06, bevelEnabled: false });   // long axis along y: for the long rails
   const diamondAlong = new THREE.ExtrudeGeometry(rhombus(1.1, 0.5), { depth: 0.06, bevelEnabled: false });    // long axis along x: for the short rails
-  for (let i = 1; i < 8; i++) if (i !== 4) for (const sy of [-1, 1]) { const d = addMesh(new THREE.Mesh(diamondAcross, pearl)); d.position.set(-HW + (i / 4) * HW, sy * (HH + CUSH + RAIL_W / 2), railTop - 0.03); }
-  for (let i = 1; i < 4; i++) for (const sx of [-1, 1]) { const d = addMesh(new THREE.Mesh(diamondAlong, pearl)); d.position.set(sx * (HW + CUSH + RAIL_W / 2), -HH + (i / 2) * HH, railTop - 0.03); }
+  for (let i = 1; i < 8; i++) if (i !== 4) for (const sy of [-1, 1]) { const d = addMesh(new THREE.Mesh(diamondAcross, pearl)); d.position.set(-HW + (i / 4) * HW, sy * (HH + CUSH + RAIL_W / 2), railTop - 0.055); }
+  for (let i = 1; i < 4; i++) for (const sx of [-1, 1]) { const d = addMesh(new THREE.Mesh(diamondAlong, pearl)); d.position.set(sx * (HW + CUSH + RAIL_W / 2), -HH + (i / 2) * HH, railTop - 0.055); }
   // apron with a moulding line and a lower lip
   const apronH = 4.2, apronZ = FELT_Z - 1.2 - apronH / 2;
-  for (const sy of [-1, 1]) { const a = addMesh(new THREE.Mesh(new THREE.BoxGeometry(ox * 2, 1.2, apronH), apronWood)); a.position.set(0, sy * (oy - 0.6), apronZ); a.castShadow = true; a.receiveShadow = true; }
-  for (const sx of [-1, 1]) { const a = addMesh(new THREE.Mesh(new THREE.BoxGeometry(1.2, oy * 2, apronH), apronWoodEnd)); a.position.set(sx * (ox - 0.6), 0, apronZ); a.castShadow = true; a.receiveShadow = true; }
+  for (const sy of [-1, 1]) { const a = addMesh(new THREE.Mesh(new RoundedBoxGeometry(ox * 2, 1.2, apronH, 3, 0.35), apronWood)); a.position.set(0, sy * (oy - 0.6), apronZ); a.castShadow = true; a.receiveShadow = true; }
+  for (const sx of [-1, 1]) { const a = addMesh(new THREE.Mesh(new RoundedBoxGeometry(1.2, oy * 2, apronH, 3, 0.35), apronWoodEnd)); a.position.set(sx * (ox - 0.6), 0, apronZ); a.castShadow = true; a.receiveShadow = true; }
   const mouldMat = new THREE.MeshPhysicalMaterial({ color: '#1a0d05', roughness: 0.6, clearcoat: 0.15, clearcoatRoughness: 0.6, envMapIntensity: 0.08 });
   for (const [w, h, x, y] of [[ox * 2 + 0.4, 0.5, 0, oy], [ox * 2 + 0.4, 0.5, 0, -oy], [0.5, oy * 2 + 0.4, ox, 0], [0.5, oy * 2 + 0.4, -ox, 0]]) {
     const m1 = addMesh(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.35), mouldMat)); m1.position.set(x, y, FELT_Z - 1.2 - 1.3);    // moulding line
     const m2 = addMesh(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.5), mouldMat)); m2.position.set(x, y, FELT_Z - 1.2 - apronH + 0.25);  // lower lip
   }
-  // tapered square legs with a foot block
+  // turned legs: a collar under the apron, a slight swell, a long taper and a ringed foot
   const legH = 24, legTop = FELT_Z - 1.2 - apronH;
-  const legGeo = new THREE.CylinderGeometry(1.6, 2.4, legH, 4, 1).rotateX(Math.PI / 2).rotateZ(Math.PI / 4);   // square section, wider at the top
-  const footGeo = new THREE.BoxGeometry(3.6, 3.6, 1.2);
+  const legProfile = [[0.01, 0], [2.3, 0], [2.3, -1.1], [1.95, -1.5], [1.95, -2.1], [2.35, -2.6], [2.35, -3.2], [1.8, -3.9],
+    [2.05, -6.5], [1.95, -10], [1.45, -19.5], [1.35, -20.6], [1.75, -21.1], [1.75, -21.7], [1.45, -22.1], [2.1, -22.9], [2.2, -23.4], [2.2, -legH], [0.01, -legH]];
+  const legGeo = new THREE.LatheGeometry(legProfile.map(([r, z]) => new THREE.Vector2(r, z)), 32).rotateX(Math.PI / 2);   // profile z becomes world z
   const legs = [];
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
-    const l = addMesh(new THREE.Mesh(legGeo, legWood)); l.position.set(sx * (HW - 3), sy * (HH - 1), legTop - legH / 2); l.castShadow = true; l.receiveShadow = true;
-    const f = addMesh(new THREE.Mesh(footGeo, mouldMat)); f.position.set(sx * (HW - 3), sy * (HH - 1), legTop - legH + 0.6);
-    legs.push(l, f);
+    const l = addMesh(new THREE.Mesh(legGeo, legWood)); l.position.set(sx * (HW - 3), sy * (HH - 1), legTop); l.castShadow = true; l.receiveShadow = true;
+    legs.push(l);
   }
   for (const c of backstopColliders(world, FELT_Z)) registerCollider(c);   // nothing leaves the table area even on a jump
 
@@ -307,7 +327,10 @@ function build() {
   panel.position.set(0, 0, LAMP_Z - 0.05); panel.rotation.x = Math.PI;
   fixture = [shade, panel];
   for (const x of [-16, 0, 16]) { const w = addMesh(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 60), new THREE.MeshStandardMaterial({ color: '#222', transparent: true }))); w.rotation.x = Math.PI / 2; w.position.set(x, 0, LAMP_Z + 32); fixture.push(w); }
-  fixtureFade = [LAMP_Z - 7, LAMP_Z - 2];   // camera heights between which the fixture fades out so it never blocks a top-down view
+  // Camera heights between which the fixture fades out. With the eye below the lamp, every point of the
+  // fixture projects above the horizon and every point of the table below it, so the lamp cannot cover
+  // the table. It is gone before the eye reaches the lamp's height.
+  fixtureFade = [LAMP_Z - 7, LAMP_Z - 2];
 
   // ---- lights: soft panel for the look, spotlight for shadows, tight enough that the floor falls into shadow ----
   const area = addMesh(new THREE.RectAreaLight('#fff1d0', 1.6, 44, 10)); area.position.set(0, 0, LAMP_Z); area.lookAt(0, 0, FELT_Z);
@@ -336,7 +359,7 @@ function build() {
   // ---- plain balls: the white cue ball (0) and the black 8, so the 14 heads plus one make a full rack ----
   extras = [0, 8].map((n) => {
     const mat = new THREE.MeshPhysicalMaterial({ map: authenticBall(n), roughness: 0.32, clearcoat: 0.6, clearcoatRoughness: 0.2, envMapIntensity: 1.4 });
-    const mesh = new THREE.Mesh(heads[0].mesh.geometry, mat); mesh.scale.setScalar(R / 1.5); mesh.castShadow = true;
+    const mesh = new THREE.Mesh(heads[0].mesh.geometry, mat); mesh.scale.setScalar(R / 1.5); mesh.castShadow = true; mesh.receiveShadow = true;
     const body = addBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 0, BALL_Z + 5 + 5 * n).setLinearDamping(0).setAngularDamping(0.02).setCcdEnabled(true),
       RAPIER.ColliderDesc.ball(R).setRestitution(E_BALL).setFriction(MU_BALL).setDensity(1).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS), mesh);
     return { id: n === 0 ? 'cue' : `ball${n}`, body, mesh, number: n };
@@ -464,7 +487,7 @@ function layout(animate = true) {
   resetHeads({ linearDamping: 0, angularDamping: 0.02, restitution: E_BALL, friction: MU_BALL });
   for (const h of heads) {
     h.body.collider(0).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
-    h.mesh.receiveShadow = ballStyle === 'planets';
+    h.mesh.receiveShadow = true;   // balls shade each other and take the cue's shadow; the Sun cue opts out in planet-balls.js
   }
   for (const e of extras) { e.body.setEnabled(true); e.mesh.visible = true; }
   spot(cue, -HW * 0.5, 0, IDENTITY);

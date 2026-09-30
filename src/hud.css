@@ -71,7 +71,9 @@ button:disabled { opacity: .45; cursor: default; }
 #hud button, #hud select, #hud input, #hud summary, #hud a { pointer-events: auto; }
 
 /* ----------------------------------------------------------------- top row */
-.topbar::before { content: ''; position: fixed; left: 0; right: 0; top: 0; height: 22vh; pointer-events: none; background: linear-gradient(#0b0908cc, #0000); }
+/* The scrim and a soft shadow keep the small header text legible over bright panoramas (lamps, windows). */
+.topbar::before { content: ''; position: fixed; left: 0; right: 0; top: 0; height: 24vh; pointer-events: none; background: linear-gradient(#0b0908e0, #0b090899 45%, #0000); }
+.topbar { text-shadow: 0 1px 3px #000c; }
 .topbar > * { position: relative; }
 .topbar { grid-row: 1; position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: var(--s5); }
 .brand { width: 160px; max-width: 100%; }

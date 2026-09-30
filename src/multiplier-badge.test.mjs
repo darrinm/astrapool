@@ -13,7 +13,9 @@ function fixture() {
 }
 test('a lost streak shows one broken-chain transition then returns to the ordinary multiplier', async () => {
   const { badge, element, label, animations } = fixture();
-  badge.update(2, 'rack1', 2); badge.update(1, 'rack1', 3); badge.update(1, 'rack1', 3);
+  badge.update(2, 'rack1', 2); assert.equal(element.dataset.hot, 'true');   // a live streak takes the player's colour
+  badge.update(1, 'rack1', 3); badge.update(1, 'rack1', 3);
+  assert.equal(element.dataset.hot, undefined);
   assert.equal(animations.length, 1); assert.equal(element.dataset.reset, 'true'); assert.equal(label.textContent, '×1');
   animations[0].finish(); await animations[0].finished;
   assert.equal(element.dataset.reset, undefined);

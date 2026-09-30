@@ -13,14 +13,14 @@ export class MultiplierBadge {
     }
     const reset = visible && !silent && scope === this.scope && play === this.play + 1 && this.value > value;
     this.clear(); this.value = value; this.scope = scope; this.play = play;
-    this.label.textContent = `×${value}`;
+    this.label.textContent = `×${value}`; if (value > 1) this.element.dataset.hot = 'true'; else delete this.element.dataset.hot;
     this.element.setAttribute('aria-label', `Score multiplier ${value}${reset ? '. Streak ended' : ''}`);
     if (!reset) return;
     this.element.dataset.reset = 'true';
     const animation = this.element.animate([
       { color: '#ffac98', backgroundColor: '#673a2c', transform: reduced ? 'none' : 'translateY(-3px)', offset: 0 },
       { color: '#ffac98', backgroundColor: '#673a2c', transform: 'none', offset: 0.65 },
-      { color: '#ffe08a', backgroundColor: '#ffe08a17', transform: 'none', offset: 1 },
+      { transform: 'none', offset: 1 },   // colours settle on the badge's own style (neutral ×1, or a live streak)
     ], { duration: 1800, easing: 'ease-out' });
     this.animation = animation;
     animation.finished.then(() => { if (this.animation === animation) this.clear(); }).catch(() => {});
